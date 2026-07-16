@@ -1,122 +1,172 @@
-{% extends "base.html" %}
-{% block title %}Yeni Fatura - {{ clinic_name }}{% endblock %}
-
-{% block content %}
+{% extends "base.html" %} {% block title %}Yeni Fatura - {{ clinic_name }}{%
+endblock %} {% block content %}
 <div class="mb-4">
-    <nav aria-label="breadcrumb">
-        <ol class="breadcrumb">
-            <li class="breadcrumb-item"><a href="{{ url_for('invoices.list_invoices') }}">Faturalar</a></li>
-            <li class="breadcrumb-item active">Yeni Fatura</li>
-        </ol>
-    </nav>
+  <nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item">
+        <a href="{{ url_for('invoices.list_invoices') }}">Faturalar</a>
+      </li>
+      <li class="breadcrumb-item active">Yeni Fatura</li>
+    </ol>
+  </nav>
 </div>
 
 <div class="row justify-content-center">
-    <div class="col-md-10">
-        <div class="card border-0 shadow-sm">
-            <div class="card-header bg-white">
-                <h5 class="mb-0"><i class="bi bi-receipt"></i> Yeni Fatura Oluştur</h5>
-            </div>
-            <div class="card-body">
-                {% if current_rate %}
-                <div class="alert alert-info mb-3">
-                    <i class="bi bi-currency-exchange"></i>
-                    Güncel Kur: <strong>1 EUR = ₺{{ "{:,.4f}".format(current_rate.eur_to_try) }}</strong>
-                    <small class="text-muted ms-2">({{ current_rate.rate_date.strftime('%d.%m.%Y') }})</small>
-                </div>
-                {% else %}
-                <div class="alert alert-warning mb-3">
-                    <i class="bi bi-exclamation-triangle"></i>
-                    Döviz kuru tanımlanmamış! Lütfen önce <a href="{{ url_for('settings.index') }}">Ayarlar</a>'dan kur ekleyin.
-                </div>
-                {% endif %}
-
-                <form method="POST" action="{{ url_for('invoices.add_invoice') }}">
-                    <div class="row g-3 mb-4">
-                        <div class="col-md-6">
-                            <label class="form-label">Hasta <span class="text-danger">*</span></label>
-                            <select name="patient_id" class="form-select" required>
-                                <option value="">Hasta seçiniz...</option>
-                                {% for p in patients %}
-                                <option value="{{ p.id }}">{{ p.full_name }}{% if p.phone %} ({{ p.phone }}){% endif %}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label">Fatura Tarihi</label>
-                            <input type="date" name="invoice_date" class="form-control" value="{{ today.isoformat() if today else '' }}">
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label">Son Ödeme</label>
-                            <input type="date" name="due_date" class="form-control">
-                        </div>
-                    </div>
-
-                    <h6 class="mb-3"><i class="bi bi-heart-pulse"></i> Tedavi Seçimi</h6>
-                    <div class="card bg-light border-0 mb-3">
-                        <div class="card-body">
-                            <div class="table-responsive">
-                                <table class="table table-sm mb-0">
-                                    <thead>
-                                        <tr>
-                                            <th style="width: 50px">Seç</th>
-                                            <th>Tarih</th>
-                                            <th>Hasta</th>
-                                            <th>Tedavi</th>
-                                            <th class="text-end">Fiyat (EUR)</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {% for pt in patient_treatments %}
-                                        <tr>
-                                            <td>
-                                                <input type="checkbox" name="treatment_ids" value="{{ pt.id }}" class="form-check-input treatment-checkbox" data-price="{{ pt.effective_price_eur }}">
-                                            </td>
-                                            <td>{{ pt.treatment_date.strftime('%d.%m.%Y') }}</td>
-                                            <td>{{ pt.patient.full_name }}</td>
-                                            <td>{{ pt.treatment.name }}</td>
-                                            <td class="text-end">€{{ "{:,.2f}".format(pt.effective_price_eur) }}</td>
-                                        </tr>
-                                        {% else %}
-                                        <tr><td colspan="5" class="text-center text-muted">Henüz tedavi kaydı yok. Önce hasta tedavisi ekleyin.</td></tr>
-                                        {% endfor %}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label">Notlar</label>
-                        <textarea name="notes" class="form-control" rows="2" placeholder="İsteğe bağlı notlar..."></textarea>
-                    </div>
-
-                    <div class="d-flex justify-content-between align-items-center">
-                        <a href="{{ url_for('invoices.list_invoices') }}" class="btn btn-outline-secondary">
-                            <i class="bi bi-arrow-left"></i> İptal
-                        </a>
-                        <button type="submit" class="btn btn-primary btn-lg" id="submit-btn">
-                            <i class="bi bi-receipt"></i> Fatura Oluştur
-                        </button>
-                    </div>
-                </form>
-            </div>
+  <div class="col-md-10">
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-white">
+        <h5 class="mb-0"><i class="bi bi-receipt"></i> Yeni Fatura Oluştur</h5>
+      </div>
+      <div class="card-body">
+        {% if current_rate %}
+        <div class="alert alert-info mb-3">
+          <i class="bi bi-currency-exchange"></i>
+          Güncel Kur:
+          <strong
+            >1 EUR = ₺{{ "{:,.4f}".format(current_rate.eur_to_try) }}</strong
+          >
+          <small class="text-muted ms-2"
+            >({{ current_rate.rate_date.strftime('%d.%m.%Y') }})</small
+          >
         </div>
-    </div>
-</div>
-{% endblock %}
+        {% else %}
+        <div class="alert alert-warning mb-3">
+          <i class="bi bi-exclamation-triangle"></i>
+          Döviz kuru tanımlanmamış! Lütfen önce
+          <a href="{{ url_for('settings.index') }}">Ayarlar</a>'dan kur ekleyin.
+        </div>
+        {% endif %}
 
-{% block scripts %}
+        <form method="POST" action="{{ url_for('invoices.add_invoice') }}">
+          <div class="row g-3 mb-4">
+            <div class="col-md-6">
+              <label class="form-label"
+                >Hasta <span class="text-danger">*</span></label
+              >
+              <select
+                name="patient_id"
+                class="form-select js-searchable-select"
+                data-search-placeholder="Hasta ara..."
+                required
+              >
+                <option value="">Hasta seçiniz...</option>
+                {% for p in patients %}
+                <option value="{{ p.id }}">
+                  {{ p.full_name }}{% if p.phone %} ({{ p.phone }}){% endif %}
+                </option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Fatura Tarihi</label>
+              <input
+                type="date"
+                name="invoice_date"
+                class="form-control"
+                value="{{ today.isoformat() if today else '' }}"
+              />
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Son Ödeme</label>
+              <input type="date" name="due_date" class="form-control" />
+            </div>
+          </div>
+
+          <h6 class="mb-3"><i class="bi bi-heart-pulse"></i> Tedavi Seçimi</h6>
+          <div class="card bg-light border-0 mb-3">
+            <div class="card-body">
+              <div class="mb-2">
+                <input
+                  type="text"
+                  class="form-control js-table-filter"
+                  data-target="#invoice-treatment-table tbody tr[data-search-row='1']"
+                  placeholder="Tedavi ya da hasta yazarak filtrele..."
+                />
+              </div>
+              <div class="table-responsive">
+                <table class="table table-sm mb-0" id="invoice-treatment-table">
+                  <thead>
+                    <tr>
+                      <th style="width: 50px">Seç</th>
+                      <th>Tarih</th>
+                      <th>Hasta</th>
+                      <th>Tedavi</th>
+                      <th class="text-end">Fiyat (EUR)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for pt in patient_treatments %}
+                    <tr data-search-row="1">
+                      <td>
+                        <input
+                          type="checkbox"
+                          name="treatment_ids"
+                          value="{{ pt.id }}"
+                          class="form-check-input treatment-checkbox"
+                          data-price="{{ pt.effective_price_eur }}"
+                        />
+                      </td>
+                      <td>{{ pt.treatment_date.strftime('%d.%m.%Y') }}</td>
+                      <td>{{ pt.patient.full_name }}</td>
+                      <td>{{ pt.treatment.name }}</td>
+                      <td class="text-end">
+                        €{{ "{:,.2f}".format(pt.effective_price_eur) }}
+                      </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                      <td colspan="5" class="text-center text-muted">
+                        Henüz tedavi kaydı yok. Önce hasta tedavisi ekleyin.
+                      </td>
+                    </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Notlar</label>
+            <textarea
+              name="notes"
+              class="form-control"
+              rows="2"
+              placeholder="İsteğe bağlı notlar..."
+            ></textarea>
+          </div>
+
+          <div class="d-flex justify-content-between align-items-center">
+            <a
+              href="{{ url_for('invoices.list_invoices') }}"
+              class="btn btn-outline-secondary"
+            >
+              <i class="bi bi-arrow-left"></i> İptal
+            </a>
+            <button
+              type="submit"
+              class="btn btn-primary btn-lg"
+              id="submit-btn"
+            >
+              <i class="bi bi-receipt"></i> Fatura Oluştur
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %} {% block scripts %}
 <script>
-document.querySelectorAll('.treatment-checkbox').forEach(cb => {
-    cb.addEventListener('change', function() {
-        let total = 0;
-        document.querySelectorAll('.treatment-checkbox:checked').forEach(c => {
-            total += parseFloat(c.dataset.price);
-        });
-        const eurEl = document.getElementById('total-eur');
-        if (eurEl) eurEl.textContent = '€' + total.toFixed(2);
+  document.querySelectorAll(".treatment-checkbox").forEach((cb) => {
+    cb.addEventListener("change", function () {
+      let total = 0;
+      document.querySelectorAll(".treatment-checkbox:checked").forEach((c) => {
+        total += parseFloat(c.dataset.price);
+      });
+      const eurEl = document.getElementById("total-eur");
+      if (eurEl) eurEl.textContent = "€" + total.toFixed(2);
     });
-});
+  });
 </script>
 {% endblock %}

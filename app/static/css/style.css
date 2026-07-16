@@ -77,6 +77,28 @@ main {
     border-radius: 8px;
 }
 
+.typeahead-wrapper {
+    position: relative;
+}
+
+.typeahead-list {
+    position: absolute;
+    top: calc(100% - 0.5rem);
+    left: 0;
+    right: 0;
+    z-index: 1050;
+    max-height: 260px;
+    overflow-y: auto;
+    display: none;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+}
+
+.typeahead-list .list-group-item {
+    border-left: none;
+    border-right: none;
+}
+
 .badge {
     font-weight: 500;
 }
