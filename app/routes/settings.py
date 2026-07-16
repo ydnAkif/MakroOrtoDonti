@@ -4,12 +4,14 @@ from datetime import date
 
 from app.extensions import db
 from app.models.models import Settings, ExchangeRate
+from app.authz import roles_required
 
 settings_bp = Blueprint("settings", __name__)
 
 
 @settings_bp.route("/")
 @login_required
+@roles_required("admin")
 def index():
     settings = db.session.execute(db.select(Settings)).scalars().all()
     settings_dict = {s.key: s.value for s in settings}
@@ -27,12 +29,20 @@ def index():
 
 @settings_bp.route("/update", methods=["POST"])
 @login_required
+@roles_required("admin")
 def update_settings():
-    for key in [
+    allowed_keys = {
         "clinic_name", "clinic_address", "clinic_phone", "clinic_email",
         "tax_id", "invoice_prefix", "invoice_footer_text",
         "smtp_server", "smtp_port", "smtp_username", "smtp_password",
-    ]:
+    }
+
+    submitted_keys = [key for key in request.form.keys() if key in allowed_keys]
+    if not submitted_keys:
+        flash("Güncellenecek ayar bulunamadı.", "warning")
+        return redirect(url_for("settings.index"))
+
+    for key in submitted_keys:
         value = request.form.get(key, "").strip()
         setting = db.session.execute(
             db.select(Settings).where(Settings.key == key)
@@ -49,6 +59,7 @@ def update_settings():
 
 @settings_bp.route("/exchange-rate/add", methods=["POST"])
 @login_required
+@roles_required("admin")
 def add_exchange_rate():
     rate_date_str = request.form.get("rate_date", "")
     rate_value = request.form.get("eur_try_rate", "")
@@ -83,6 +94,7 @@ def add_exchange_rate():
 
 @settings_bp.route("/exchange-rate/fetch", methods=["POST"])
 @login_required
+@roles_required("admin")
 def fetch_exchange_rate():
     from app.services.exchange_service import fetch_and_store_rate
     try:

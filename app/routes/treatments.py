@@ -3,6 +3,7 @@ from flask_login import login_required
 
 from app.extensions import db
 from app.models.models import Treatment, TreatmentCategory
+from app.authz import roles_required
 
 treatments_bp = Blueprint("treatments", __name__)
 
@@ -48,6 +49,7 @@ def list_treatments():
 
 @treatments_bp.route("/add", methods=["GET", "POST"])
 @login_required
+@roles_required("admin")
 def add_treatment():
     if request.method == "POST":
         treatment = Treatment(
@@ -77,6 +79,7 @@ def add_treatment():
 
 @treatments_bp.route("/<int:treatment_id>/edit", methods=["GET", "POST"])
 @login_required
+@roles_required("admin")
 def edit_treatment(treatment_id):
     treatment = db.get_or_404(Treatment, treatment_id)
 
@@ -105,6 +108,7 @@ def edit_treatment(treatment_id):
 
 @treatments_bp.route("/<int:treatment_id>/delete", methods=["POST"])
 @login_required
+@roles_required("admin")
 def delete_treatment(treatment_id):
     treatment = db.get_or_404(Treatment, treatment_id)
     treatment.is_active = False

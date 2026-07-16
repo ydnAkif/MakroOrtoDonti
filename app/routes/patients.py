@@ -4,6 +4,7 @@ from datetime import date
 
 from app.extensions import db
 from app.models.models import Patient, PatientTreatment, Treatment, Invoice, ExchangeRate
+from app.authz import roles_required
 
 patients_bp = Blueprint("patients", __name__)
 
@@ -122,6 +123,7 @@ def edit_patient(patient_id):
 
 @patients_bp.route("/<int:patient_id>/delete", methods=["POST"])
 @login_required
+@roles_required("admin")
 def delete_patient(patient_id):
     patient = db.get_or_404(Patient, patient_id)
     patient.is_active = False

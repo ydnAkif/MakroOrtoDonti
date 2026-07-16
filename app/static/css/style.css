@@ -1,16 +1,18 @@
 :root {
     --primary: #0d6efd;
     --primary-dark: #0a58ca;
+    --topbar-height: 64px;
 }
 
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     background-color: #f8f9fa;
+    padding-top: var(--topbar-height);
 }
 
 .sidebar {
     position: fixed;
-    top: 56px;
+    top: var(--topbar-height);
     bottom: 0;
     left: 0;
     z-index: 100;
@@ -46,7 +48,7 @@ body {
 }
 
 main {
-    padding-top: 70px;
+    padding-top: 1rem;
 }
 
 .card {
@@ -55,7 +57,7 @@ main {
 }
 
 .card:hover {
-    box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
 }
 
 .table th {
@@ -70,7 +72,8 @@ main {
     border-radius: 8px;
 }
 
-.form-control, .form-select {
+.form-control,
+.form-select {
     border-radius: 8px;
 }
 
@@ -90,5 +93,9 @@ main {
 @media (max-width: 768px) {
     .sidebar {
         display: none;
+    }
+
+    body {
+        padding-top: 56px;
     }
 }

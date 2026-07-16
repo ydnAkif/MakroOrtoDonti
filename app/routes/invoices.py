@@ -6,6 +6,7 @@ import io
 from app.extensions import db
 from app.models.models import Invoice, InvoiceItem, Patient, PatientTreatment, Treatment, ExchangeRate
 from app.models.invoice_service import InvoiceService
+from app.authz import roles_required
 
 invoices_bp = Blueprint("invoices", __name__)
 
@@ -149,6 +150,7 @@ def send_email(invoice_id):
 
 @invoices_bp.route("/<int:invoice_id>/delete", methods=["POST"])
 @login_required
+@roles_required("admin")
 def delete_invoice(invoice_id):
     invoice = db.get_or_404(Invoice, invoice_id)
     invoice.is_deleted = True

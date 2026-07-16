@@ -1,5 +1,6 @@
 from app import create_app, db
 from app.models.models import User
+import os
 
 app = create_app()
 
@@ -9,9 +10,8 @@ def make_shell_context():
 
 if __name__ == "__main__":
     with app.app_context():
-        from app.models.database import init_db, get_session, seed_sample_data
+        from app.models.database import init_db
         init_db()
-        session = get_session()
-        seed_sample_data(session)
-        session.close()
-    app.run(debug=True, host="127.0.0.1", port=5000)
+
+    debug_mode = os.environ.get("FLASK_DEBUG", "false").lower() == "true"
+    app.run(debug=debug_mode, host="127.0.0.1", port=5000)

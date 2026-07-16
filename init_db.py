@@ -16,7 +16,7 @@ def main():
 
     print("Örnek veriler ekleniyor...")
     session = get_session()
-    seed_sample_data(session)
+    generated_password = seed_sample_data(session)
     session.close()
 
     print("Veritabanı başarıyla oluşturuldu!")
@@ -24,7 +24,11 @@ def main():
     print("")
     print("Giriş bilgileri:")
     print("  Kullanıcı: admin")
-    print("  Şifre: admin123")
+    if generated_password:
+        print(f"  Şifre: {generated_password}")
+        print("  Not: Güvenlik için rastgele şifre üretildi. İsterseniz DEFAULT_ADMIN_PASSWORD ile sabitleyebilirsiniz.")
+    else:
+        print("  Şifre: mevcut admin şifresi korundu")
     print("")
     print("Uygulamayı başlatmak için: python run.py")
 

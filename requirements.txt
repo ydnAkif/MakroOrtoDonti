@@ -9,3 +9,4 @@ fpdf2==2.8.3
 requests==2.34.2
 python-dotenv==1.2.2
 neonize==0.4.3.post0
+pytest==8.3.3

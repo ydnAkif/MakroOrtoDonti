@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import secrets
 from datetime import date
 
 import bcrypt
@@ -78,27 +79,41 @@ def _is_valid_bcrypt_hash(password_hash: str | None) -> bool:
         return False
 
 
-def seed_sample_data(session: Session) -> None:
+def _resolve_admin_password() -> tuple[str, bool]:
+    env_password = os.environ.get("DEFAULT_ADMIN_PASSWORD", "").strip()
+    if env_password:
+        return env_password, False
+    return secrets.token_urlsafe(12), True
+
+
+def seed_sample_data(session: Session) -> str | None:
+    generated_password: str | None = None
     has_seed_data = session.query(Treatment).first() is not None
 
     if has_seed_data:
         admin_user = session.query(User).filter_by(username="admin").one_or_none()
         if admin_user is None:
+            admin_password, is_generated = _resolve_admin_password()
             session.add(
                 User(
                     username="admin",
-                    password_hash=_hash_password("admin123"),
+                    password_hash=_hash_password(admin_password),
                     full_name="Admin",
                     role=User.ROLE_ADMIN,
                 )
             )
             session.commit()
-            return
+            if is_generated:
+                generated_password = admin_password
+            return generated_password
 
         if not _is_valid_bcrypt_hash(admin_user.password_hash):
-            admin_user.password_hash = _hash_password("admin123")
+            admin_password, is_generated = _resolve_admin_password()
+            admin_user.password_hash = _hash_password(admin_password)
             session.commit()
-        return
+            if is_generated:
+                generated_password = admin_password
+        return generated_password
 
     treatments = [
         # Orthodontic
@@ -477,9 +492,10 @@ def seed_sample_data(session: Session) -> None:
     settings_defaults = Settings.DEFAULTS.copy()
     settings_defaults["invoice_next_number"] = "1"
 
+    admin_password, is_generated = _resolve_admin_password()
     admin_user = User(
         username="admin",
-        password_hash=_hash_password("admin123"),
+        password_hash=_hash_password(admin_password),
         full_name="Admin",
         role=User.ROLE_ADMIN,
     )
@@ -497,6 +513,9 @@ def seed_sample_data(session: Session) -> None:
     session.add(admin_user)
     session.add(sample_rate)
     session.commit()
+    if is_generated:
+        generated_password = admin_password
+    return generated_password
 
 
 def setup_database() -> Session:

@@ -1,11 +1,20 @@
 from flask import Blueprint, render_template, redirect, url_for, flash, request
 from flask_login import login_user, logout_user, login_required, current_user
 import bcrypt
+from urllib.parse import urlparse, urljoin
 
 from app.extensions import db
 from app.models.models import User
 
 auth_bp = Blueprint("auth", __name__)
+
+
+def _is_safe_redirect_url(target: str) -> bool:
+    if not target:
+        return False
+    host_url = urlparse(request.host_url)
+    redirect_url = urlparse(urljoin(request.host_url, target))
+    return redirect_url.scheme in ("http", "https") and host_url.netloc == redirect_url.netloc
 
 
 @auth_bp.route("/login", methods=["GET", "POST"])
@@ -34,7 +43,9 @@ def login():
                 login_user(user)
                 next_page = request.args.get("next")
                 flash("Giriş başarılı!", "success")
-                return redirect(next_page or url_for("dashboard.index"))
+                if next_page and _is_safe_redirect_url(next_page):
+                    return redirect(next_page)
+                return redirect(url_for("dashboard.index"))
 
         flash("Kullanıcı adı veya şifre hatalı.", "danger")
 

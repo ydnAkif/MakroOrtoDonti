@@ -16,13 +16,51 @@ class InvoicePDF(FPDF):
         self.clinic_phone = clinic_phone
         self.clinic_email = clinic_email
 
+        self.default_font = "Helvetica"
         if os.path.exists(FONT_PATH):
-            self.add_font("DejaVu", "", FONT_PATH, uni=True)
-            if os.path.exists(FONT_PATH_BOLD):
-                self.add_font("DejaVu", "B", FONT_PATH_BOLD, uni=True)
-            self.default_font = "DejaVu"
-        else:
-            self.default_font = "Helvetica"
+            try:
+                self.add_font("DejaVu", "", FONT_PATH, uni=True)
+                if os.path.exists(FONT_PATH_BOLD):
+                    self.add_font("DejaVu", "B", FONT_PATH_BOLD, uni=True)
+                self.default_font = "DejaVu"
+            except Exception:
+                # If custom font files are invalid/corrupt, continue with a core font.
+                self.default_font = "Helvetica"
+
+    def _safe_text(self, text):
+        if text is None:
+            return ""
+        value = str(text)
+        if self.default_font == "DejaVu":
+            return value
+
+        # Core fonts cannot reliably render all Unicode characters.
+        replacements = {
+            "₺": "TRY ",
+            "€": "EUR ",
+            "ı": "i",
+            "İ": "I",
+            "ş": "s",
+            "Ş": "S",
+            "ğ": "g",
+            "Ğ": "G",
+            "ü": "u",
+            "Ü": "U",
+            "ö": "o",
+            "Ö": "O",
+            "ç": "c",
+            "Ç": "C",
+        }
+        for src, target in replacements.items():
+            value = value.replace(src, target)
+
+        return value.encode("cp1252", errors="replace").decode("cp1252")
+
+    def cell(self, w=0, h=0, text="", *args, **kwargs):
+        return super().cell(w, h, self._safe_text(text), *args, **kwargs)
+
+    def multi_cell(self, w, h, text="", *args, **kwargs):
+        return super().multi_cell(w, h, self._safe_text(text), *args, **kwargs)
 
     def header(self):
         self.set_font(self.default_font, "B", 18)
@@ -190,4 +228,9 @@ def generate_invoice_pdf(invoice) -> bytes:
     pdf.add_totals(invoice.total_eur, invoice.total_try, invoice.exchange_rate)
     pdf.add_notes(invoice.notes)
 
-    return pdf.output()
+    output = pdf.output()
+    if isinstance(output, bytearray):
+        return bytes(output)
+    if isinstance(output, bytes):
+        return output
+    return str(output).encode("latin-1", errors="ignore")
