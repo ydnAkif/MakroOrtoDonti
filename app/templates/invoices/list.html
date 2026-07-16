@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block title %}Faturalar - {{ clinic_name }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h4 class="mb-0"><i class="bi bi-receipt"></i> Faturalar</h4>
+    <a href="{{ url_for('invoices.add_invoice') }}" class="btn btn-primary">
+        <i class="bi bi-plus-circle"></i> Yeni Fatura
+    </a>
+</div>
+
+<!-- Filters -->
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body">
+        <form method="GET" action="{{ url_for('invoices.list_invoices') }}">
+            <div class="row g-3 align-items-end">
+                <div class="col-md-3">
+                    <label class="form-label">Durum</label>
+                    <select name="status" class="form-select" onchange="this.form.submit()">
+                        <option value="">Tüm Durumlar</option>
+                        <option value="pending" {% if selected_status == 'pending' %}selected{% endif %}>Bekliyor</option>
+                        <option value="paid" {% if selected_status == 'paid' %}selected{% endif %}>Ödendi</option>
+                        <option value="overdue" {% if selected_status == 'overdue' %}selected{% endif %}>Gecikmiş</option>
+                        <option value="cancelled" {% if selected_status == 'cancelled' %}selected{% endif %}>İptal</option>
+                    </select>
+                </div>
+                <div class="col-md-7">
+                    <label class="form-label">Ara</label>
+                    <input type="text" class="form-control" name="search" value="{{ search }}" placeholder="Fatura no veya hasta adı ile ara...">
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-primary w-100">Ara</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Invoice List -->
+<div class="card border-0 shadow-sm">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Fatura No</th>
+                        <th>Hasta</th>
+                        <th>Tarih</th>
+                        <th>Toplam (EUR)</th>
+                        <th>Toplam (TRY)</th>
+                        <th>Durum</th>
+                        <th class="text-end">İşlem</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for invoice in invoices %}
+                    <tr>
+                        <td><a href="{{ url_for('invoices.detail_invoice', invoice_id=invoice.id) }}" class="fw-bold">{{ invoice.invoice_number }}</a></td>
+                        <td>{{ invoice.patient.full_name }}</td>
+                        <td>{{ invoice.invoice_date.strftime('%d.%m.%Y') }}</td>
+                        <td>€{{ "{:,.2f}".format(invoice.total_eur) }}</td>
+                        <td>₺{{ "{:,.2f}".format(invoice.total_try) }}</td>
+                        <td>
+                            {% if invoice.status == 'pending' %}
+                                <span class="badge bg-warning">Bekliyor</span>
+                            {% elif invoice.status == 'paid' %}
+                                <span class="badge bg-success">Ödendi</span>
+                            {% elif invoice.status == 'overdue' %}
+                                <span class="badge bg-danger">Gecikmiş</span>
+                            {% else %}
+                                <span class="badge bg-secondary">İptal</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-end">
+                            <a href="{{ url_for('invoices.detail_invoice', invoice_id=invoice.id) }}" class="btn btn-sm btn-outline-primary">
+                                <i class="bi bi-eye"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="7" class="text-center text-muted py-4">
+                        {% if search %}"{{ search }}" için sonuç bulunamadı.{% else %}Henüz fatura bulunmuyor.{% endif %}
+                    </td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

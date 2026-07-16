@@ -1,0 +1,41 @@
+<nav id="sidebar" class="col-md-3 col-lg-2 d-md-block bg-light sidebar collapse border-end">
+    <div class="position-sticky pt-3">
+        <ul class="nav flex-column">
+            <li class="nav-item">
+                <a class="nav-link {% if request.endpoint == 'dashboard.index' %}active{% endif %}" href="{{ url_for('dashboard.index') }}">
+                    <i class="bi bi-speedometer2"></i> Ana Sayfa
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {% if 'patient' in request.endpoint|default('') %}active{% endif %}" href="{{ url_for('patients.list_patients') }}">
+                    <i class="bi bi-people"></i> Hastalar
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {% if 'treatment' in request.endpoint|default('') %}active{% endif %}" href="{{ url_for('treatments.list_treatments') }}">
+                    <i class="bi bi-heart-pulse"></i> Tedaviler
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {% if 'invoice' in request.endpoint|default('') %}active{% endif %}" href="{{ url_for('invoices.list_invoices') }}">
+                    <i class="bi bi-receipt"></i> Faturalar
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {% if 'whatsapp' in request.endpoint|default('') %}active{% endif %}" href="{{ url_for('whatsapp.index') }}">
+                    <i class="bi bi-whatsapp"></i> WhatsApp
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {% if 'report' in request.endpoint|default('') %}active{% endif %}" href="{{ url_for('reports.index') }}">
+                    <i class="bi bi-bar-chart"></i> Raporlar
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {% if request.endpoint == 'settings.index' %}active{% endif %}" href="{{ url_for('settings.index') }}">
+                    <i class="bi bi-gear"></i> Ayarlar
+                </a>
+            </li>
+        </ul>
+    </div>
+</nav>

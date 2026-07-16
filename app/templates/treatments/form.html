@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}{% if treatment %}Düzenle{% else %}Yeni Tedavi{% endif %} - {{ clinic_name }}{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{{ url_for('treatments.list_treatments') }}">Tedaviler</a></li>
+            <li class="breadcrumb-item active">{% if treatment %}{{ treatment.name }}{% else %}Yeni Tedavi{% endif %}</li>
+        </ol>
+    </nav>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-heart-pulse"></i>
+                    {% if treatment %}Tedavi Düzenle{% else %}Yeni Tedavi Ekle{% endif %}
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('treatments.edit_treatment', treatment_id=treatment.id) if treatment else url_for('treatments.add_treatment') }}">
+                    <div class="row g-3">
+                        <div class="col-md-8">
+                            <label for="name" class="form-label">Tedavi Adı <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="name" name="name" value="{{ treatment.name if treatment else '' }}" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="price_eur" class="form-label">Fiyat (EUR) <span class="text-danger">*</span></label>
+                            <div class="input-group">
+                                <span class="input-group-text">€</span>
+                                <input type="number" step="0.01" class="form-control" id="price_eur" name="price_eur" value="{{ treatment.price_eur if treatment else '' }}" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="category" class="form-label">Kategori <span class="text-danger">*</span></label>
+                            <select class="form-select" id="category" name="category" required>
+                                {% for cat, label in category_labels.items() %}
+                                <option value="{{ cat }}" {% if treatment and treatment.category == cat %}selected{% endif %}>{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <label for="description" class="form-label">Açıklama</label>
+                            <textarea class="form-control" id="description" name="description" rows="3">{{ treatment.description if treatment and treatment.description else '' }}</textarea>
+                        </div>
+                    </div>
+                    <hr>
+                    <div class="d-flex justify-content-between">
+                        <a href="{{ url_for('treatments.list_treatments') }}" class="btn btn-outline-secondary">
+                            <i class="bi bi-arrow-left"></i> İptal
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-lg"></i> {% if treatment %}Güncelle{% else %}Kaydet{% endif %}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

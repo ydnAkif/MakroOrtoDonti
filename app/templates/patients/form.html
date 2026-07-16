@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}{% if patient %}Düzenle{% else %}Yeni Hasta{% endif %} - {{ clinic_name }}{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{{ url_for('patients.list_patients') }}">Hastalar</a></li>
+            <li class="breadcrumb-item active">{% if patient %}{{ patient.full_name }}{% else %}Yeni Hasta{% endif %}</li>
+        </ol>
+    </nav>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-person-plus"></i>
+                    {% if patient %}Hasta Düzenle{% else %}Yeni Hasta Ekle{% endif %}
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('patients.edit_patient', patient_id=patient.id) if patient else url_for('patients.add_patient') }}">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label for="first_name" class="form-label">Ad <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="first_name" name="first_name" value="{{ patient.first_name if patient else '' }}" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="last_name" class="form-label">Soyad <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="last_name" name="last_name" value="{{ patient.last_name if patient else '' }}" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="phone" class="form-label">Telefon</label>
+                            <input type="tel" class="form-control" id="phone" name="phone" value="{{ patient.phone if patient and patient.phone else '' }}" placeholder="+90 5XX XXX XX XX">
+                        </div>
+                        <div class="col-md-6">
+                            <label for="email" class="form-label">E-posta</label>
+                            <input type="email" class="form-control" id="email" name="email" value="{{ patient.email if patient and patient.email else '' }}">
+                        </div>
+                        <div class="col-12">
+                            <label for="address" class="form-label">Adres</label>
+                            <textarea class="form-control" id="address" name="address" rows="2">{{ patient.address if patient and patient.address else '' }}</textarea>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="treatment_status" class="form-label">Tedavi Durumu</label>
+                            <select class="form-select" id="treatment_status" name="treatment_status">
+                                <option value="active" {% if patient and patient.treatment_status == 'active' %}selected{% endif %}>Aktif</option>
+                                <option value="completed" {% if patient and patient.treatment_status == 'completed' %}selected{% endif %}>Tamamlandı</option>
+                                <option value="inactive" {% if patient and patient.treatment_status == 'inactive' %}selected{% endif %}>Pasif</option>
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <label for="notes" class="form-label">Notlar</label>
+                            <textarea class="form-control" id="notes" name="notes" rows="3">{{ patient.notes if patient and patient.notes else '' }}</textarea>
+                        </div>
+                    </div>
+                    <hr>
+                    <div class="d-flex justify-content-between">
+                        <a href="{{ url_for('patients.list_patients') }}" class="btn btn-outline-secondary">
+                            <i class="bi bi-arrow-left"></i> İptal
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-lg"></i> {% if patient %}Güncelle{% else %}Kaydet{% endif %}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

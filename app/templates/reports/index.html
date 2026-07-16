@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+{% block title %}Raporlar - {{ clinic_name }}{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+    <h4 class="mb-0"><i class="bi bi-bar-chart"></i> Raporlar</h4>
+    <small class="text-muted">Tarih: {{ today.strftime('%d.%m.%Y') }}</small>
+</div>
+
+<!-- Revenue Cards -->
+<div class="row g-3 mb-4">
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+                <h6 class="text-muted">Bu Ayın Geliri</h6>
+                <h3 class="text-success mb-1">€{{ "{:,.2f}".format(monthly_revenue.total_eur or 0) }}</h3>
+                <p class="text-muted mb-0">₺{{ "{:,.2f}".format(monthly_revenue.total_try or 0) }}</p>
+                <small class="text-muted">{{ month_start.strftime('%B %Y') }}</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+                <h6 class="text-muted">Yılın Toplam Geliri</h6>
+                <h3 class="text-primary mb-1">€{{ "{:,.2f}".format(yearly_revenue.total_eur or 0) }}</h3>
+                <p class="text-muted mb-0">₺{{ "{:,.2f}".format(yearly_revenue.total_try or 0) }}</p>
+                <small class="text-muted">{{ year_start.strftime('%Y') }}</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+                <h6 class="text-muted">Bekleyen Tutar</h6>
+                <h3 class="text-warning mb-1">€{{ "{:,.2f}".format(pending_amounts.total_eur or 0) }}</h3>
+                <p class="text-muted mb-0">₺{{ "{:,.2f}".format(pending_amounts.total_try or 0) }}</p>
+                <small class="text-muted">{{ pending_amounts.count or 0 }} fatura bekliyor</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <!-- Treatment Statistics -->
+    <div class="col-md-6">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-heart-pulse"></i> En Çok Yapılan Tedaviler</h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Tedavi</th>
+                                <th>Kategori</th>
+                                <th class="text-end">Sayı</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for stat in treatment_stats %}
+                            <tr>
+                                <td>{{ stat.name }}</td>
+                                <td><span class="badge bg-light text-dark">{{ category_labels.get(stat.category, stat.category) }}</span></td>
+                                <td class="text-end fw-bold">{{ stat.count }}</td>
+                            </tr>
+                            {% else %}
+                            <tr><td colspan="3" class="text-center text-muted py-3">Henüz veri yok.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Category Statistics -->
+    <div class="col-md-6">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-pie-chart"></i> Kategorilere Göre Dağılım</h5>
+            </div>
+            <div class="card-body">
+                {% for stat in category_stats %}
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between mb-1">
+                        <span>{{ category_labels.get(stat.category, stat.category) }}</span>
+                        <span class="fw-bold">{{ stat.count }}</span>
+                    </div>
+                    <div class="progress" style="height: 8px;">
+                        <div class="progress-bar bg-primary" style="width: {{ (stat.count / (category_stats[0].count if category_stats else 1) * 100)|int }}%"></div>
+                    </div>
+                </div>
+                {% else %}
+                <p class="text-center text-muted">Henüz veri yok.</p>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Patient Status -->
+    <div class="col-md-6">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-people"></i> Hasta Durumu</h5>
+            </div>
+            <div class="card-body">
+                {% for stat in patient_stats %}
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span>
+                        {% if stat.treatment_status == 'active' %}
+                            <span class="badge bg-success">Aktif</span>
+                        {% elif stat.treatment_status == 'completed' %}
+                            <span class="badge bg-primary">Tamamlandı</span>
+                        {% else %}
+                            <span class="badge bg-secondary">{{ stat.treatment_status }}</span>
+                        {% endif %}
+                    </span>
+                    <span class="fw-bold">{{ stat.count }} hasta</span>
+                </div>
+                {% else %}
+                <p class="text-center text-muted">Henüz hasta yok.</p>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Exchange Rates -->
+    <div class="col-md-6">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-currency-exchange"></i> Kur Geçmişi</h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive" style="max-height: 300px;">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light sticky-top">
+                            <tr>
+                                <th>Tarih</th>
+                                <th class="text-end">EUR/TRY</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for rate in exchange_rates %}
+                            <tr>
+                                <td>{{ rate.rate_date.strftime('%d.%m.%Y') }}</td>
+                                <td class="text-end">₺{{ "{:,.4f}".format(rate.eur_to_try) }}</td>
+                            </tr>
+                            {% else %}
+                            <tr><td colspan="2" class="text-center text-muted py-3">Henüz kur verisi yok.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

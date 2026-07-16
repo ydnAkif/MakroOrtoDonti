@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+{% block title %}{{ invoice.invoice_number }} - {{ clinic_name }}{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{{ url_for('invoices.list_invoices') }}">Faturalar</a></li>
+            <li class="breadcrumb-item active">{{ invoice.invoice_number }}</li>
+        </ol>
+    </nav>
+</div>
+
+<div class="row g-4">
+    <!-- Invoice Info -->
+    <div class="col-md-8">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-receipt"></i> {{ invoice.invoice_number }}</h5>
+                <div>
+                    <a href="{{ url_for('invoices.download_pdf', invoice_id=invoice.id) }}" class="btn btn-sm btn-outline-danger">
+                        <i class="bi bi-file-pdf"></i> PDF İndir
+                    </a>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <h6 class="text-muted">Hasta</h6>
+                        <p class="mb-0"><strong>{{ invoice.patient.full_name }}</strong></p>
+                        {% if invoice.patient.phone %}<p class="text-muted mb-0">{{ invoice.patient.phone }}</p>{% endif %}
+                        {% if invoice.patient.email %}<p class="text-muted mb-0">{{ invoice.patient.email }}</p>{% endif %}
+                    </div>
+                    <div class="col-md-6 text-md-end">
+                        <h6 class="text-muted">Fatura Bilgileri</h6>
+                        <p class="mb-0"><strong>{{ invoice.invoice_number }}</strong></p>
+                        <p class="text-muted mb-0">Tarih: {{ invoice.invoice_date.strftime('%d.%m.%Y') }}</p>
+                        {% if invoice.due_date %}
+                        <p class="text-muted mb-0">Son Ödeme: {{ invoice.due_date.strftime('%d.%m.%Y') }}</p>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Items Table -->
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Tedavi</th>
+                                <th>Adet</th>
+                                <th class="text-end">Birim (EUR)</th>
+                                <th class="text-end">Birim (TRY)</th>
+                                <th class="text-end">Toplam (TRY)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in invoice.items %}
+                            <tr>
+                                <td>{{ item.description }}</td>
+                                <td>{{ item.quantity }}</td>
+                                <td class="text-end">€{{ "{:,.2f}".format(item.unit_price_eur) }}</td>
+                                <td class="text-end">₺{{ "{:,.2f}".format(item.unit_price_try) }}</td>
+                                <td class="text-end fw-bold">₺{{ "{:,.2f}".format(item.line_total_try) }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                        <tfoot>
+                            <tr class="table-light">
+                                <td colspan="4" class="text-end"><strong>Kur (1 EUR =)</strong></td>
+                                <td class="text-end">₺{{ "{:,.4f}".format(invoice.exchange_rate) }}</td>
+                            </tr>
+                            <tr class="table-light">
+                                <td colspan="4" class="text-end"><strong>Toplam (EUR)</strong></td>
+                                <td class="text-end">€{{ "{:,.2f}".format(invoice.total_eur) }}</td>
+                            </tr>
+                            <tr class="table-primary">
+                                <td colspan="4" class="text-end"><strong>TOPLAM (TRY)</strong></td>
+                                <td class="text-end"><strong>₺{{ "{:,.2f}".format(invoice.total_try) }}</strong></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+
+                {% if invoice.notes %}
+                <div class="mt-3">
+                    <h6 class="text-muted">Notlar</h6>
+                    <p>{{ invoice.notes }}</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="col-md-4">
+        <!-- Status -->
+        <div class="card border-0 shadow-sm mb-3">
+            <div class="card-header bg-white">
+                <h6 class="mb-0"><i class="bi bi-info-circle"></i> Durum</h6>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    {% if invoice.status == 'pending' %}
+                        <span class="badge bg-warning fs-6">Bekliyor</span>
+                    {% elif invoice.status == 'paid' %}
+                        <span class="badge bg-success fs-6">Ödendi</span>
+                    {% elif invoice.status == 'overdue' %}
+                        <span class="badge bg-danger fs-6">Gecikmiş</span>
+                    {% else %}
+                        <span class="badge bg-secondary fs-6">İptal</span>
+                    {% endif %}
+                </div>
+                <form method="POST" action="{{ url_for('invoices.update_status', invoice_id=invoice.id) }}">
+                    <div class="input-group">
+                        <select name="status" class="form-select form-select-sm">
+                            <option value="pending" {% if invoice.status == 'pending' %}selected{% endif %}>Bekliyor</option>
+                            <option value="paid" {% if invoice.status == 'paid' %}selected{% endif %}>Ödendi</option>
+                            <option value="overdue" {% if invoice.status == 'overdue' %}selected{% endif %}>Gecikmiş</option>
+                            <option value="cancelled" {% if invoice.status == 'cancelled' %}selected{% endif %}>İptal</option>
+                        </select>
+                        <button type="submit" class="btn btn-sm btn-primary">Güncelle</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Send Email -->
+        <div class="card border-0 shadow-sm mb-3">
+            <div class="card-header bg-white">
+                <h6 class="mb-0"><i class="bi bi-envelope"></i> E-posta Gönder</h6>
+            </div>
+            <div class="card-body">
+                {% if invoice.patient.email %}
+                <p class="text-muted small mb-2">Alıcı: {{ invoice.patient.email }}</p>
+                <form method="POST" action="{{ url_for('invoices.send_email', invoice_id=invoice.id) }}">
+                    <button type="submit" class="btn btn-outline-primary w-100">
+                        <i class="bi bi-send"></i> PDF'li E-posta Gönder
+                    </button>
+                </form>
+                {% else %}
+                <p class="text-muted small mb-0">Hastanın e-posta adresi tanımlı değil.</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Delete -->
+        <div class="card border-0 shadow-sm">
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('invoices.delete_invoice', invoice_id=invoice.id) }}" onsubmit="return confirm('Bu faturayı silmek istediğinize emin misiniz?')">
+                    <button type="submit" class="btn btn-outline-danger w-100">
+                        <i class="bi bi-trash"></i> Faturayı Sil
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
