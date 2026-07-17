@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Tedavi İçe Aktar - {{ clinic_name }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h4 class="mb-0"><i class="bi bi-upload"></i> Tedavi İçe Aktar (XLS/XLSX)</h4>
+    <a href="{{ url_for('treatments.list_treatments') }}" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> Geri
+    </a>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body">
+                <div class="alert alert-info mb-4">
+                    <h6 class="alert-heading"><i class="bi bi-info-circle"></i> Dosya Formatı</h6>
+                    <p class="mb-2">Excel dosyası aşağıdaki sütun sırasına uygun olmalıdır:</p>
+                    <table class="table table-sm table-bordered mb-2" style="max-width:500px">
+                        <thead class="table-light">
+                            <tr><th>Sütun</th><th>Alan</th><th>Açıklama</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>A</td><td><strong>Tedavi Adı</strong></td><td>Zorunlu</td></tr>
+                            <tr><td>B</td><td>Kategori</td><td>TR veya EN (ortodonti, protetik, cerrahi, implant, vb.)</td></tr>
+                            <tr><td>C</td><td>Fiyat (EUR)</td><td>Sayısal değer</td></tr>
+                            <tr><td>D</td><td>Açıklama</td><td>Opsiyonel</td></tr>
+                        </tbody>
+                    </table>
+                    <small class="text-muted">İlk satır başlık satırı olarak atlanır. Mevcut tedaviler aynı adda bulunursa fiyat ve kategori güncellenir.</small>
+                </div>
+
+                <form method="POST" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label for="file" class="form-label">Excel Dosyası Seçin</label>
+                        <input type="file" class="form-control" id="file" name="file" accept=".xlsx,.xls" required>
+                    </div>
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <a href="{{ url_for('treatments.list_treatments') }}" class="btn btn-outline-secondary">İptal</a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-upload"></i> İçe Aktar
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
