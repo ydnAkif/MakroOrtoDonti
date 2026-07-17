@@ -5,7 +5,7 @@ import io
 import json
 
 from app.extensions import db
-from app.models.models import Invoice, InvoiceItem, Party, PatientTreatment, Treatment, ExchangeRate, InvoiceItemType
+from app.models.models import Invoice, InvoiceItem, Party, PartyType, PatientTreatment, Treatment, ExchangeRate, InvoiceItemType
 from app.models.invoice_service import InvoiceService
 from app.authz import roles_required
 
@@ -65,7 +65,6 @@ def add_invoice():
                 party_id = patient.party_id
             else:
                 # Create a party for this patient if needed
-                from app.models.models import Party, PartyType
                 party = Party(
                     party_type=PartyType.PATIENT,
                     name=f"{patient.first_name} {patient.last_name}",
