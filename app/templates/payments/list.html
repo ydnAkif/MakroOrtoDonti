@@ -15,20 +15,20 @@
         <form method="GET" action="{{ url_for('payments.list_payments') }}" class="row g-3">
             <div class="col-md-3">
                 <label class="form-label">Ödeme Yöntemi</label>
-                <select name="status" class="form-select" onchange="this.form.submit()">
+                <select name="method" class="form-select" onchange="this.form.submit()">
                     <option value="">Tümü</option>
-                    {% for m in methods %}
-                    <option value="{{ m }}" {% if selected_status == m %}selected{% endif %}>{{ m|title }}</option>
+                    {% for m in ['cash', 'card', 'transfer', 'check', 'other'] %}
+                    <option value="{{ m }}" {% if selected_method == m %}selected{% endif %}>{{ m|title }}</option>
                     {% endfor %}
                 </select>
             </div>
             <div class="col-md-3">
                 <label class="form-label">Başlangıç Tarihi</label>
-                <input type="date" class="form-control" name="date_from" value="{{ date_from }}">
+                <input type="date" class="form-control" name="start_date" value="{{ start_date }}">
             </div>
             <div class="col-md-3">
                 <label class="form-label">Bitiş Tarihi</label>
-                <input type="date" class="form-control" name="date_to" value="{{ date_to }}">
+                <input type="date" class="form-control" name="end_date" value="{{ end_date }}">
             </div>
             <div class="col-md-2">
                 <label class="form-label">Ara</label>
@@ -37,7 +37,7 @@
             <div class="col-md-1 d-flex align-items-end">
                 <button type="submit" class="btn btn-primary w-100">Ara</button>
             </div>
-            {% if search or date_from or date_to or selected_status %}
+            {% if search or start_date or end_date or selected_method %}
             <div class="col-md-1 d-flex align-items-end">
                 <a href="{{ url_for('payments.list_payments') }}" class="btn btn-outline-secondary w-100">Temizle</a>
             </div>

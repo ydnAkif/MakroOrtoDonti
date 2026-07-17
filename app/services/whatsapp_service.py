@@ -137,10 +137,19 @@ class WhatsAppService:
 
     @classmethod
     def send_invoice_message(cls, invoice) -> dict:
-        """Send invoice notification to patient via WhatsApp."""
-        patient = invoice.patient
-        if not patient.phone:
-            return {"success": False, "message": "Hastanın telefon numarası bulunmuyor."}
+        """Send invoice notification to customer via WhatsApp."""
+        # Support both party and legacy patient invoices
+        phone = None
+        name = None
+        if invoice.party and invoice.party.phone:
+            phone = invoice.party.phone
+            name = invoice.party.display_name
+        elif invoice.patient and invoice.patient.phone:
+            phone = invoice.patient.phone
+            name = invoice.patient.full_name
+
+        if not phone:
+            return {"success": False, "message": "Müşterinin telefon numarası bulunmuyor."}
 
         status_tr = {
             "pending": "Bekliyor",
@@ -149,7 +158,7 @@ class WhatsAppService:
             "cancelled": "İptal",
         }
 
-        message = f"""Sayın {patient.full_name},
+        message = f"""Sayın {name},
 
 {invoice.invoice_date.strftime('%d.%m.%Y')} tarihli {invoice.invoice_number} numaralı faturanız hazırlanmıştır.
 
@@ -162,7 +171,7 @@ Faturanız ekte gönderilmiştir.
 Saygılarımızla,
 Makro Orto Denti"""
 
-        return cls.send_message(patient.phone, message)
+        return cls.send_message(phone, message)
 
     @classmethod
     def send_reminder(cls, patient, message: str) -> dict:

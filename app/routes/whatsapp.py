@@ -2,7 +2,7 @@ from flask import Blueprint, render_template, redirect, url_for, flash, request,
 from flask_login import login_required
 
 from app.extensions import db
-from app.models.models import Patient, Invoice, WhatsAppSession
+from app.models.models import Party, PartyType, Invoice, WhatsAppSession
 
 whatsapp_bp = Blueprint("whatsapp", __name__)
 
@@ -13,18 +13,18 @@ def index():
     from app.services.whatsapp_service import WhatsAppService
     status = WhatsAppService.get_status()
 
-    patients_with_phone = db.session.execute(
-        db.select(Patient).where(
-            Patient.is_active == True,
-            Patient.phone.isnot(None),
-            Patient.phone != "",
+    parties_with_phone = db.session.execute(
+        db.select(Party).where(
+            Party.is_active == True,
+            Party.phone.isnot(None),
+            Party.phone != "",
         )
     ).scalars().all()
 
     return render_template(
         "whatsapp/index.html",
         status=status,
-        patients=patients_with_phone,
+        patients=parties_with_phone,
     )
 
 
@@ -80,24 +80,24 @@ def send_bulk():
     import time
 
     message_template = request.form.get("message", "").strip()
-    patient_ids = request.form.getlist("patient_ids", type=int)
+    party_ids = request.form.getlist("patient_ids", type=int)
 
-    if not message_template or not patient_ids:
-        flash("Mesaj ve en az bir hasta seçimi zorunludur.", "danger")
+    if not message_template or not party_ids:
+        flash("Mesaj ve en az bir kişi seçimi zorunludur.", "danger")
         return redirect(url_for("whatsapp.index"))
 
     success_count = 0
     fail_count = 0
 
-    for pid in patient_ids:
-        patient = db.session.get(Patient, pid)
-        if patient and patient.phone:
-            result = WhatsAppService.send_message(patient.phone, message_template)
+    for pid in party_ids:
+        party = db.session.get(Party, pid)
+        if party and party.phone:
+            result = WhatsAppService.send_message(party.phone, message_template)
             if result["success"]:
                 success_count += 1
             else:
                 fail_count += 1
-            time.sleep(3)  # Delay between messages
+            time.sleep(3)
 
     flash(f"Toplu gönderim tamamlandı: {success_count} başarılı, {fail_count} başarısız.", "info")
     return redirect(url_for("whatsapp.index"))

@@ -56,7 +56,7 @@
                     {% for invoice in invoices %}
                     <tr>
                         <td><a href="{{ url_for('invoices.detail_invoice', invoice_id=invoice.id) }}" class="fw-bold">{{ invoice.invoice_number }}</a></td>
-                        <td>{{ invoice.patient.full_name }}</td>
+                        <td>{{ invoice.party.display_name if invoice.party else (invoice.patient.full_name if invoice.patient else '-') }}</td>
                         <td>{{ invoice.invoice_date.strftime('%d.%m.%Y') }}</td>
                         <td>€{{ "{:,.2f}".format(invoice.total_eur) }}</td>
                         <td>₺{{ "{:,.2f}".format(invoice.total_try) }}</td>

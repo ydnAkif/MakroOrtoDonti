@@ -34,7 +34,7 @@ def test_login_invalid_username(client):
 def test_logout(client):
     """Cikis yapilabilmeli."""
     login(client, "admin", "admin-pass")
-    response = client.get("/logout", follow_redirects=True)
+    response = client.post("/logout", follow_redirects=True)
     assert response.status_code == 200
 
 
@@ -755,3 +755,250 @@ def test_party_referred_by(client, app):
             db.select(Party).where(Party.first_name == "Sevkli", Party.last_name == "Hasta")
         ).scalar_one()
         assert party.referred_by_id == dentist.id
+
+
+# ==================== BUG FIX TESTS ====================
+
+def test_recalculate_totals_includes_discount_and_vat(client, app):
+    """Bug #1: recalculate_totals indirim ve KDV'yi hesaba katmali."""
+    login(client, "admin", "admin-pass")
+
+    with app.app_context():
+        party = db.session.execute(
+            db.select(Party).where(Party.party_type == PartyType.PATIENT).limit(1)
+        ).scalar_one()
+
+    # 2 adet x 100 EUR = 200 EUR, %10 indirim = 180 EUR, %20 KDV = 216 EUR
+    items = [{
+        "item_type": "product",
+        "description": "Test Product",
+        "quantity": 2,
+        "unit_price_eur": 100.00,
+        "vat_rate": 20.0,
+        "discount_type": "percent",
+        "discount_value": 10.0,
+    }]
+
+    response = client.post("/invoices/add", data={
+        "party_id": party.id,
+        "invoice_date": date.today().isoformat(),
+        "items_json": json.dumps(items),
+    }, follow_redirects=False)
+    assert response.status_code == 302
+
+    with app.app_context():
+        invoice = db.session.execute(
+            db.select(Invoice).order_by(Invoice.id.desc())
+        ).scalar_one()
+        # total_eur should include discount and VAT
+        assert abs(invoice.total_eur - 216.0) < 0.01
+        assert invoice.total_try > 0
+
+
+def test_party_only_invoice_detail_no_crash(client, app):
+    """Bug #4-6: Party faturalari detay sayfasinda craslamamali."""
+    login(client, "admin", "admin-pass")
+
+    with app.app_context():
+        party = db.session.execute(
+            db.select(Party).where(Party.party_type == PartyType.PATIENT).limit(1)
+        ).scalar_one()
+        client.post("/invoices/add", data={
+            "party_id": party.id,
+            "invoice_date": date.today().isoformat(),
+            "items_json": json.dumps([{
+                "item_type": "treatment",
+                "treatment_id": 1,
+                "description": "Crash Test",
+                "quantity": 1,
+                "unit_price_eur": 100.00,
+            }]),
+        })
+        invoice_id = db.session.execute(
+            db.select(Invoice).order_by(Invoice.id.desc())
+        ).scalar_one().id
+
+    # These should NOT crash
+    response = client.get(f"/invoices/{invoice_id}")
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    assert "Crash Test" in html
+
+
+def test_party_only_dashboard_no_crash(client, app):
+    """Bug #4: Dashboard party faturalarinda craslamamali."""
+    login(client, "admin", "admin-pass")
+
+    with app.app_context():
+        party = db.session.execute(
+            db.select(Party).where(Party.party_type == PartyType.PATIENT).limit(1)
+        ).scalar_one()
+        client.post("/invoices/add", data={
+            "party_id": party.id,
+            "invoice_date": date.today().isoformat(),
+            "items_json": json.dumps([{
+                "item_type": "treatment",
+                "treatment_id": 1,
+                "description": "Dashboard Crash Test",
+                "quantity": 1,
+                "unit_price_eur": 100.00,
+            }]),
+        })
+
+    response = client.get("/")
+    assert response.status_code == 200
+
+
+def test_party_list_enum_badges(client, app):
+    """Bug #7: Parties listesinde badge renkleri dogru olmali."""
+    login(client, "admin", "admin-pass")
+
+    # Create one of each type (is_active must be "on" to appear in list)
+    client.post("/parties/add", data={
+        "party_type": "patient",
+        "first_name": "Badge",
+        "last_name": "TestPatient",
+        "phone": "5559990001",
+        "is_active": "on",
+    })
+    client.post("/parties/add", data={
+        "party_type": "dentist_customer",
+        "name": "Dr. Badge Test",
+        "phone": "5559990002",
+        "is_active": "on",
+    })
+    client.post("/parties/add", data={
+        "party_type": "company_customer",
+        "name": "Badge Corp",
+        "phone": "5559990003",
+        "is_active": "on",
+    })
+
+    # All parties page
+    response = client.get("/parties/")
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    assert "bg-primary" in html  # patient badge
+    assert "bg-success" in html  # dentist badge
+    assert "bg-info" in html     # company badge
+
+    # Filtered pages should also work
+    response = client.get("/parties/?type=dentist_customer")
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    assert "Dr. Badge Test" in html
+
+
+def test_payments_list_no_crash(client, app):
+    """Bug #8: Odeme listesi craslamamali."""
+    login(client, "admin", "admin-pass")
+
+    response = client.get("/payments/")
+    assert response.status_code == 200
+
+    response = client.get("/payments/?method=cash")
+    assert response.status_code == 200
+
+    today = date.today()
+    response = client.get(f"/payments/?start_date={today.isoformat()}&end_date={today.isoformat()}")
+    assert response.status_code == 200
+
+
+def test_payment_form_no_crash(client, app):
+    """Bug #9: Odeme formu current_rate olmadan craslamamali."""
+    login(client, "admin", "admin-pass")
+
+    response = client.get("/payments/add")
+    assert response.status_code == 200
+
+
+def test_email_service_party_only(client, app):
+    """Bug #2: Email servisi party faturalarinda craslamamali."""
+    from app.services.email_service import send_invoice_email
+
+    login(client, "admin", "admin-pass")
+
+    with app.app_context():
+        party = db.session.execute(
+            db.select(Party).where(Party.party_type == PartyType.PATIENT).limit(1)
+        ).scalar_one()
+        client.post("/invoices/add", data={
+            "party_id": party.id,
+            "invoice_date": date.today().isoformat(),
+            "items_json": json.dumps([{
+                "item_type": "treatment",
+                "treatment_id": 1,
+                "description": "Email Test",
+                "quantity": 1,
+                "unit_price_eur": 100.00,
+            }]),
+        })
+        invoice = db.session.execute(
+            db.select(Invoice).order_by(Invoice.id.desc())
+        ).scalar_one()
+
+        # Should NOT crash, should return error message about missing email
+        success, message = send_invoice_email(invoice)
+        assert not success  # No SMTP configured in test
+
+
+def test_whatsapp_service_party_only(client, app):
+    """Bug #3: WhatsApp servisi party faturalarinda craslamamali."""
+    from app.services.whatsapp_service import WhatsAppService
+
+    login(client, "admin", "admin-pass")
+
+    with app.app_context():
+        party = db.session.execute(
+            db.select(Party).where(Party.party_type == PartyType.PATIENT).limit(1)
+        ).scalar_one()
+        client.post("/invoices/add", data={
+            "party_id": party.id,
+            "invoice_date": date.today().isoformat(),
+            "items_json": json.dumps([{
+                "item_type": "treatment",
+                "treatment_id": 1,
+                "description": "WA Test",
+                "quantity": 1,
+                "unit_price_eur": 100.00,
+            }]),
+        })
+        invoice = db.session.execute(
+            db.select(Invoice).order_by(Invoice.id.desc())
+        ).scalar_one()
+
+        # Should NOT crash, should return error about disconnected
+        result = WhatsAppService.send_invoice_message(invoice)
+        assert not result["success"]  # WhatsApp not connected in test
+
+
+def test_invoice_vat_in_totals(client, app):
+    """KDV dahil toplam hesaplamasi dogru olmali."""
+    login(client, "admin", "admin-pass")
+
+    with app.app_context():
+        party = db.session.execute(
+            db.select(Party).where(Party.party_type == PartyType.PATIENT).limit(1)
+        ).scalar_one()
+
+    items = [{
+        "item_type": "service",
+        "description": "KDV Test",
+        "quantity": 1,
+        "unit_price_eur": 100.00,
+        "vat_rate": 20.0,
+    }]
+
+    response = client.post("/invoices/add", data={
+        "party_id": party.id,
+        "invoice_date": date.today().isoformat(),
+        "items_json": json.dumps(items),
+    }, follow_redirects=False)
+    assert response.status_code == 302
+
+    with app.app_context():
+        invoice = db.session.execute(
+            db.select(Invoice).order_by(Invoice.id.desc())
+        ).scalar_one()
+        # 100 EUR + 20% VAT = 120 EUR
+        assert abs(invoice.total_eur - 120.0) < 0.01

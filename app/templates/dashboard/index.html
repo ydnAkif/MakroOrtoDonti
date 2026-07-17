@@ -107,7 +107,7 @@
                             {% for inv in recent_invoices %}
                             <tr>
                                 <td><a href="{{ url_for('invoices.detail_invoice', invoice_id=inv.id) }}">{{ inv.invoice_number }}</a></td>
-                                <td>{{ inv.patient.full_name }}</td>
+                                <td>{{ inv.party.display_name if inv.party else (inv.patient.full_name if inv.patient else '-') }}</td>
                                 <td>€{{ "{:,.2f}".format(inv.total_eur) }}<br><small class="text-muted">₺{{ "{:,.2f}".format(inv.total_try) }}</small></td>
                                 <td>
                                     {% if inv.status == 'pending' %}

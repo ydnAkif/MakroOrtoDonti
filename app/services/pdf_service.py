@@ -211,20 +211,20 @@ class InvoicePDF(FPDF):
 
 
 def get_customer_info(invoice):
-    """Get customer info from either patient or party."""
-    if invoice.patient:
-        return {
-            "name": invoice.patient.full_name,
-            "phone": invoice.patient.phone,
-            "email": invoice.patient.email,
-            "address": invoice.patient.address,
-        }
-    elif invoice.party:
+    """Get customer info from either party (preferred) or legacy patient."""
+    if invoice.party:
         return {
             "name": invoice.party.display_name,
             "phone": invoice.party.phone,
             "email": invoice.party.email,
             "address": invoice.party.address,
+        }
+    elif invoice.patient:
+        return {
+            "name": invoice.patient.full_name,
+            "phone": invoice.patient.phone,
+            "email": invoice.patient.email,
+            "address": invoice.patient.address,
         }
     return {"name": "Bilinmeyen Müşteri", "phone": None, "email": None, "address": None}
 

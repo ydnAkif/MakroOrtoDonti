@@ -263,8 +263,8 @@ class Invoice(Base, TimestampMixin):
     STATUS_CANCELLED = "cancelled"
 
     def recalculate_totals(self) -> None:
-        self.total_eur = sum(item.unit_price_eur * item.quantity for item in self.items)
-        self.total_try = sum(item.unit_price_try * item.quantity for item in self.items)
+        self.total_eur = sum(item.line_total_eur + item.vat_amount_eur for item in self.items)
+        self.total_try = sum(item.line_total_try + item.vat_amount_try for item in self.items)
 
     def __repr__(self) -> str:
         return f"<Invoice {self.invoice_number} €{self.total_eur:.2f}>"

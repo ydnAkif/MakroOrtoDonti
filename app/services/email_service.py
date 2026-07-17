@@ -24,8 +24,18 @@ def get_smtp_config() -> dict:
 
 
 def send_invoice_email(invoice) -> tuple[bool, str]:
-    if not invoice.patient.email:
-        return False, "Hastanın e-posta adresi bulunmuyor."
+    # Support both party and legacy patient invoices
+    recipient_email = None
+    recipient_name = None
+    if invoice.party and invoice.party.email:
+        recipient_email = invoice.party.email
+        recipient_name = invoice.party.display_name
+    elif invoice.patient and invoice.patient.email:
+        recipient_email = invoice.patient.email
+        recipient_name = invoice.patient.full_name
+
+    if not recipient_email:
+        return False, "Müşterinin e-posta adresi bulunmuyor."
 
     smtp_config = get_smtp_config()
     if not smtp_config["smtp_username"] or not smtp_config["smtp_password"]:
@@ -37,10 +47,10 @@ def send_invoice_email(invoice) -> tuple[bool, str]:
 
         msg = MIMEMultipart()
         msg["From"] = smtp_config["smtp_username"]
-        msg["To"] = invoice.patient.email
+        msg["To"] = recipient_email
         msg["Subject"] = f"Fatura - {invoice.invoice_number}"
 
-        body = f"""Sayın {invoice.patient.full_name},
+        body = f"""Sayın {recipient_name},
 
 {invoice.invoice_date.strftime('%d.%m.%Y')} tarihli {invoice.invoice_number} numaralı faturanız ekte gönderilmiştir.
 

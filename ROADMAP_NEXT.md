@@ -88,7 +88,7 @@ Finans bilgi mimarisi: ✅
 
 ## 8) Test Kapsam Genisletme ✅ TAMAMLANDI
 
-### Gecen Testler (56/56)
+### Gecen Testler (65/65)
 
 **test_critical_flows.py (18 test)**
 - `test_login_success` ✅
@@ -110,7 +110,7 @@ Finans bilgi mimarisi: ✅
 - `test_invoice_api_treatment_price` ✅
 - `test_party_api_info` ✅
 
-**test_comprehensive.py (38 test)**
+**test_comprehensive.py (47 test)**
 - Auth: login invalid creds, logout, unauthenticated redirect ✅
 - Dashboard: sayfa yukleme ✅
 - Patients: list, add (+ Party olusturma), detail, edit (+ Party sync), delete (+ Party deaktivasyonu), add-treatment ✅
@@ -120,28 +120,31 @@ Finans bilgi mimarisi: ✅
 - Settings: page load, clinic info update, exchange rate manual add ✅
 - Reports: page load ✅
 - Parties: search, referred_by ✅
+- Bug fix regression tests: recalculate_totals, party-only invoice/dashboard/detail crash, enum badges, payment list/form crash, email service, whatsapp service, VAT totals ✅
 
 ---
 
 ## Yapilacaklar (Sirali)
 
 ### Hemen
-1. [x] Test dosyasini genislet (56/56 geciyor) ✅
+1. [x] Test dosyasini genislet (56/56 → 65/65 geciyor) ✅
 2. [x] Reports sayfasina Yaslandirma raporu (aging) ✅
 3. [x] Invoice modal formunda KDV/Iskonto alanlari gorunurlugu ✅
 4. [x] Fatura olusturmada tedavi secimi dogrulama hatasi duzelt ✅
 5. [x] Kisi Detay'dan fatura olustururken kisi onceden secili gelsin ✅
+6. [x] TODO.md'deki 13 bug'i duzelt ✅ (recalculate_totals, email/wa service, template fallbacks, enum badges, payments template vars, race condition, logout CSRF, WhatsApp Party migration, PDF party-first)
+7. [x] Bug fix regression testleri ekle ✅ (9 yeni test)
 
 ### Kisa Vadeli
-6. [ ] API endpoint'leri (mobil entegrasyon icin)
-7. [ ] Patient modelinden `party_id` ve `Patient.party` relationship'ini kullanarak `Patient` bagimliligi azaltma
-8. [ ] Randevu sistemi (Calendar entegrasyonu)
+8. [ ] API endpoint'leri (mobil entegrasyon icin)
+9. [ ] Patient modelinden `party_id` ve `Patient.party` relationship'ini kullanarak `Patient` bagimliligi azaltma
+10. [ ] Randevu sistemi (Calendar entegrasyonu)
 
 ### Uzun Vadeli
-9. [ ] Otomatik SQLite yedekleme (cron/job)
-10. [ ] Coklu dil (i18n) altyapisi
-11. [ ] Barkod/QR fatura
-12. [ ] Stok yonetimi (urun kalemleri icin)
+11. [ ] Otomatik SQLite yedekleme (cron/job)
+12. [ ] Coklu dil (i18n) altyapisi
+13. [ ] Barkod/QR fatura
+14. [ ] Stok yonetimi (urun kalemleri icin)
 
 ---
 
@@ -151,5 +154,6 @@ Finans bilgi mimarisi: ✅
 - ✅ Faz B: model gecisi altyapisi (Party tablosu + migration)
 - ✅ Faz C: Finans modulu genisleme (genel satir, tahsilat)
 - ✅ Faz D: IA uygulama + gorsel revizyon (sidebar, navbar, mobile nav)
-- ✅ Faz E: performans/test kapsam genisletme (56 test, tumunu geciyor)
+- ✅ Faz E: performans/test kapsam genisletme (65 test, tumunu geciyor)
 - ✅ Faz F: Tedavi yonetimi + sevk sistemi + UX duzeltmeleri
+- ✅ Faz G: TODO.md bug fixleri (13/15 duzeltildi, 2 bekliyor)

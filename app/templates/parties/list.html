@@ -77,12 +77,12 @@
                             <a href="{{ url_for('parties.detail_party', party_id=p.id) }}" class="text-decoration-none fw-bold">
                                 {{ p.display_name }}
                             </a>
-                            {% if p.party_type == 'patient' %}
+                            {% if p.party_type.value == 'patient' %}
                             <small class="text-muted d-block">{{ p.first_name }} {{ p.last_name }}</small>
                             {% endif %}
                         </td>
                         <td>
-                            <span class="badge bg-{% if p.party_type == 'patient' %}primary{% elif p.party_type == 'dentist_customer' %}success{% else %}info{% endif %}">
+                            <span class="badge bg-{% if p.party_type.value == 'patient' %}primary{% elif p.party_type.value == 'dentist_customer' %}success{% else %}info{% endif %}">
                                 {{ p.party_type.value|title }}
                             </span>
                         </td>
@@ -93,7 +93,7 @@
                             <a href="{{ url_for('parties.edit_party', party_id=p.id) }}" class="btn btn-sm btn-outline-primary">
                                 <i class="bi bi-pencil"></i>
                             </a>
-                            {% if p.party_type == 'patient' %}
+                            {% if p.party_type.value == 'patient' %}
                             <a href="{{ url_for('parties.detail_party', party_id=p.id) }}" class="btn btn-sm btn-outline-secondary">
                                 <i class="bi bi-eye"></i>
                             </a>

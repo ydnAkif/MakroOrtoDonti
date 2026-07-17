@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import date
 from typing import Optional, List, Dict, Any
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 
 from .models import (
     ExchangeRate, Invoice, InvoiceItem, InvoiceItemType,
@@ -33,10 +33,12 @@ class InvoiceService:
         year = date.today().year
         invoice_number = f"{prefix}-{year}-{next_num:04d}"
 
-        settings_row = session.execute(
-            select(Settings).where(Settings.key == "invoice_next_number")
-        ).scalar_one()
-        settings_row.value = str(next_num + 1)
+        # Atomic update to prevent race conditions
+        session.execute(
+            update(Settings)
+            .where(Settings.key == "invoice_next_number")
+            .values(value=str(next_num + 1))
+        )
         session.flush()
 
         return invoice_number

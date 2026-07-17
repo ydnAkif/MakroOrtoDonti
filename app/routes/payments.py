@@ -119,6 +119,9 @@ def add_payment():
         "payments/form.html",
         invoices=invoices,
         today=date.today(),
+        current_rate=db.session.execute(
+            db.select(ExchangeRate).order_by(ExchangeRate.rate_date.desc()).limit(1)
+        ).scalar_one_or_none(),
     )
 
 
