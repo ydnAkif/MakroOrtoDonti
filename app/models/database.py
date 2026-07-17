@@ -274,11 +274,26 @@ def seed_sample_data() -> str | None:
     )
 
     db.session.add_all(treatments)
-    db.session.add_all([
-        Settings(key=k, value=v) for k, v in settings_defaults.items()
-    ])
+
+    existing_settings = {
+        s.key for s in db.session.execute(db.select(Settings)).scalars().all()
+    }
+    new_settings = [
+        Settings(key=k, value=v) for k, v in settings_defaults.items() if k not in existing_settings
+    ]
+    if new_settings:
+        db.session.add_all(new_settings)
+
     db.session.add(admin_user)
-    db.session.add(sample_rate)
+
+    existing_rate = db.session.execute(
+        db.select(ExchangeRate).where(
+            ExchangeRate.rate_date == date.today(),
+            ExchangeRate.source == "ecb",
+        )
+    ).scalar_one_or_none()
+    if not existing_rate:
+        db.session.add(sample_rate)
 
     sample_parties = [
         Party(party_type=PartyType.PATIENT, name="Ayşe Yılmaz", first_name="Ayşe", last_name="Yılmaz", phone="+905321112233", email="ayse@example.com", address="İstanbul, Kadıköy", treatment_status="active"),
