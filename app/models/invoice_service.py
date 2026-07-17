@@ -11,7 +11,6 @@ from .models import (
     ExchangeRate, Invoice, InvoiceItem, InvoiceItemType,
     PatientTreatment, Settings, Treatment, Party
 )
-from .database import get_session
 
 
 class InvoiceService:
