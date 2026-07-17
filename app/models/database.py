@@ -586,6 +586,66 @@ def seed_sample_data(session: Session) -> str | None:
     ])
     session.add(admin_user)
     session.add(sample_rate)
+
+    sample_parties = [
+        Party(
+            party_type=PartyType.PATIENT,
+            name="Ayşe Yılmaz",
+            first_name="Ayşe",
+            last_name="Yılmaz",
+            phone="+905321112233",
+            email="ayse@example.com",
+            address="İstanbul, Kadıköy",
+            treatment_status="active",
+        ),
+        Party(
+            party_type=PartyType.PATIENT,
+            name="Mehmet Kaya",
+            first_name="Mehmet",
+            last_name="Kaya",
+            phone="+905332223344",
+            email="mehmet@example.com",
+            address="İstanbul, Beşiktaş",
+            treatment_status="active",
+        ),
+        Party(
+            party_type=PartyType.DENTIST_CUSTOMER,
+            name="Dr. Elif Demir",
+            first_name="Elif",
+            last_name="Demir",
+            phone="+905343334455",
+            email="elif.demir@dentalclinic.com",
+            address="İstanbul, Şişli",
+        ),
+        Party(
+            party_type=PartyType.DENTIST_CUSTOMER,
+            name="Dr. Ahmet Özkan",
+            first_name="Ahmet",
+            last_name="Özkan",
+            phone="+905354445566",
+            email="ahmet.ozkan@smiledental.com",
+            address="Ankara, Çankaya",
+        ),
+        Party(
+            party_type=PartyType.COMPANY_CUSTOMER,
+            name="DentalPlus Laboratuvar",
+            contact_person="Fatma Arslan",
+            contact_phone="+905365556677",
+            phone="+905365556677",
+            email="info@dentalplus.com",
+            address="İstanbul, Başakşehir",
+        ),
+        Party(
+            party_type=PartyType.COMPANY_CUSTOMER,
+            name="SmileTech Malzeme",
+            contact_person="Ali Çelik",
+            contact_phone="+905376667788",
+            phone="+905376667788",
+            email="satis@smiletech.com",
+            address="İzmir, Bornova",
+        ),
+    ]
+    session.add_all(sample_parties)
     session.commit()
     if is_generated:
         generated_password = admin_password
