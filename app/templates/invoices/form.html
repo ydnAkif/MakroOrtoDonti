@@ -54,7 +54,8 @@
                 <option value="{{ p.id }}" data-type="{{ p.party_type.value }}" 
                         data-name="{{ p.display_name }}" data-phone="{{ p.phone or '' }}"
                         data-email="{{ p.email or '' }}" data-address="{{ p.address or '' }}"
-                        data-tax-id="{{ p.tax_id or '' }}">
+                        data-tax-id="{{ p.tax_id or '' }}"
+                        {% if selected_party_id and p.id == selected_party_id %}selected{% endif %}>
                   {{ p.display_name }} <span class="badge bg-{% if p.party_type.value == 'patient' %}primary{% elif p.party_type.value == 'dentist_customer' %}success{% else %}info{% endif %} ms-2">
                     {{ p.party_type.value|title }}
                   </span>
@@ -392,7 +393,7 @@ function openItemModal(type) {
 
 // Auto-populate fields when treatment is selected (works with typeahead hidden input)
 document.addEventListener('change', function(e) {
-    if (e.target.name === 'treatment_id' && e.target.type === 'hidden') {
+    if (e.target.name === 'treatment_id') {
         const val = e.target.value;
         if (val) {
             const treatment = treatments.find(t => t.id == val);
@@ -435,7 +436,8 @@ document.getElementById('item-form').addEventListener('submit', function(e) {
     };
     
     if (type === 'treatment') {
-        const treatment_id = document.getElementById('item-treatment-id').value;
+        const treatmentInput = document.querySelector('#item-form input[name="treatment_id"]') || document.getElementById('item-treatment-id');
+        const treatment_id = treatmentInput ? treatmentInput.value : '';
         if (!treatment_id) {
             alert('Tedavi seçimi zorunludur.');
             return;

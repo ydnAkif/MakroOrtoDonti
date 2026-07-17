@@ -55,7 +55,7 @@ Finans bilgi mimarisi: ✅
 - Fatura listesi ✅
 - Tahsilat listesi ✅
 - Kur yonetimi ✅
-- Yaslandirma raporu (0-30, 31-60, 61+) ⏳ (Reports sayfasina eklenecek)
+- Yaslandirma raporu (0-30, 31-60, 61+) ✅
 
 ## 4) UI/UX: gorsel iyilestirme prensipleri ✅ TAMAMLANDI
 
@@ -73,9 +73,24 @@ Finans bilgi mimarisi: ✅
 - Fatura odeme durumu otomatik guncelleme ✅ (paid/partial/pending)
 - Doviz kur yonetimi ✅ (Settings sayfasinda)
 
-## 6) Test Kapsam Genisletme ✅ TAMAMLANDI
+## 6) Tedavi Yonetimi ✅ TAMAMLANDI
 
-### Gecen Testler (18/18)
+- Tedavi katalogu CRUD ✅
+- XLSX import (upsert, TR/EN kategori eslestirme) ✅
+- Inline duzenleme (contenteditable + AJAX) ✅
+- Fatura formunda tedavi secimi → otomatik aciklama/fiyat doldurma ✅
+
+## 7) Sevk Sistemi ✅ TAMAMLANDI
+
+- `Party.referred_by_id` (self-referential FK) ✅
+- Hasta olustururken sevk eden dis hekimini secme ✅
+- Typeahead hidden input change event destegi ✅
+
+## 8) Test Kapsam Genisletme ✅ TAMAMLANDI
+
+### Gecen Testler (56/56)
+
+**test_critical_flows.py (18 test)**
 - `test_login_success` ✅
 - `test_invoice_create_flow` ✅ (legacy + yeni format)
 - `test_settings_update_does_not_overwrite_unsent_fields` ✅
@@ -95,30 +110,46 @@ Finans bilgi mimarisi: ✅
 - `test_invoice_api_treatment_price` ✅
 - `test_party_api_info` ✅
 
-## 6) Kademeli Cikis Plani (Guncel)
-
-- ✅ Faz A: guvenlik ve veri butunlugu (tamamlandi)
-- ✅ Faz B: model gecisi altyapisi (Party tablosu + migration)
-- ✅ Faz C: Finans modulu genisleme (genel satir, tahsilat)
-- ✅ Faz D: IA uygulama + gorsel revizyon (sidebar, navbar, mobile nav)
-- ✅ Faz E: performans/test kapsam genisletme (18 test, tumunu geciyor)
+**test_comprehensive.py (38 test)**
+- Auth: login invalid creds, logout, unauthenticated redirect ✅
+- Dashboard: sayfa yukleme ✅
+- Patients: list, add (+ Party olusturma), detail, edit (+ Party sync), delete (+ Party deaktivasyonu), add-treatment ✅
+- Treatments: list, filter category, search, add, edit, delete, API update, API invalid, XLSX import, invalid file ✅
+- Invoices: list, filter status, detail, status update, soft-delete, party preselect, no items rejected, amount discount, search ✅
+- Payments: add, delete (+ invoice status geri alma) ✅
+- Settings: page load, clinic info update, exchange rate manual add ✅
+- Reports: page load ✅
+- Parties: search, referred_by ✅
 
 ---
 
 ## Yapilacaklar (Sirali)
 
 ### Hemen
-1. [x] Test dosyasini genislet (18/18 geciyor) ✅
+1. [x] Test dosyasini genislet (56/56 geciyor) ✅
 2. [x] Reports sayfasina Yaslandirma raporu (aging) ✅
 3. [x] Invoice modal formunda KDV/Iskonto alanlari gorunurlugu ✅
+4. [x] Fatura olusturmada tedavi secimi dogrulama hatasi duzelt ✅
+5. [x] Kisi Detay'dan fatura olustururken kisi onceden secili gelsin ✅
 
 ### Kisa Vadeli
-4. [ ] API endpoint'leri (mobil entegrasyon icin)
-5. [ ] Patient modelinden `party_id` ve `Patient.party` relationship'ini kullanarak `Patient` bagimliligi azaltma
-6. [ ] Randevu sistemi (Calendar entegrasyonu)
+6. [ ] API endpoint'leri (mobil entegrasyon icin)
+7. [ ] Patient modelinden `party_id` ve `Patient.party` relationship'ini kullanarak `Patient` bagimliligi azaltma
+8. [ ] Randevu sistemi (Calendar entegrasyonu)
 
 ### Uzun Vadeli
-7. [ ] Otomatik SQLite yedekleme (cron/job)
-8. [ ] Coklu dil (i18n) altyapisi
-9. [ ] Barkod/QR fatura
-10. [ ] Stok yonetimi (urun kalemleri icin)
+9. [ ] Otomatik SQLite yedekleme (cron/job)
+10. [ ] Coklu dil (i18n) altyapisi
+11. [ ] Barkod/QR fatura
+12. [ ] Stok yonetimi (urun kalemleri icin)
+
+---
+
+## Kademeli Cikis Plani (Guncel)
+
+- ✅ Faz A: guvenlik ve veri butunlugu (tamamlandi)
+- ✅ Faz B: model gecisi altyapisi (Party tablosu + migration)
+- ✅ Faz C: Finans modulu genisleme (genel satir, tahsilat)
+- ✅ Faz D: IA uygulama + gorsel revizyon (sidebar, navbar, mobile nav)
+- ✅ Faz E: performans/test kapsam genisletme (56 test, tumunu geciyor)
+- ✅ Faz F: Tedavi yonetimi + sevk sistemi + UX duzeltmeleri

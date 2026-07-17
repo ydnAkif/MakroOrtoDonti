@@ -39,6 +39,9 @@ document.addEventListener('DOMContentLoaded', function() {
         var hiddenInput = document.createElement('input');
         hiddenInput.type = 'hidden';
         hiddenInput.name = select.name;
+        if (select.id) {
+            hiddenInput.id = select.id;
+        }
 
         var input = document.createElement('input');
         input.type = 'text';

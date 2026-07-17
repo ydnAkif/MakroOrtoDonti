@@ -114,12 +114,14 @@ def add_invoice():
                 )
             else:
                 flash("En az bir kalem seçimi zorunludur.", "danger")
-                return redirect(url_for("invoices.add_invoice"))
+                party_id_param = f"?party_id={party_id}" if party_id else ""
+                return redirect(url_for("invoices.add_invoice") + party_id_param)
             flash(f"Fatura {invoice.invoice_number} oluşturuldu.", "success")
             return redirect(url_for("invoices.detail_invoice", invoice_id=invoice.id))
         except ValueError as e:
             flash(str(e), "danger")
-            return redirect(url_for("invoices.add_invoice"))
+            party_id_param = f"?party_id={party_id}" if party_id else ""
+            return redirect(url_for("invoices.add_invoice") + party_id_param)
 
     # Get active parties for dropdown
     parties = db.session.execute(
@@ -156,6 +158,7 @@ def add_invoice():
         treatments=treatments_json,
         current_rate=current_rate,
         today=date.today(),
+        selected_party_id=request.args.get("party_id", type=int),
     )
 
 
