@@ -1,5 +1,4 @@
-{% extends "base.html" %} {% block title %}Yeni Fatura - {{ clinic_name }}{%
-endblock %} {% block content %}
+{% extends "base.html" %} {% block title %}Yeni Fatura - {{ clinic_name }}{% endblock %} {% block content %}
 <div class="mb-4">
   <nav aria-label="breadcrumb">
     <ol class="breadcrumb">
@@ -37,22 +36,28 @@ endblock %} {% block content %}
         </div>
         {% endif %}
 
-        <form method="POST" action="{{ url_for('invoices.add_invoice') }}">
+        <form method="POST" action="{{ url_for('invoices.add_invoice') }}" id="invoice-form">
           <div class="row g-3 mb-4">
             <div class="col-md-6">
               <label class="form-label"
-                >Hasta <span class="text-danger">*</span></label
+                >Müşteri <span class="text-danger">*</span></label
               >
               <select
-                name="patient_id"
+                name="party_id"
+                id="party-select"
                 class="form-select js-searchable-select"
-                data-search-placeholder="Hasta ara..."
+                data-search-placeholder="Müşteri ara..."
                 required
               >
-                <option value="">Hasta seçiniz...</option>
-                {% for p in patients %}
-                <option value="{{ p.id }}">
-                  {{ p.full_name }}{% if p.phone %} ({{ p.phone }}){% endif %}
+                <option value="">Müşteri seçiniz...</option>
+                {% for p in parties %}
+                <option value="{{ p.id }}" data-type="{{ p.party_type.value }}" 
+                        data-name="{{ p.display_name }}" data-phone="{{ p.phone or '' }}"
+                        data-email="{{ p.email or '' }}" data-address="{{ p.address or '' }}"
+                        data-tax-id="{{ p.tax_id or '' }}">
+                  {{ p.display_name }} <span class="badge bg-{% if p.party_type.value == 'patient' %}primary{% elif p.party_type.value == 'dentist_customer' %}success{% else %}info{% endif %} ms-2">
+                    {{ p.party_type.value|title }}
+                  </span>
                 </option>
                 {% endfor %}
               </select>
@@ -62,66 +67,96 @@ endblock %} {% block content %}
               <input
                 type="date"
                 name="invoice_date"
+                id="invoice-date"
                 class="form-control"
                 value="{{ today.isoformat() if today else '' }}"
               />
             </div>
             <div class="col-md-3">
               <label class="form-label">Son Ödeme</label>
-              <input type="date" name="due_date" class="form-control" />
+              <input type="date" name="due_date" id="due-date" class="form-control" />
             </div>
           </div>
 
-          <h6 class="mb-3"><i class="bi bi-heart-pulse"></i> Tedavi Seçimi</h6>
-          <div class="card bg-light border-0 mb-3">
+          <!-- Customer info display -->
+          <div id="customer-info" class="card bg-light border-0 mb-3 d-none">
             <div class="card-body">
-              <div class="mb-2">
-                <input
-                  type="text"
-                  class="form-control js-table-filter"
-                  data-target="#invoice-treatment-table tbody tr[data-search-row='1']"
-                  placeholder="Tedavi ya da hasta yazarak filtrele..."
-                />
+              <div class="row g-2">
+                <div class="col-md-4"><strong>Adres:</strong> <span id="cust-address">-</span></div>
+                <div class="col-md-4"><strong>E-posta:</strong> <span id="cust-email">-</span></div>
+                <div class="col-md-4"><strong>Vergi No:</strong> <span id="cust-tax-id">-</span></div>
               </div>
-              <div class="table-responsive">
-                <table class="table table-sm mb-0" id="invoice-treatment-table">
-                  <thead>
-                    <tr>
-                      <th style="width: 50px">Seç</th>
-                      <th>Tarih</th>
-                      <th>Hasta</th>
-                      <th>Tedavi</th>
-                      <th class="text-end">Fiyat (EUR)</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {% for pt in patient_treatments %}
-                    <tr data-search-row="1">
-                      <td>
-                        <input
-                          type="checkbox"
-                          name="treatment_ids"
-                          value="{{ pt.id }}"
-                          class="form-check-input treatment-checkbox"
-                          data-price="{{ pt.effective_price_eur }}"
-                        />
-                      </td>
-                      <td>{{ pt.treatment_date.strftime('%d.%m.%Y') }}</td>
-                      <td>{{ pt.patient.full_name }}</td>
-                      <td>{{ pt.treatment.name }}</td>
-                      <td class="text-end">
-                        €{{ "{:,.2f}".format(pt.effective_price_eur) }}
-                      </td>
-                    </tr>
-                    {% else %}
-                    <tr>
-                      <td colspan="5" class="text-center text-muted">
-                        Henüz tedavi kaydı yok. Önce hasta tedavisi ekleyin.
-                      </td>
-                    </tr>
-                    {% endfor %}
-                  </tbody>
-                </table>
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label"><i class="bi bi-list-ul"></i> Fatura Kalemleri</label>
+            <div class="alert alert-info small mb-3">
+              <i class="bi bi-info-circle"></i>
+              Kalemleri eklemek için aşağıdan "Kalem Ekle" butonunu kullanın. Tedavi, ürün, hizmet, laboratuvar veya özel kalem tipleri ekleyebilirsiniz.
+            </div>
+            
+            <div class="card bg-light border-0 mb-3">
+              <div class="card-body">
+                <div class="table-responsive">
+                  <table class="table table-sm mb-0" id="invoice-items-table">
+                    <thead>
+                      <tr>
+                        <th style="width: 120px">Tip</th>
+                        <th>Açıklama</th>
+                        <th class="text-center" style="width: 80px">Adet</th>
+                        <th class="text-end" style="width: 120px">Birim (EUR)</th>
+                        <th class="text-end" style="width: 120px">KDV %</th>
+                        <th class="text-end" style="width: 120px">İskonto</th>
+                        <th class="text-end" style="width: 140px">Toplam (EUR)</th>
+                        <th style="width: 50px"></th>
+                      </tr>
+                    </thead>
+                    <tbody id="invoice-items-body">
+                      <!-- Items will be added here dynamically -->
+                    </tbody>
+                    <tfoot>
+                      <tr class="table-light">
+                        <td colspan="6" class="text-end fw-bold">Ara Toplam (EUR):</td>
+                        <td class="text-end fw-bold" id="subtotal-eur">€0,00</td>
+                        <td></td>
+                      </tr>
+                      <tr class="table-light">
+                        <td colspan="6" class="text-end fw-bold">Toplam KDV (EUR):</td>
+                        <td class="text-end fw-bold" id="total-vat-eur">€0,00</td>
+                        <td></td>
+                      </tr>
+                      <tr class="table-primary">
+                        <td colspan="6" class="text-end fw-bold">GENEL TOPLAM (EUR):</td>
+                        <td class="text-end fw-bold fs-6" id="grand-total-eur">€0,00</td>
+                        <td></td>
+                      </tr>
+                      <tr class="table-primary">
+                        <td colspan="6" class="text-end fw-bold">GENEL TOPLAM (TRY):</td>
+                        <td class="text-end fw-bold fs-6" id="grand-total-try">₺0,00</td>
+                        <td></td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+                
+                <div class="mt-3 d-flex gap-2">
+                  <button type="button" class="btn btn-outline-primary" id="add-treatment-btn">
+                    <i class="bi bi-heart-pulse"></i> Tedavi Ekle
+                  </button>
+                  <button type="button" class="btn btn-outline-success" id="add-product-btn">
+                    <i class="bi bi-box"></i> Ürün Ekle
+                  </button>
+                  <button type="button" class="btn btn-outline-info" id="add-service-btn">
+                    <i class="bi bi-tools"></i> Hizmet Ekle
+                  </button>
+                  <button type="button" class="btn btn-outline-warning" id="add-lab-btn">
+                    <i class="bi bi-flask"></i> Laboratuvar Ekle
+                  </button>
+                  <button type="button" class="btn btn-outline-secondary" id="add-custom-btn">
+                    <i class="bi bi-plus-circle"></i> Özel Kalem
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -156,17 +191,308 @@ endblock %} {% block content %}
     </div>
   </div>
 </div>
+
+<!-- Modal for adding items -->
+<div class="modal fade" id="itemModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="modal-title">Kalem Ekle</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form id="item-form">
+        <div class="modal-body">
+          <input type="hidden" name="item_index" id="item-index">
+          <input type="hidden" name="item_type" id="item-type">
+          
+          <div class="mb-3">
+            <label class="form-label">Açıklama <span class="text-danger">*</span></label>
+            <input type="text" class="form-control" name="description" id="item-description" required>
+          </div>
+          
+          <div class="row g-3">
+            <div class="col-md-3">
+              <label class="form-label">Adet <span class="text-danger">*</span></label>
+              <input type="number" class="form-control" name="quantity" id="item-quantity" value="1" min="1" required>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Birim Fiyat (EUR) <span class="text-danger">*</span></label>
+              <input type="number" step="0.01" class="form-control" name="unit_price_eur" id="item-unit-price-eur" required>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">KDV %</label>
+              <input type="number" step="0.01" class="form-control" name="vat_rate" id="item-vat-rate" value="0" min="0" max="100">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">İskonto Tipi</label>
+              <select class="form-select" name="discount_type" id="item-discount-type">
+                <option value="">Yok</option>
+                <option value="percent">Yüzde (%)</option>
+                <option value="amount">Tutar (EUR)</option>
+              </select>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">İskonto Değeri</label>
+              <input type="number" step="0.01" class="form-control" name="discount_value" id="item-discount-value" value="0" min="0">
+            </div>
+          </div>
+          
+          <div id="treatment-field" class="mb-3 d-none">
+            <label class="form-label">Tedavi Seç <span class="text-danger">*</span></label>
+            <select class="form-select js-searchable-select" name="treatment_id" id="item-treatment-id" 
+                    data-search-placeholder="Tedavi ara...">
+              <option value="">Tedavi seçiniz...</option>
+              {% for t in treatments %}
+              <option value="{{ t.id }}" data-price="{{ t.price_eur }}">{{ t.name }} (€{{ "{:,.2f}".format(t.price_eur) }})</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">İptal</button>
+          <button type="submit" class="btn btn-primary">Ekle</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
 {% endblock %} {% block scripts %}
 <script>
-  document.querySelectorAll(".treatment-checkbox").forEach((cb) => {
-    cb.addEventListener("change", function () {
-      let total = 0;
-      document.querySelectorAll(".treatment-checkbox:checked").forEach((c) => {
-        total += parseFloat(c.dataset.price);
-      });
-      const eurEl = document.getElementById("total-eur");
-      if (eurEl) eurEl.textContent = "€" + total.toFixed(2);
+let itemCounter = 0;
+const currentRate = {{ current_rate.eur_to_try if current_rate else 0 }};
+const treatments = {{ treatments|tojson|safe if treatments else [] }};
+
+function formatNumber(num) {
+    return new Intl.NumberFormat('tr-TR', {minimumFractionDigits: 2, maximumFractionDigits: 2}).format(num);
+}
+
+function formatCurrencyEUR(num) {
+    return '€' + formatNumber(num);
+}
+
+function formatCurrencyTRY(num) {
+    return '₺' + formatNumber(num);
+}
+
+function calculateLineTotal(item) {
+    const base = item.unit_price_eur * item.quantity;
+    let discounted = base;
+    if (item.discount_type === 'percent') {
+        discounted = base * (1 - item.discount_value / 100);
+    } else if (item.discount_type === 'amount') {
+        discounted = base - item.discount_value;
+    }
+    const vat = discounted * (item.vat_rate / 100);
+    return {
+        subtotal: discounted,
+        vat: vat,
+        total: discounted + vat
+    };
+}
+
+function recalculateTotals() {
+    let subtotal = 0;
+    let totalVat = 0;
+    let grandTotal = 0;
+    
+    document.querySelectorAll('#invoice-items-body tr[data-item]').forEach(row => {
+        const item = JSON.parse(row.dataset.item);
+        const calc = calculateLineTotal(item);
+        subtotal += calc.subtotal;
+        totalVat += calc.vat;
+        grandTotal += calc.total;
+        
+        // Update row totals
+        row.querySelector('.line-total-eur').textContent = formatCurrencyEUR(calc.total);
+        row.querySelector('.line-subtotal-eur').textContent = formatCurrencyEUR(calc.subtotal);
+        row.querySelector('.line-vat-eur').textContent = formatCurrencyEUR(calc.vat);
     });
-  });
+    
+    document.getElementById('subtotal-eur').textContent = formatCurrencyEUR(subtotal);
+    document.getElementById('total-vat-eur').textContent = formatCurrencyEUR(totalVat);
+    document.getElementById('grand-total-eur').textContent = formatCurrencyEUR(grandTotal);
+    document.getElementById('grand-total-try').textContent = formatCurrencyTRY(grandTotal * currentRate);
+}
+
+function addItemToTable(item) {
+    const tbody = document.getElementById('invoice-items-body');
+    const index = itemCounter++;
+    item.index = index;
+    
+    const calc = calculateLineTotal(item);
+    
+    const typeLabels = {
+        'treatment': '<span class="badge bg-primary">Tedavi</span>',
+        'product': '<span class="badge bg-success">Ürün</span>',
+        'service': '<span class="badge bg-info">Hizmet</span>',
+        'lab': '<span class="badge bg-warning text-dark">Lab</span>',
+        'custom': '<span class="badge bg-secondary">Özel</span>'
+    };
+    
+    const discountDisplay = item.discount_type ? 
+        (item.discount_type === 'percent' ? '%' + item.discount_value : '€' + formatNumber(item.discount_value)) : '-';
+    
+    const tr = document.createElement('tr');
+    tr.dataset.item = JSON.stringify(item);
+    tr.dataset.itemIndex = index;
+    tr.innerHTML = `
+        <td>${typeLabels[item.item_type] || item.item_type}</td>
+        <td>
+            <strong>${item.description}</strong>
+            ${item.treatment_name ? '<br><small class="text-muted">' + item.treatment_name + '</small>' : ''}
+        </td>
+        <td class="text-center">${item.quantity}</td>
+        <td class="text-end">€${formatNumber(item.unit_price_eur)}</td>
+        <td class="text-end">%${formatNumber(item.vat_rate)}</td>
+        <td class="text-end">${discountDisplay}</td>
+        <td class="text-end fw-bold line-total-eur">${formatCurrencyEUR(calc.total)}</td>
+        <td>
+            <button type="button" class="btn btn-sm btn-outline-danger delete-item" data-index="${index}">
+                <i class="bi bi-trash"></i>
+            </button>
+        </td>
+    `;
+    tbody.appendChild(tr);
+    
+    // Add delete handler
+    tr.querySelector('.delete-item').addEventListener('click', function() {
+        tr.remove();
+        recalculateTotals();
+    });
+    
+    recalculateTotals();
+}
+
+function openItemModal(type) {
+    document.getElementById('item-index').value = '';
+    document.getElementById('item-type').value = type;
+    document.getElementById('item-form').reset();
+    document.getElementById('item-quantity').value = 1;
+    document.getElementById('item-vat-rate').value = 0;
+    document.getElementById('item-discount-type').value = '';
+    document.getElementById('item-discount-value').value = 0;
+    document.getElementById('treatment-field').classList.add('d-none');
+    
+    const titles = {
+        'treatment': 'Tedavi Ekle',
+        'product': 'Ürün Ekle',
+        'service': 'Hizmet Ekle',
+        'lab': 'Laboratuvar Ekle',
+        'custom': 'Özel Kalem Ekle'
+    };
+    document.getElementById('modal-title').textContent = titles[type] || 'Kalem Ekle';
+    
+    if (type === 'treatment') {
+        document.getElementById('treatment-field').classList.remove('d-none');
+    }
+    
+    new bootstrap.Modal(document.getElementById('itemModal')).show();
+}
+
+// Event listeners for add buttons
+document.getElementById('add-treatment-btn').addEventListener('click', () => openItemModal('treatment'));
+document.getElementById('add-product-btn').addEventListener('click', () => openItemModal('product'));
+document.getElementById('add-service-btn').addEventListener('click', () => openItemModal('service'));
+document.getElementById('add-lab-btn').addEventListener('click', () => openItemModal('lab'));
+document.getElementById('add-custom-btn').addEventListener('click', () => openItemModal('custom'));
+
+// Item form submit
+document.getElementById('item-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const index = document.getElementById('item-index').value;
+    const type = document.getElementById('item-type').value;
+    const description = document.getElementById('item-description').value;
+    const quantity = parseInt(document.getElementById('item-quantity').value);
+    const unit_price_eur = parseFloat(document.getElementById('item-unit-price-eur').value);
+    const vat_rate = parseFloat(document.getElementById('item-vat-rate').value) || 0;
+    const discount_type = document.getElementById('item-discount-type').value;
+    const discount_value = parseFloat(document.getElementById('item-discount-value').value) || 0;
+    
+    const item = {
+        item_type: type,
+        description: description,
+        quantity: quantity,
+        unit_price_eur: unit_price_eur,
+        vat_rate: vat_rate,
+        discount_type: discount_type,
+        discount_value: discount_value,
+    };
+    
+    if (type === 'treatment') {
+        const treatment_id = document.getElementById('item-treatment-id').value;
+        if (!treatment_id) {
+            alert('Tedavi seçimi zorunludur.');
+            return;
+        }
+        item.treatment_id = parseInt(treatment_id);
+        const treatment = treatments.find(t => t.id == treatment_id);
+        if (treatment) item.treatment_name = treatment.name;
+    }
+    
+    if (index) {
+        // Edit existing
+        const row = document.querySelector(`tr[data-item-index="${index}"]`);
+        if (row) {
+            Object.assign(item, JSON.parse(row.dataset.item));
+            item.description = description;
+            item.quantity = quantity;
+            item.unit_price_eur = unit_price_eur;
+            item.vat_rate = vat_rate;
+            item.discount_type = discount_type;
+            item.discount_value = discount_value;
+            row.dataset.item = JSON.stringify(item);
+            // Update display
+            const calc = calculateLineTotal(item);
+            row.querySelector('.line-total-eur').textContent = formatCurrencyEUR(calc.total);
+        }
+    } else {
+        // Add new
+        addItemToTable(item);
+    }
+    
+    bootstrap.Modal.getInstance(document.getElementById('itemModal')).hide();
+    recalculateTotals();
+});
+
+// Customer select handler
+document.getElementById('party-select').addEventListener('change', function() {
+    const opt = this.options[this.selectedIndex];
+    if (this.value) {
+        document.getElementById('cust-address').textContent = opt.dataset.address || '-';
+        document.getElementById('cust-email').textContent = opt.dataset.email || '-';
+        document.getElementById('cust-tax-id').textContent = opt.dataset.taxId || '-';
+        document.getElementById('customer-info').classList.remove('d-none');
+    } else {
+        document.getElementById('customer-info').classList.add('d-none');
+    }
+});
+
+// Prepare items_json on form submit
+document.getElementById('invoice-form').addEventListener('submit', function(e) {
+    const items = [];
+    document.querySelectorAll('#invoice-items-body tr[data-item]').forEach(row => {
+        items.push(JSON.parse(row.dataset.item));
+    });
+    
+    if (items.length === 0) {
+        e.preventDefault();
+        alert('En az bir kalem eklenmelidir.');
+        return;
+    }
+    
+    // Add hidden input with items JSON
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = 'items_json';
+    input.value = JSON.stringify(items);
+    this.appendChild(input);
+});
+
+// Initialize with current rate display
+if (currentRate > 0) {
+    console.log('Current EUR/TRY rate:', currentRate);
+}
 </script>
 {% endblock %}

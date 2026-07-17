@@ -1,5 +1,6 @@
 import os
 from fpdf import FPDF
+from fpdf.enums import XPos, YPos
 from datetime import date
 
 
@@ -19,9 +20,9 @@ class InvoicePDF(FPDF):
         self.default_font = "Helvetica"
         if os.path.exists(FONT_PATH):
             try:
-                self.add_font("DejaVu", "", FONT_PATH, uni=True)
+                self.add_font("DejaVu", "", FONT_PATH)
                 if os.path.exists(FONT_PATH_BOLD):
-                    self.add_font("DejaVu", "B", FONT_PATH_BOLD, uni=True)
+                    self.add_font("DejaVu", "B", FONT_PATH_BOLD)
                 self.default_font = "DejaVu"
             except Exception:
                 # If custom font files are invalid/corrupt, continue with a core font.
@@ -57,9 +58,15 @@ class InvoicePDF(FPDF):
         return value.encode("cp1252", errors="replace").decode("cp1252")
 
     def cell(self, w=0, h=0, text="", *args, **kwargs):
+        if kwargs.pop("ln", False):
+            kwargs.setdefault("new_x", XPos.LMARGIN)
+            kwargs.setdefault("new_y", YPos.NEXT)
         return super().cell(w, h, self._safe_text(text), *args, **kwargs)
 
     def multi_cell(self, w, h, text="", *args, **kwargs):
+        if kwargs.pop("ln", False):
+            kwargs.setdefault("new_x", XPos.LMARGIN)
+            kwargs.setdefault("new_y", YPos.NEXT)
         return super().multi_cell(w, h, self._safe_text(text), *args, **kwargs)
 
     def header(self):
@@ -108,22 +115,32 @@ class InvoicePDF(FPDF):
         self.ln(5)
 
     def add_patient_info(self, patient):
+        """Legacy method for backward compatibility."""
+        self.add_customer_info({
+            "name": patient.full_name,
+            "phone": patient.phone,
+            "email": patient.email,
+            "address": patient.address,
+        })
+
+    def add_customer_info(self, customer):
+        """Add customer info (works for both patient and party)."""
         self.set_font(self.default_font, "B", 11)
         self.set_text_color(0, 102, 153)
-        self.cell(0, 8, "Hasta Bilgileri", ln=True)
+        self.cell(0, 8, "Müşteri Bilgileri", ln=True)
         self.set_draw_color(0, 102, 153)
         self.line(10, self.get_y(), 80, self.get_y())
         self.ln(3)
 
         self.set_font(self.default_font, "", 10)
         self.set_text_color(0, 0, 0)
-        self.cell(0, 6, f"Ad Soyad: {patient.full_name}", ln=True)
-        if patient.phone:
-            self.cell(0, 6, f"Telefon: {patient.phone}", ln=True)
-        if patient.email:
-            self.cell(0, 6, f"E-posta: {patient.email}", ln=True)
-        if patient.address:
-            self.cell(0, 6, f"Adres: {patient.address}", ln=True)
+        self.cell(0, 6, f"Ad Soyad: {customer['name']}", ln=True)
+        if customer.get('phone'):
+            self.cell(0, 6, f"Telefon: {customer['phone']}", ln=True)
+        if customer.get('email'):
+            self.cell(0, 6, f"E-posta: {customer['email']}", ln=True)
+        if customer.get('address'):
+            self.cell(0, 6, f"Adres: {customer['address']}", ln=True)
         self.ln(5)
 
     def add_items_table(self, items, exchange_rate):
@@ -193,6 +210,25 @@ class InvoicePDF(FPDF):
             self.multi_cell(0, 5, notes)
 
 
+def get_customer_info(invoice):
+    """Get customer info from either patient or party."""
+    if invoice.patient:
+        return {
+            "name": invoice.patient.full_name,
+            "phone": invoice.patient.phone,
+            "email": invoice.patient.email,
+            "address": invoice.patient.address,
+        }
+    elif invoice.party:
+        return {
+            "name": invoice.party.display_name,
+            "phone": invoice.party.phone,
+            "email": invoice.party.email,
+            "address": invoice.party.address,
+        }
+    return {"name": "Bilinmeyen Müşteri", "phone": None, "email": None, "address": None}
+
+
 def generate_invoice_pdf(invoice) -> bytes:
     from app.extensions import db
     from app.models.models import Settings
@@ -223,7 +259,9 @@ def generate_invoice_pdf(invoice) -> bytes:
         invoice.due_date,
         invoice.status,
     )
-    pdf.add_patient_info(invoice.patient)
+    
+    customer = get_customer_info(invoice)
+    pdf.add_customer_info(customer)
     pdf.add_items_table(invoice.items, invoice.exchange_rate)
     pdf.add_totals(invoice.total_eur, invoice.total_try, invoice.exchange_rate)
     pdf.add_notes(invoice.notes)

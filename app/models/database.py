@@ -15,8 +15,11 @@ from .models import (
     ExchangeRate,
     Invoice,
     InvoiceItem,
+    Party,
+    PartyType,
     Patient,
     PatientTreatment,
+    Payment,
     Settings,
     Treatment,
     TreatmentCategory,
@@ -60,9 +63,80 @@ def _create_indexes() -> None:
             "CREATE INDEX IF NOT EXISTS idx_settings_key ON settings(key)",
             "CREATE INDEX IF NOT EXISTS idx_users_username ON users(username)",
             "CREATE INDEX IF NOT EXISTS idx_whatsapp_status ON whatsapp_sessions(status)",
+            # Party indexes
+            "CREATE INDEX IF NOT EXISTS idx_parties_type ON parties(party_type)",
+            "CREATE INDEX IF NOT EXISTS idx_parties_name ON parties(name)",
+            "CREATE INDEX IF NOT EXISTS idx_parties_active ON parties(is_active)",
+            # Invoice party index
+            "CREATE INDEX IF NOT EXISTS idx_invoices_party ON invoices(party_id, invoice_date)",
+            # Invoice item type index
+            "CREATE INDEX IF NOT EXISTS idx_invoice_items_type ON invoice_items(item_type)",
+            # Payment indexes
+            "CREATE INDEX IF NOT EXISTS idx_payments_invoice ON payments(invoice_id)",
+            "CREATE INDEX IF NOT EXISTS idx_payments_date ON payments(payment_date)",
         ]
         for stmt in indexes:
             conn.execute(text(stmt))
+
+
+def migrate_patients_to_parties(session: Session) -> int:
+    """Migrate existing patients to Party records. Returns count of migrated patients."""
+    from .models import Party, PartyType
+    
+    migrated = 0
+    patients = session.query(Patient).filter(Patient.party_id.is_(None)).all()
+    
+    for patient in patients:
+        # Check if party already exists for this patient
+        existing = session.query(Party).filter(
+            Party.party_type == PartyType.PATIENT,
+            Party.first_name == patient.first_name,
+            Party.last_name == patient.last_name,
+            Party.phone == patient.phone,
+        ).first()
+        
+        if existing:
+            patient.party_id = existing.id
+        else:
+            party = Party(
+                party_type=PartyType.PATIENT,
+                name=f"{patient.first_name} {patient.last_name}",
+                first_name=patient.first_name,
+                last_name=patient.last_name,
+                phone=patient.phone,
+                email=patient.email,
+                address=patient.address,
+                tax_id=getattr(patient, 'tax_id', None),
+                notes=patient.notes,
+                date_of_birth=patient.date_of_birth,
+                treatment_status=patient.treatment_status,
+                is_active=patient.is_active,
+            )
+            session.add(party)
+            session.flush()
+            patient.party_id = party.id
+        migrated += 1
+    
+    if migrated > 0:
+        session.commit()
+    
+    return migrated
+
+
+def link_invoices_to_parties(session: Session) -> int:
+    """Link existing invoices to parties via their patients. Returns count of linked invoices."""
+    linked = 0
+    invoices = session.query(Invoice).filter(Invoice.party_id.is_(None)).all()
+    
+    for invoice in invoices:
+        if invoice.patient and invoice.patient.party_id:
+            invoice.party_id = invoice.patient.party_id
+            linked += 1
+    
+    if linked > 0:
+        session.commit()
+    
+    return linked
 
 
 def _hash_password(password: str) -> str:

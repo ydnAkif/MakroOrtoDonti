@@ -1,41 +1,125 @@
 <nav id="sidebar" class="col-md-3 col-lg-2 d-md-block bg-light sidebar collapse border-end">
     <div class="position-sticky pt-3">
+        <!-- Logo / Brand -->
+        <div class="px-3 mb-3">
+            <a href="{{ url_for('dashboard.index') }}" class="d-flex align-items-center text-decoration-none text-dark">
+                <i class="bi bi-tooth fs-4 me-2 text-primary"></i>
+                <span class="fw-bold fs-5">{{ clinic_name }}</span>
+            </a>
+        </div>
+
         <ul class="nav flex-column">
+            <!-- Panel -->
             <li class="nav-item">
-                <a class="nav-link {% if request.endpoint == 'dashboard.index' %}active{% endif %}" href="{{ url_for('dashboard.index') }}">
-                    <i class="bi bi-speedometer2"></i> Ana Sayfa
+                <a class="nav-link {% if request.endpoint == 'dashboard.index' %}active{% endif %}" 
+                   href="{{ url_for('dashboard.index') }}">
+                    <i class="bi bi-speedometer2"></i> Panel
                 </a>
             </li>
+
+            <!-- Kişiler -->
             <li class="nav-item">
-                <a class="nav-link {% if 'patient' in request.endpoint|default('') %}active{% endif %}" href="{{ url_for('patients.list_patients') }}">
-                    <i class="bi bi-people"></i> Hastalar
+                <a class="nav-link {% if 'parties' in request.endpoint|default('') %}active{% endif %}" 
+                   href="{{ url_for('parties.list_parties') }}">
+                    <i class="bi bi-people"></i> Kişiler
                 </a>
             </li>
+
+            <!-- Tedavi Kataloğu -->
             <li class="nav-item">
-                <a class="nav-link {% if 'treatment' in request.endpoint|default('') %}active{% endif %}" href="{{ url_for('treatments.list_treatments') }}">
-                    <i class="bi bi-heart-pulse"></i> Tedaviler
+                <a class="nav-link {% if 'treatment' in request.endpoint|default('') %}active{% endif %}" 
+                   href="{{ url_for('treatments.list_treatments') }}">
+                    <i class="bi bi-heart-pulse"></i> Tedavi Kataloğu
                 </a>
             </li>
+
+            <!-- Finans -->
             <li class="nav-item">
-                <a class="nav-link {% if 'invoice' in request.endpoint|default('') %}active{% endif %}" href="{{ url_for('invoices.list_invoices') }}">
+                <a class="nav-link {% if 'invoice' in request.endpoint|default('') %}active{% endif %}" 
+                   href="{{ url_for('invoices.list_invoices') }}">
                     <i class="bi bi-receipt"></i> Faturalar
                 </a>
             </li>
             <li class="nav-item">
-                <a class="nav-link {% if 'whatsapp' in request.endpoint|default('') %}active{% endif %}" href="{{ url_for('whatsapp.index') }}">
+                <a class="nav-link {% if 'payment' in request.endpoint|default('') %}active{% endif %}" 
+                   href="{{ url_for('payments.list_payments') }}">
+                    <i class="bi bi-cash-coin"></i> Tahsilatlar
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {% if 'settings' in request.endpoint|default('') and 'exchange' in request.path|default('') %}active{% endif %}" 
+                   href="{{ url_for('settings.index') }}#exchange-rates">
+                    <i class="bi bi-currency-exchange"></i> Döviz Kurları
+                </a>
+            </li>
+
+            <!-- İletişim -->
+            <li class="nav-item">
+                <a class="nav-link {% if 'whatsapp' in request.endpoint|default('') %}active{% endif %}" 
+                   href="{{ url_for('whatsapp.index') }}">
                     <i class="bi bi-whatsapp"></i> WhatsApp
                 </a>
             </li>
             <li class="nav-item">
-                <a class="nav-link {% if 'report' in request.endpoint|default('') %}active{% endif %}" href="{{ url_for('reports.index') }}">
+                <a class="nav-link {% if 'email' in request.endpoint|default('') %}active{% endif %}" 
+                   href="{{ url_for('settings.index') }}#email-settings">
+                    <i class="bi bi-envelope"></i> E-posta Ayarları
+                </a>
+            </li>
+
+            <!-- Raporlar -->
+            <li class="nav-item">
+                <a class="nav-link {% if 'report' in request.endpoint|default('') %}active{% endif %}" 
+                   href="{{ url_for('reports.index') }}">
                     <i class="bi bi-bar-chart"></i> Raporlar
                 </a>
             </li>
-            <li class="nav-item">
-                <a class="nav-link {% if request.endpoint == 'settings.index' %}active{% endif %}" href="{{ url_for('settings.index') }}">
+
+            <!-- Ayarlar -->
+            <li class="nav-item mt-2">
+                <a class="nav-link {% if request.endpoint == 'settings.index' %}active{% endif %}" 
+                   href="{{ url_for('settings.index') }}">
                     <i class="bi bi-gear"></i> Ayarlar
                 </a>
             </li>
         </ul>
+
+        <!-- Mobil alt navigasyon (sidebar kapanıkken görünür) -->
+        <div class="d-md-none fixed-bottom bg-white border-top shadow-sm p-2" id="mobile-nav">
+            <div class="d-flex justify-content-around">
+                <a href="{{ url_for('dashboard.index') }}" class="nav-link text-center py-1 {% if request.endpoint == 'dashboard.index' %}active{% endif %}">
+                    <i class="bi bi-speedometer2 d-block fs-5"></i>
+                    <small>Panel</small>
+                </a>
+                <a href="{{ url_for('parties.list_parties') }}" class="nav-link text-center py-1 {% if 'parties' in request.endpoint|default('') %}active{% endif %}">
+                    <i class="bi bi-people d-block fs-5"></i>
+                    <small>Kişiler</small>
+                </a>
+                <a href="{{ url_for('invoices.list_invoices') }}" class="nav-link text-center py-1 {% if 'invoice' in request.endpoint|default('') %}active{% endif %}">
+                    <i class="bi bi-receipt d-block fs-5"></i>
+                    <small>Faturalar</small>
+                </a>
+                <a href="{{ url_for('payments.list_payments') }}" class="nav-link text-center py-1 {% if 'payment' in request.endpoint|default('') %}active{% endif %}">
+                    <i class="bi bi-cash-coin d-block fs-5"></i>
+                    <small>Tahsilat</small>
+                </a>
+                <a href="{{ url_for('settings.index') }}" class="nav-link text-center py-1 {% if request.endpoint == 'settings.index' %}active{% endif %}">
+                    <i class="bi bi-gear d-block fs-5"></i>
+                    <small>Ayarlar</small>
+                </a>
+            </div>
+        </div>
     </div>
 </nav>
+
+<!-- Mobile body padding -->
+<style>
+@media (max-width: 767.98px) {
+    body {
+        padding-bottom: 70px;
+    }
+    #mobile-nav {
+        z-index: 1030;
+    }
+}
+</style>

@@ -18,8 +18,10 @@ def create_app(config_class=Config) -> Flask:
     from .routes.auth import auth_bp
     from .routes.dashboard import dashboard_bp
     from .routes.patients import patients_bp
+    from .routes.parties import parties_bp
     from .routes.treatments import treatments_bp
     from .routes.invoices import invoices_bp
+    from .routes.payments import payments_bp
     from .routes.settings import settings_bp
     from .routes.whatsapp import whatsapp_bp
     from .routes.reports import reports_bp
@@ -27,8 +29,10 @@ def create_app(config_class=Config) -> Flask:
     app.register_blueprint(auth_bp)
     app.register_blueprint(dashboard_bp)
     app.register_blueprint(patients_bp, url_prefix="/patients")
+    app.register_blueprint(parties_bp, url_prefix="/parties")
     app.register_blueprint(treatments_bp, url_prefix="/treatments")
     app.register_blueprint(invoices_bp, url_prefix="/invoices")
+    app.register_blueprint(payments_bp, url_prefix="/payments")
     app.register_blueprint(settings_bp, url_prefix="/settings")
     app.register_blueprint(whatsapp_bp, url_prefix="/whatsapp")
     app.register_blueprint(reports_bp, url_prefix="/reports")

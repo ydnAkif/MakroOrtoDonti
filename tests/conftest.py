@@ -8,7 +8,9 @@ import pytest
 from app import create_app
 from app.extensions import db
 from app.models.base import Base
-from app.models.models import ExchangeRate, Patient, PatientTreatment, Settings, Treatment, User
+from app.models.models import (
+    ExchangeRate, Patient, PatientTreatment, Party, PartyType, Settings, Treatment, User
+)
 
 
 class TestConfig:
@@ -59,15 +61,41 @@ def app():
         )
 
         patient = Patient(first_name="Ayse", last_name="Yilmaz", phone="5551112233")
-        treatment = Treatment(name="Consultation", category="other", price_eur=50.0)
         db.session.add(patient)
-        db.session.add(treatment)
         db.session.flush()
+
+        treatments_seed = [
+            Treatment(name="Consultation", category="other", price_eur=50.0),
+            Treatment(name="Crown", category="prosthetic", price_eur=200.0),
+            Treatment(name="Extraction", category="surgical", price_eur=100.0),
+        ]
+        for t in treatments_seed:
+            db.session.add(t)
+        db.session.flush()
+
+        # Create Party linked to Patient
+        party = Party(
+            party_type=PartyType.PATIENT,
+            name=f"{patient.first_name} {patient.last_name}",
+            first_name=patient.first_name,
+            last_name=patient.last_name,
+            phone=patient.phone,
+            email=patient.email,
+            address=patient.address,
+            notes=patient.notes,
+            date_of_birth=patient.date_of_birth,
+            treatment_status=patient.treatment_status,
+            is_active=patient.is_active,
+        )
+        db.session.add(party)
+        db.session.flush()
+
+        patient.party_id = party.id
 
         db.session.add(
             PatientTreatment(
                 patient_id=patient.id,
-                treatment_id=treatment.id,
+                treatment_id=treatments_seed[0].id,
                 treatment_date=date.today(),
                 price_override_eur=55.0,
             )

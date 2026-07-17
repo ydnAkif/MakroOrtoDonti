@@ -24,6 +24,7 @@ def index():
         "settings/index.html",
         settings=settings_dict,
         exchange_rates=exchange_rates,
+        today=date.today(),
     )
 
 
