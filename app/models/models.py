@@ -93,6 +93,10 @@ class Party(Base, TimestampMixin):
     contact_person: Mapped[str | None] = mapped_column(String(150), nullable=True)
     contact_phone: Mapped[str | None] = mapped_column(String(20), nullable=True)
 
+    # Doctor link (patients -> referring dentist)
+    referred_by_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("parties.id"), nullable=True, index=True)
+    referred_by = relationship("Party", remote_side="Party.id", foreign_keys=[referred_by_id], lazy="selectin")
+
     # Relationships
     invoices: Mapped[list["Invoice"]] = relationship(
         back_populates="party", lazy="selectin"

@@ -41,7 +41,16 @@ def init_db() -> None:
     os.makedirs(DATABASE_DIR, exist_ok=True)
     with current_app.app_context():
         Base.metadata.create_all(bind=db.engine)
+        _migrate_columns(db.engine)
         _create_indexes(db.engine)
+
+
+def _migrate_columns(engine) -> None:
+    """Add columns to existing tables for schema evolution."""
+    with engine.begin() as conn:
+        cols = [r[1] for r in conn.execute(text("PRAGMA table_info(parties)")).fetchall()]
+        if "referred_by_id" not in cols:
+            conn.execute(text("ALTER TABLE parties ADD COLUMN referred_by_id INTEGER REFERENCES parties(id)"))
 
 
 def _create_indexes(engine) -> None:
@@ -64,6 +73,7 @@ def _create_indexes(engine) -> None:
             "CREATE INDEX IF NOT EXISTS idx_invoice_items_type ON invoice_items(item_type)",
             "CREATE INDEX IF NOT EXISTS idx_payments_invoice ON payments(invoice_id)",
             "CREATE INDEX IF NOT EXISTS idx_payments_date ON payments(payment_date)",
+            "CREATE INDEX IF NOT EXISTS idx_parties_referred_by ON parties(referred_by_id)",
         ]
         for stmt in indexes:
             conn.execute(text(stmt))

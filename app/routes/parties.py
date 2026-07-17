@@ -71,12 +71,16 @@ def add_party():
             contact_phone=request.form.get("contact_phone", "").strip() or None,
             is_active=request.form.get("is_active") == "on",
         )
+        party.referred_by_id = request.form.get("referred_by_id", type=int)
         db.session.add(party)
         db.session.commit()
         flash(f"{party.display_name} başarıyla eklendi.", "success")
         return redirect(url_for("parties.detail_party", party_id=party.id))
 
-    return render_template("parties/form.html", party=None)
+    dentists = db.session.execute(
+        db.select(Party).where(Party.party_type == PartyType.DENTIST_CUSTOMER, Party.is_active == True).order_by(Party.name)
+    ).scalars().all()
+    return render_template("parties/form.html", party=None, dentists=dentists)
 
 
 @parties_bp.route("/<int:party_id>")
@@ -127,12 +131,16 @@ def edit_party(party_id):
         party.contact_person = request.form.get("contact_person", "").strip() or None
         party.contact_phone = request.form.get("contact_phone", "").strip() or None
         party.is_active = request.form.get("is_active") == "on"
+        party.referred_by_id = request.form.get("referred_by_id", type=int)
         
         db.session.commit()
         flash(f"{party.display_name} güncellendi.", "success")
         return redirect(url_for("parties.detail_party", party_id=party.id))
 
-    return render_template("parties/form.html", party=party)
+    dentists = db.session.execute(
+        db.select(Party).where(Party.party_type == PartyType.DENTIST_CUSTOMER, Party.is_active == True).order_by(Party.name)
+    ).scalars().all()
+    return render_template("parties/form.html", party=party, dentists=dentists)
 
 
 @parties_bp.route("/<int:party_id>/delete", methods=["POST"])

@@ -5,8 +5,9 @@
             <i class="bi bi-list fs-4"></i>
         </button>
 
-        <a class="navbar-brand fw-bold" href="{{ url_for('dashboard.index') }}">
-            <i class="bi bi-tooth"></i> {{ clinic_name }}
+        <a class="navbar-brand fw-bold d-flex align-items-center" href="{{ url_for('dashboard.index') }}">
+            <img src="{{ url_for('static', filename='images/logo.png') }}" alt="Logo" height="32" class="me-2 rounded">
+            {{ clinic_name }}
         </a>
 
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
@@ -35,7 +36,7 @@
 <!-- Offcanvas sidebar for mobile -->
 <div class="offcanvas offcanvas-start d-md-none" tabindex="-1" id="sidebar" aria-labelledby="sidebarLabel">
     <div class="offcanvas-header bg-primary text-white">
-        <h5 class="offcanvas-title" id="sidebarLabel"><i class="bi bi-tooth me-2"></i>{{ clinic_name }}</h5>
+        <h5 class="offcanvas-title" id="sidebarLabel"><img src="{{ url_for('static', filename='images/logo.png') }}" alt="Logo" height="28" class="me-2 rounded">{{ clinic_name }}</h5>
         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" aria-label="Close"></button>
     </div>
     <div class="offcanvas-body p-0">

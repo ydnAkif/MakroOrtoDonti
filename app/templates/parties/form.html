@@ -67,6 +67,15 @@
                                     <option value="inactive" {% if party and party.treatment_status == 'inactive' %}selected{% endif %}>Pasif</option>
                                 </select>
                             </div>
+                            <div class="col-md-6">
+                                <label for="referred_by_id" class="form-label">Diş Hekimi (Sevk Eden)</label>
+                                <select class="form-select" id="referred_by_id" name="referred_by_id">
+                                    <option value="">Yok</option>
+                                    {% for d in dentists %}
+                                    <option value="{{ d.id }}" {% if party and party.referred_by_id == d.id %}selected{% endif %}>{{ d.display_name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
                         </div>
                     </div>
 
