@@ -92,6 +92,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     hiddenInput.value = opt.value;
                     input.value = opt.textContent.trim();
                     list.style.display = 'none';
+                    hiddenInput.dispatchEvent(new Event('change', { bubbles: true }));
                 });
                 list.appendChild(btn);
             });

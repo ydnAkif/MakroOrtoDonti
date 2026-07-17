@@ -25,11 +25,16 @@
                     <!-- Party Type Selector -->
                     <div class="mb-3">
                         <label class="form-label">Müşteri Tipi <span class="text-danger">*</span></label>
-                        <select class="form-select" name="party_type" id="party_type" {% if party %}disabled{% endif %} required>
-                            <option value="patient" {% if not party or party.party_type.value == 'patient' %}selected{% endif %}>Hasta</option>
-                            <option value="dentist_customer" {% if party and party.party_type.value == 'dentist_customer' %}selected{% endif %}>Diş Hekimi Müşterisi</option>
-                            <option value="company_customer" {% if party and party.party_type.value == 'company_customer' %}selected{% endif %}>Kurumsal Müşteri</option>
+                        {% if party %}
+                        <input type="hidden" name="party_type" value="{{ party.party_type.value }}">
+                        <input type="text" class="form-control" value="{{ 'Hasta' if party.party_type.value == 'patient' else ('Diş Hekimi Müşterisi' if party.party_type.value == 'dentist_customer' else 'Kurumsal Müşteri') }}" disabled>
+                        {% else %}
+                        <select class="form-select" name="party_type" id="party_type" required>
+                            <option value="patient" selected>Hasta</option>
+                            <option value="dentist_customer">Diş Hekimi Müşterisi</option>
+                            <option value="company_customer">Kurumsal Müşteri</option>
                         </select>
+                        {% endif %}
                     </div>
 
                     <!-- Patient Fields -->

@@ -390,12 +390,17 @@ function openItemModal(type) {
     new bootstrap.Modal(document.getElementById('itemModal')).show();
 }
 
-// Auto-populate fields when treatment is selected
-document.getElementById('item-treatment-id').addEventListener('change', function() {
-    const opt = this.options[this.selectedIndex];
-    if (this.value && opt.dataset.price) {
-        document.getElementById('item-description').value = opt.textContent.trim().split(' (€')[0];
-        document.getElementById('item-unit-price-eur').value = parseFloat(opt.dataset.price);
+// Auto-populate fields when treatment is selected (works with typeahead hidden input)
+document.addEventListener('change', function(e) {
+    if (e.target.name === 'treatment_id' && e.target.type === 'hidden') {
+        const val = e.target.value;
+        if (val) {
+            const treatment = treatments.find(t => t.id == val);
+            if (treatment) {
+                document.getElementById('item-description').value = treatment.name;
+                document.getElementById('item-unit-price-eur').value = treatment.price_eur;
+            }
+        }
     }
 });
 
