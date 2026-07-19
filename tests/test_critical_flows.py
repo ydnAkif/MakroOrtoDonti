@@ -132,6 +132,22 @@ def test_invoice_pdf_download_works(client, app):
     assert response.mimetype == "application/pdf"
 
 
+def test_invoice_form_totals_and_item_modal_reset_contract(client):
+    login(client, "admin", "admin-pass")
+
+    response = client.get("/invoices/add")
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+
+    assert 'id="subtotal-eur"' in html
+    assert 'id="grand-total-eur"' in html
+    assert 'id="grand-total-try"' in html
+    assert "line-subtotal-eur" not in html
+    assert "line-vat-eur" not in html
+    assert "function resetItemForm" in html
+    assert "hidden.bs.modal" in html
+
+
 def test_invoice_category_and_date_rate_api(client, app):
     login(client, "admin", "admin-pass")
 

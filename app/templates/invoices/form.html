@@ -309,8 +309,6 @@ function recalculateTotals() {
         
         // Update row totals
         row.querySelector('.line-total-eur').textContent = formatCurrencyEUR(calc.total);
-        row.querySelector('.line-subtotal-eur').textContent = formatCurrencyEUR(calc.subtotal);
-        row.querySelector('.line-vat-eur').textContent = formatCurrencyEUR(calc.vat);
     });
     
     document.getElementById('subtotal-eur').textContent = formatCurrencyEUR(subtotal);
@@ -386,23 +384,30 @@ function addItemToTable(item) {
     recalculateTotals();
 }
 
-function openItemModal(type) {
+function resetSearchableSelect(select) {
+    if (!select) return;
+    select.value = '';
+    const wrapper = select.closest('.typeahead-wrapper');
+    const searchInput = wrapper ? wrapper.querySelector('input[type="text"]') : null;
+    if (searchInput) searchInput.value = '';
+}
+
+function resetItemForm(type = '') {
+    const form = document.getElementById('item-form');
+    form.reset();
     document.getElementById('item-index').value = '';
     document.getElementById('item-type').value = type;
-    document.getElementById('item-form').reset();
     document.getElementById('item-quantity').value = 1;
     document.getElementById('item-vat-rate').value = 0;
     document.getElementById('item-discount-type').value = '';
     document.getElementById('item-discount-value').value = 0;
     document.getElementById('treatment-field').classList.add('d-none');
-    
-    const tSelect = document.getElementById('item-treatment-id');
-    if (tSelect) {
-        tSelect.value = '';
-        const tInput = tSelect.parentNode ? tSelect.parentNode.querySelector('input[type="text"]') : null;
-        if (tInput) tInput.value = '';
-    }
-    
+    resetSearchableSelect(document.getElementById('item-treatment-id'));
+}
+
+function openItemModal(type) {
+    resetItemForm(type);
+
     const titles = {
         'treatment': 'Tedavi Ekle',
         'product': 'Ürün Ekle',
@@ -418,6 +423,10 @@ function openItemModal(type) {
     
     new bootstrap.Modal(document.getElementById('itemModal')).show();
 }
+
+document.getElementById('itemModal').addEventListener('hidden.bs.modal', function() {
+    resetItemForm();
+});
 
 // Auto-populate fields when treatment is selected (works with typeahead hidden input)
 document.addEventListener('change', function(e) {
@@ -501,8 +510,8 @@ document.getElementById('item-form').addEventListener('submit', function(e) {
         addItemToTable(item);
     }
     
-    bootstrap.Modal.getInstance(document.getElementById('itemModal')).hide();
     recalculateTotals();
+    bootstrap.Modal.getInstance(document.getElementById('itemModal')).hide();
 });
 
 // Customer select handler
