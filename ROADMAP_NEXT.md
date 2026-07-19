@@ -18,6 +18,7 @@ Hedef: Hasta merkezli kayit yapisini, dis hekimi musterileri ve kurumsal musteri
   - `Invoice.patient_id` gecis suresince uyumluluk kolonu olarak kaldi ✅
 
 Asamali gecis: ✅ TAMAMLANDI
+
 1. `Party` tablosunu ekle, mevcut hastalari Party'ye backfill et. ✅
 2. Yeni kayit ekranlarini `Party` uzerinden calistir. ✅
 3. Raporlari Party bazli hale getir. ✅ (Parties listesi + filtreler)
@@ -39,6 +40,7 @@ Hedef: Sadece tedavi degil, urun, laboratuvar, danismanlik gibi satirlari da ayn
 ## 3) UI/UX: once bilgi mimarisi ✅ TAMAMLANDI
 
 Ana menu hedefi: ✅
+
 - Panel ✅
 - Kisiler ✅
 - Tedavi Katalogu ✅
@@ -48,10 +50,12 @@ Ana menu hedefi: ✅
 - Ayarlar ✅
 
 Kisiler (Parties) bilgi mimarisi: ✅
+
 - Liste: tip, durum, son islem, borc bakiyesi ✅
 - Detay sekmeleri: Profil / Islem gecmisi / Faturalar / Iletisim gecmisi ✅ (tek sayfada)
 
 Finans bilgi mimarisi: ✅
+
 - Fatura listesi ✅
 - Tahsilat listesi ✅
 - Kur yonetimi ✅
@@ -91,6 +95,7 @@ Finans bilgi mimarisi: ✅
 ### Gecen Testler (65/65)
 
 **test_critical_flows.py (18 test)**
+
 - `test_login_success` ✅
 - `test_invoice_create_flow` ✅ (legacy + yeni format)
 - `test_settings_update_does_not_overwrite_unsent_fields` ✅
@@ -111,6 +116,7 @@ Finans bilgi mimarisi: ✅
 - `test_party_api_info` ✅
 
 **test_comprehensive.py (47 test)**
+
 - Auth: login invalid creds, logout, unauthenticated redirect ✅
 - Dashboard: sayfa yukleme ✅
 - Patients: list, add (+ Party olusturma), detail, edit (+ Party sync), delete (+ Party deaktivasyonu), add-treatment ✅
@@ -127,6 +133,7 @@ Finans bilgi mimarisi: ✅
 ## Yapilacaklar (Sirali)
 
 ### Hemen
+
 1. [x] Test dosyasini genislet (56/56 → 65/65 geciyor) ✅
 2. [x] Reports sayfasina Yaslandirma raporu (aging) ✅
 3. [x] Invoice modal formunda KDV/Iskonto alanlari gorunurlugu ✅
@@ -136,15 +143,22 @@ Finans bilgi mimarisi: ✅
 7. [x] Bug fix regression testleri ekle ✅ (9 yeni test)
 
 ### Kisa Vadeli
-8. [ ] API endpoint'leri (mobil entegrasyon icin)
-9. [ ] Patient modelinden `party_id` ve `Patient.party` relationship'ini kullanarak `Patient` bagimliligi azaltma
-10. [ ] Randevu sistemi (Calendar entegrasyonu)
+
+8. [ ] Patient liste ekraninda Party->Patient id haritalama hatasini duzelt
+9. [ ] SMTP sifre saklama modelini guvenli hale getir (encrypt veya env-only) + UI'da geri gostermeyi kaldir
+10. [ ] Login endpoint icin rate-limit + gecikmeli lockout ekle
+11. [ ] Form parse noktalarinda defensive validation standardi (date/enum/float) uygula
+12. [ ] Dashboard ve Reports metriklerini Party-first modele gecir
+13. [ ] API endpoint'leri (mobil entegrasyon icin)
+14. [ ] Patient modelinden `party_id` ve `Patient.party` relationship'ini kullanarak `Patient` bagimliligi azaltma
+15. [ ] Randevu sistemi (Calendar entegrasyonu)
 
 ### Uzun Vadeli
-11. [ ] Otomatik SQLite yedekleme (cron/job)
-12. [ ] Coklu dil (i18n) altyapisi
-13. [ ] Barkod/QR fatura
-14. [ ] Stok yonetimi (urun kalemleri icin)
+
+16. [ ] Otomatik SQLite yedekleme (cron/job)
+17. [ ] Coklu dil (i18n) altyapisi
+18. [ ] Barkod/QR fatura
+19. [ ] Stok yonetimi (urun kalemleri icin)
 
 ---
 
@@ -157,3 +171,29 @@ Finans bilgi mimarisi: ✅
 - ✅ Faz E: performans/test kapsam genisletme (65 test, tumunu geciyor)
 - ✅ Faz F: Tedavi yonetimi + sevk sistemi + UX duzeltmeleri
 - ✅ Faz G: TODO.md bug fixleri (13/15 duzeltildi, 2 bekliyor)
+- 🟡 Faz H: Production hardening + Party-Patient gecis tamamlama (devam ediyor)
+
+## Faz H (Yeni) - Production Hardening
+
+Hedef: Uygulamayi guvenlik, operasyon ve veri butunlugu acisindan production seviyesine yaklastirmak.
+
+1. Kimlik ve gizli bilgi guvenligi
+
+- `.env` policy sertlestirme (`FLASK_DEBUG=false`, guclu `SECRET_KEY`, default admin sifre kaldirma)
+- SMTP sifresini plaintext saklamayi birak
+
+2. Veri modeli tutarliligi
+
+- Party-first akisa tam gecis
+- Patient route ve template baglantilarinda id tutarliligi
+
+3. Dayaniklilik
+
+- Validation katmani ile malformed input'larda 400 + acik hata mesaji
+- Kur cekme mekanizmasini request disi background job'a tasima
+
+4. Test genisletme
+
+- CSRF enabled test seti
+- Invalid payload/regression testleri
+- Auth brute-force smoke testleri
