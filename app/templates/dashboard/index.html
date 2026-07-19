@@ -141,13 +141,32 @@
             <div class="card-body p-0">
                 <div class="list-group list-group-flush">
                     {% for p in recent_patients %}
-                    <a href="{{ url_for('patients.detail_patient', patient_id=p.patient.id if p.patient else p.id) }}" class="list-group-item list-group-item-action">
+                    {% set st = (p.treatment_status or 'active')|lower %}
+                    <a href="{{ url_for('patients.detail_patient', patient_id=p.patient.id if p.patient else p.id) }}" 
+                       class="list-group-item list-group-item-action py-3 border-start border-3 {% if st == 'active' %}border-success{% elif st == 'completed' %}border-primary{% elif st == 'planned' %}border-info{% elif st == 'on_hold' %}border-warning{% else %}border-secondary{% endif %}">
                         <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <h6 class="mb-0">{{ p.full_name }}</h6>
-                                <small class="text-muted">{{ p.phone or '' }}</small>
+                            <div class="d-flex align-items-center">
+                                <div class="avatar-circle me-3 bg-primary bg-opacity-10 text-primary fw-bold rounded-circle d-flex align-items-center justify-content-center" style="width: 38px; height: 38px; font-size: 0.85rem;">
+                                    {{ (p.full_name[:2] if p.full_name else 'H')|upper }}
+                                </div>
+                                <div>
+                                    <h6 class="mb-0 fw-semibold">{{ p.full_name }}</h6>
+                                    <small class="text-muted"><i class="bi bi-telephone text-muted me-1"></i>{{ p.phone or 'Telefon yok' }}</small>
+                                </div>
                             </div>
-                            <small class="text-muted">{{ p.treatment_status }}</small>
+                            <div>
+                                {% if st == 'active' %}
+                                    <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 px-2 py-1"><i class="bi bi-activity me-1"></i> Aktif Tedavi</span>
+                                {% elif st == 'completed' %}
+                                    <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 px-2 py-1"><i class="bi bi-check-circle me-1"></i> Tamamlandı</span>
+                                {% elif st == 'planned' %}
+                                    <span class="badge bg-info bg-opacity-10 text-info border border-info border-opacity-25 px-2 py-1"><i class="bi bi-calendar-event me-1"></i> Planlandı</span>
+                                {% elif st == 'on_hold' %}
+                                    <span class="badge bg-warning bg-opacity-10 text-warning border border-warning border-opacity-25 px-2 py-1"><i class="bi bi-pause-circle me-1"></i> Beklemede</span>
+                                {% else %}
+                                    <span class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-25 px-2 py-1"><i class="bi bi-circle me-1"></i> Pasif</span>
+                                {% endif %}
+                            </div>
                         </div>
                     </a>
                     {% else %}

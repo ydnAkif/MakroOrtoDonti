@@ -53,12 +53,17 @@
                 <hr>
                 <p class="mb-1"><strong>Doğum Tarihi:</strong> {% if party.date_of_birth %}{{ party.date_of_birth.strftime('%d.%m.%Y') }}{% else %}-{% endif %}</p>
                 <p class="mb-1"><strong>Tedavi Durumu:</strong> 
-                    {% if party.treatment_status == 'active' %}
-                        <span class="badge bg-success">Aktif</span>
-                    {% elif party.treatment_status == 'completed' %}
-                        <span class="badge bg-primary">Tamamlandı</span>
+                    {% set st = (party.treatment_status or 'active')|lower %}
+                    {% if st == 'active' %}
+                        <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 px-2 py-1"><i class="bi bi-activity me-1"></i> Aktif</span>
+                    {% elif st == 'completed' %}
+                        <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 px-2 py-1"><i class="bi bi-check-circle me-1"></i> Tamamlandı</span>
+                    {% elif st == 'planned' %}
+                        <span class="badge bg-info bg-opacity-10 text-info border border-info border-opacity-25 px-2 py-1"><i class="bi bi-calendar-event me-1"></i> Planlandı</span>
+                    {% elif st == 'on_hold' %}
+                        <span class="badge bg-warning bg-opacity-10 text-warning border border-warning border-opacity-25 px-2 py-1"><i class="bi bi-pause-circle me-1"></i> Beklemede</span>
                     {% else %}
-                        <span class="badge bg-secondary">{{ party.treatment_status }}</span>
+                        <span class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-25 px-2 py-1"><i class="bi bi-circle me-1"></i> Pasif</span>
                     {% endif %}
                 </p>
                 {% endif %}

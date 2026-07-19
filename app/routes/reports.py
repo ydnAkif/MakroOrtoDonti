@@ -4,7 +4,7 @@ from datetime import date, timedelta
 from sqlalchemy import func
 
 from app.extensions import db
-from app.models.models import Invoice, Patient, PatientTreatment, Treatment, TreatmentCategory, ExchangeRate, Party, PartyType
+from app.models.models import Invoice, Patient, PatientTreatment, Treatment, TreatmentCategory, ExchangeRate, Party, PartyType, InvoiceItem
 
 reports_bp = Blueprint("reports", __name__)
 
@@ -52,29 +52,71 @@ def index():
         )
     ).one()
 
-    # Treatment statistics
-    treatment_stats = db.session.execute(
+    # Treatment statistics (counts from InvoiceItem + PatientTreatment)
+    inv_counts = db.session.execute(
         db.select(
-            Treatment.name,
-            Treatment.category,
-            func.count(PatientTreatment.id).label("count"),
+            InvoiceItem.treatment_id,
+            func.sum(InvoiceItem.quantity).label("qty")
         )
-        .join(PatientTreatment, PatientTreatment.treatment_id == Treatment.id)
-        .group_by(Treatment.id)
-        .order_by(func.count(PatientTreatment.id).desc())
-        .limit(10)
+        .where(InvoiceItem.item_type == "treatment", InvoiceItem.treatment_id.isnot(None))
+        .group_by(InvoiceItem.treatment_id)
     ).all()
 
-    # Category statistics
-    category_stats = db.session.execute(
+    pt_counts = db.session.execute(
         db.select(
-            Treatment.category,
-            func.count(PatientTreatment.id).label("count"),
+            PatientTreatment.treatment_id,
+            func.count(PatientTreatment.id).label("qty")
         )
-        .join(PatientTreatment, PatientTreatment.treatment_id == Treatment.id)
-        .group_by(Treatment.category)
-        .order_by(func.count(PatientTreatment.id).desc())
+        .where(PatientTreatment.treatment_id.isnot(None))
+        .group_by(PatientTreatment.treatment_id)
     ).all()
+
+    totals_by_id = {}
+    for tid, qty in inv_counts:
+        if tid:
+            totals_by_id[tid] = totals_by_id.get(tid, 0) + int(qty or 0)
+    for tid, qty in pt_counts:
+        if tid:
+            totals_by_id[tid] = totals_by_id.get(tid, 0) + int(qty or 0)
+
+    treatments_list = []
+    if totals_by_id:
+        treatments_in_db = db.session.execute(
+            db.select(Treatment).where(Treatment.id.in_(totals_by_id.keys()))
+        ).scalars().all()
+        
+        for t in treatments_in_db:
+            treatments_list.append({
+                "id": t.id,
+                "name": t.name,
+                "category": t.category,
+                "count": totals_by_id.get(t.id, 0)
+            })
+        
+        treatments_list.sort(key=lambda x: x["count"], reverse=True)
+    else:
+        all_treatments = db.session.execute(
+            db.select(Treatment).order_by(Treatment.name).limit(10)
+        ).scalars().all()
+        treatments_list = [{
+            "id": t.id,
+            "name": t.name,
+            "category": t.category,
+            "count": 0
+        } for t in all_treatments]
+
+    treatment_stats = treatments_list[:10]
+
+    # Category statistics
+    category_counts = {}
+    for item in treatments_list:
+        cat = item["category"] or "other"
+        category_counts[cat] = category_counts.get(cat, 0) + item["count"]
+
+    category_stats = [
+        {"category": cat, "count": count}
+        for cat, count in sorted(category_counts.items(), key=lambda x: x[1], reverse=True)
+    ]
 
     category_labels = {
         "orthodontic": "Ortodonti",
@@ -82,7 +124,8 @@ def index():
         "surgical": "Cerrahi",
         "preventive": "Koruyucu",
         "restorative": "Restoratif",
-        "periodontic": "Perio/Endo",
+        "periodontic": "Periodontoloji (Diş Eti)",
+        "endodontic": "Endodonti (Kanal Tedavisi)",
         "implant": "İmplant",
         "cosmetic": "Kozmetik",
         "other": "Diğer",
