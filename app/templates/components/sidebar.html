@@ -1,8 +1,8 @@
-<nav id="sidebar" class="col-md-3 col-lg-2 d-md-block bg-light sidebar collapse border-end">
+<nav id="sidebar" class="col-md-3 col-lg-2 d-md-block bg-body-tertiary sidebar collapse border-end">
     <div class="position-sticky pt-3">
         <!-- Logo / Brand -->
         <div class="px-3 mb-3">
-            <a href="{{ url_for('dashboard.index') }}" class="d-flex align-items-center text-decoration-none text-dark">
+            <a href="{{ url_for('dashboard.index') }}" class="d-flex align-items-center text-decoration-none text-body">
                 <img src="{{ url_for('static', filename='images/logo.png') }}" alt="Logo" height="36" class="me-2 rounded">
                 <span class="fw-bold fs-5">{{ clinic_name }}</span>
             </a>
@@ -85,7 +85,7 @@
         </ul>
 
         <!-- Mobil alt navigasyon (sidebar kapanıkken görünür) -->
-        <div class="d-md-none fixed-bottom bg-white border-top shadow-sm p-2" id="mobile-nav">
+        <div class="d-md-none fixed-bottom bg-body border-top shadow-sm p-2" id="mobile-nav">
             <div class="d-flex justify-content-around">
                 <a href="{{ url_for('dashboard.index') }}" class="nav-link text-center py-1 {% if request.endpoint == 'dashboard.index' %}active{% endif %}">
                     <i class="bi bi-speedometer2 d-block fs-5"></i>

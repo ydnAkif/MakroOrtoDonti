@@ -162,4 +162,32 @@ document.addEventListener('DOMContentLoaded', function() {
             bsAlert.close();
         }, 5000);
     });
+    // Theme toggle click handler
+    var themeToggle = document.getElementById('theme-toggle');
+    if (themeToggle) {
+        var themeToggleIcon = document.getElementById('theme-toggle-icon');
+        
+        function updateIcon(theme) {
+            if (themeToggleIcon) {
+                if (theme === 'dark') {
+                    themeToggleIcon.className = 'bi bi-sun-fill';
+                } else {
+                    themeToggleIcon.className = 'bi bi-moon-fill';
+                }
+            }
+        }
+        
+        // Initial icon state
+        var currentTheme = document.documentElement.getAttribute('data-bs-theme') || 'light';
+        updateIcon(currentTheme);
+        
+        themeToggle.addEventListener('click', function() {
+            var activeTheme = document.documentElement.getAttribute('data-bs-theme');
+            var nextTheme = activeTheme === 'dark' ? 'light' : 'dark';
+            
+            document.documentElement.setAttribute('data-bs-theme', nextTheme);
+            localStorage.setItem('theme', nextTheme);
+            updateIcon(nextTheme);
+        });
+    }
 });

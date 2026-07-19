@@ -1,11 +1,11 @@
-<nav class="navbar navbar-expand-lg navbar-dark bg-primary fixed-top shadow-sm">
+<nav class="navbar navbar-expand-lg fixed-top shadow-sm bg-body-tertiary">
     <div class="container-fluid">
         <!-- Sidebar toggle for mobile -->
-        <button class="btn btn-light me-2 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#sidebar" aria-controls="sidebar">
+        <button class="btn btn-outline-secondary me-2 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#sidebar" aria-controls="sidebar">
             <i class="bi bi-list fs-4"></i>
         </button>
 
-        <a class="navbar-brand fw-bold d-flex align-items-center" href="{{ url_for('dashboard.index') }}">
+        <a class="navbar-brand fw-bold d-flex align-items-center text-body" href="{{ url_for('dashboard.index') }}">
             <img src="{{ url_for('static', filename='images/logo.png') }}" alt="Logo" height="32" class="me-2 rounded">
             {{ clinic_name }}
         </a>
@@ -15,13 +15,19 @@
         </button>
 
         <div class="collapse navbar-collapse" id="navbarNav">
-            <ul class="navbar-nav ms-auto">
+            <ul class="navbar-nav ms-auto align-items-center">
+                <!-- Theme Toggle Button -->
+                <li class="nav-item me-2">
+                    <button class="btn" id="theme-toggle" type="button" title="Koyu/Açık Tema">
+                        <i class="bi bi-moon-fill" id="theme-toggle-icon"></i>
+                    </button>
+                </li>
                 {% if current_user.is_authenticated %}
                 <li class="nav-item dropdown">
-                    <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">
+                    <a class="nav-link dropdown-toggle text-body" href="#" data-bs-toggle="dropdown">
                         <i class="bi bi-person-circle"></i> {{ current_user.full_name }}
                     </a>
-                    <ul class="dropdown-menu dropdown-menu-end">
+                    <ul class="dropdown-menu dropdown-menu-end shadow-sm">
                         <li><a class="dropdown-item" href="{{ url_for('settings.index') }}"><i class="bi bi-gear"></i> Ayarlar</a></li>
                         <li><hr class="dropdown-divider"></li>
                         <li><form method="POST" action="{{ url_for('auth.logout') }}" class="d-inline"><button type="submit" class="dropdown-item text-danger"><i class="bi bi-box-arrow-right"></i> Çıkış</button></form></li>
@@ -35,9 +41,12 @@
 
 <!-- Offcanvas sidebar for mobile -->
 <div class="offcanvas offcanvas-start d-md-none" tabindex="-1" id="sidebar" aria-labelledby="sidebarLabel">
-    <div class="offcanvas-header bg-primary text-white">
-        <h5 class="offcanvas-title" id="sidebarLabel"><img src="{{ url_for('static', filename='images/logo.png') }}" alt="Logo" height="28" class="me-2 rounded">{{ clinic_name }}</h5>
-        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+    <div class="offcanvas-header bg-body-tertiary border-bottom">
+        <h5 class="offcanvas-title" id="sidebarLabel">
+            <img src="{{ url_for('static', filename='images/logo.png') }}" alt="Logo" height="28" class="me-2 rounded">
+            <span class="text-body fw-bold">{{ clinic_name }}</span>
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
     </div>
     <div class="offcanvas-body p-0">
         {% include 'components/sidebar.html' %}
