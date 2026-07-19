@@ -44,6 +44,13 @@ def list_payments():
     query = query.order_by(Payment.payment_date.desc())
     payments = db.session.execute(query).scalars().all()
 
+    # Pending/Unpaid invoices
+    pending_invoices = db.session.execute(
+        db.select(Invoice)
+        .where(Invoice.status.in_([Invoice.STATUS_PENDING, Invoice.STATUS_OVERDUE]))
+        .order_by(Invoice.invoice_date.desc())
+    ).scalars().all()
+
     # Totals
     total_eur = sum(p.amount_eur for p in payments)
     total_try = sum(p.amount_try for p in payments)
@@ -51,6 +58,7 @@ def list_payments():
     return render_template(
         "payments/list.html",
         payments=payments,
+        pending_invoices=pending_invoices,
         total_eur=total_eur,
         total_try=total_try,
         selected_method=method,
@@ -124,16 +132,21 @@ def add_payment():
         flash(f"Ödeme kaydedildi: €{amount_eur:,.2f} (₺{amount_try:,.2f})", "success")
         return redirect(url_for("payments.list_payments"))
 
+    selected_invoice_id = request.args.get("invoice_id", type=int)
+
     # Get unpaid/partially paid invoices for dropdown
+    invoices_query = db.select(Invoice).where(Invoice.status.in_([Invoice.STATUS_PENDING, Invoice.STATUS_OVERDUE]))
+    if selected_invoice_id:
+        invoices_query = invoices_query.or_(Invoice.id == selected_invoice_id)
+
     invoices = db.session.execute(
-        db.select(Invoice)
-        .where(Invoice.status.in_([Invoice.STATUS_PENDING, Invoice.STATUS_OVERDUE]))
-        .order_by(Invoice.invoice_date.desc())
+        invoices_query.order_by(Invoice.invoice_date.desc())
     ).scalars().all()
 
     return render_template(
         "payments/form.html",
         invoices=invoices,
+        selected_invoice_id=selected_invoice_id,
         today=date.today(),
         current_rate=db.session.execute(
             db.select(ExchangeRate).order_by(ExchangeRate.rate_date.desc()).limit(1)

@@ -30,7 +30,8 @@
                                     data-total-eur="{{ inv.total_eur }}"
                                     data-total-try="{{ inv.total_try }}"
                                     data-balance-eur="{{ inv.total_eur - (inv.payments|sum(attribute='amount_eur')) }}"
-                                    data-status="{{ inv.status }}">
+                                    data-status="{{ inv.status }}"
+                                    {% if selected_invoice_id and inv.id == selected_invoice_id %}selected{% endif %}>
                                 {{ inv.invoice_number }} - {{ inv.party.display_name if inv.party else inv.patient.full_name }}
                                 (€{{ "{:,.2f}".format(inv.total_eur) }} / ₺{{ "{:,.2f}".format(inv.total_try) }})
                             </option>
@@ -171,6 +172,9 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Initialize
     paymentRate.value = currentRate.toFixed(4);
+    if (invoiceSelect.value) {
+        invoiceSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    }
     
     // Auto-focus on invoice select
     invoiceSelect.focus();

@@ -84,4 +84,44 @@ def create_app(config_class=Config) -> Flask:
             "auto_rate_error": auto_rate_error,
         }
 
+    # Database self-healing migration:
+    # Ensure any invoice marked as 'paid' has a corresponding payment record.
+    with app.app_context():
+        try:
+            from app.models.models import Invoice, Payment, PaymentMethod, ExchangeRate
+            
+            invoices = db.session.execute(
+                db.select(Invoice).where(Invoice.status == Invoice.STATUS_PAID)
+            ).scalars().all()
+            
+            updated = False
+            for inv in invoices:
+                total_paid = sum(p.amount_eur for p in inv.payments)
+                diff = inv.total_eur - total_paid
+                if diff > 0.01:
+                    rate = db.session.execute(
+                        db.select(ExchangeRate)
+                        .where(ExchangeRate.rate_date <= inv.invoice_date)
+                        .order_by(ExchangeRate.rate_date.desc())
+                        .limit(1)
+                    ).scalar_one_or_none()
+                    eur_to_try = rate.eur_to_try if rate else inv.exchange_rate
+                    
+                    payment = Payment(
+                        invoice_id=inv.id,
+                        payment_date=inv.invoice_date,
+                        amount_eur=diff,
+                        amount_try=round(diff * eur_to_try, 2),
+                        exchange_rate=eur_to_try,
+                        method=PaymentMethod.CASH,
+                        reference="Otomatik Geçmiş Tahsilat",
+                        notes="Veritabanı denetiminde eksik olan tahsilat kaydı otomatik tamamlandı.",
+                    )
+                    db.session.add(payment)
+                    updated = True
+            if updated:
+                db.session.commit()
+        except Exception:
+            pass
+
     return app

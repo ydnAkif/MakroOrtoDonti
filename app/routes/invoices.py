@@ -196,6 +196,33 @@ def update_status(invoice_id):
     invoice = db.get_or_404(Invoice, invoice_id)
     new_status = request.form.get("status", "")
     if new_status in [Invoice.STATUS_PENDING, Invoice.STATUS_PAID, Invoice.STATUS_OVERDUE, Invoice.STATUS_CANCELLED]:
+        if new_status == Invoice.STATUS_PAID:
+            total_paid = sum(p.amount_eur for p in invoice.payments)
+            diff = invoice.total_eur - total_paid
+            if diff > 0.01:
+                from datetime import date
+                from app.models.models import Payment, PaymentMethod, ExchangeRate
+                rate = db.session.execute(
+                    db.select(ExchangeRate)
+                    .where(ExchangeRate.rate_date <= invoice.invoice_date)
+                    .order_by(ExchangeRate.rate_date.desc())
+                    .limit(1)
+                ).scalar_one_or_none()
+                eur_to_try = rate.eur_to_try if rate else invoice.exchange_rate
+                
+                payment = Payment(
+                    invoice_id=invoice.id,
+                    payment_date=date.today(),
+                    amount_eur=diff,
+                    amount_try=round(diff * eur_to_try, 2),
+                    exchange_rate=eur_to_try,
+                    method=PaymentMethod.CASH,
+                    reference="Otomatik Tahsilat",
+                    notes="Fatura durumu manuel olarak 'Ödendi' yapıldığında otomatik oluşturuldu.",
+                )
+                db.session.add(payment)
+                flash(f"Otomatik tahsilat kaydı oluşturuldu: €{diff:,.2f}", "info")
+                
         invoice.status = new_status
         db.session.commit()
         flash(f"Fatura durumu güncellendi: {new_status}", "success")
