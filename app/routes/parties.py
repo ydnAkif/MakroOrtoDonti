@@ -55,12 +55,23 @@ def list_parties():
 @login_required
 def add_party():
     if request.method == "POST":
+        from app.services.validation_service import parse_date, parse_enum
+        party_type = parse_enum(PartyType, request.form.get("party_type", ""))
+        if not party_type:
+            flash("Geçersiz müşteri tipi seçildi.", "danger")
+            return redirect(url_for("parties.add_party"))
+
+        dob = parse_date(request.form.get("date_of_birth", "")) if request.form.get("date_of_birth") else None
+        if request.form.get("date_of_birth") and not dob:
+            flash("Geçersiz doğum tarihi formatı.", "danger")
+            return redirect(url_for("parties.add_party"))
+
         party = Party(
-            party_type=PartyType(request.form["party_type"]),
-            name=request.form.get("name", "").strip() or f"{request.form['first_name']} {request.form['last_name']}",
+            party_type=party_type,
+            name=request.form.get("name", "").strip() or f"{request.form.get('first_name', '')} {request.form.get('last_name', '')}".strip(),
             first_name=request.form.get("first_name", "").strip() or None,
             last_name=request.form.get("last_name", "").strip() or None,
-            date_of_birth=date.fromisoformat(request.form["date_of_birth"]) if request.form.get("date_of_birth") else None,
+            date_of_birth=dob,
             phone=request.form.get("phone", "").strip() or None,
             email=request.form.get("email", "").strip() or None,
             address=request.form.get("address", "").strip() or None,
@@ -73,6 +84,23 @@ def add_party():
         )
         party.referred_by_id = request.form.get("referred_by_id", type=int)
         db.session.add(party)
+        db.session.flush()
+
+        # Sync: Create Patient record if it is a patient
+        if party_type == PartyType.PATIENT:
+            from app.models.models import Patient
+            patient = Patient(
+                first_name=party.first_name or "",
+                last_name=party.last_name or "",
+                phone=party.phone,
+                email=party.email,
+                address=party.address,
+                notes=party.notes,
+                treatment_status=party.treatment_status,
+                party_id=party.id,
+            )
+            db.session.add(patient)
+
         db.session.commit()
         flash(f"{party.display_name} başarıyla eklendi.", "success")
         return redirect(url_for("parties.detail_party", party_id=party.id))
@@ -117,11 +145,22 @@ def edit_party(party_id):
     party = db.get_or_404(Party, party_id)
 
     if request.method == "POST":
-        party.party_type = PartyType(request.form["party_type"])
+        from app.services.validation_service import parse_date, parse_enum
+        party_type = parse_enum(PartyType, request.form.get("party_type", ""))
+        if not party_type:
+            flash("Geçersiz müşteri tipi seçildi.", "danger")
+            return redirect(url_for("parties.edit_party", party_id=party.id))
+
+        dob = parse_date(request.form.get("date_of_birth", "")) if request.form.get("date_of_birth") else None
+        if request.form.get("date_of_birth") and not dob:
+            flash("Geçersiz doğum tarihi formatı.", "danger")
+            return redirect(url_for("parties.edit_party", party_id=party.id))
+
+        party.party_type = party_type
         party.name = request.form.get("name", "").strip() or (f"{request.form['first_name']} {request.form['last_name']}" if request.form.get("first_name") else request.form.get("company_name", ""))
         party.first_name = request.form.get("first_name", "").strip() or None
         party.last_name = request.form.get("last_name", "").strip() or None
-        party.date_of_birth = date.fromisoformat(request.form["date_of_birth"]) if request.form.get("date_of_birth") else None
+        party.date_of_birth = dob
         party.phone = request.form.get("phone", "").strip() or None
         party.email = request.form.get("email", "").strip() or None
         party.address = request.form.get("address", "").strip() or None
@@ -133,6 +172,23 @@ def edit_party(party_id):
         party.is_active = request.form.get("is_active") == "on"
         party.referred_by_id = request.form.get("referred_by_id", type=int)
         
+        # Sync: Update corresponding Patient record if it is a patient
+        if party.party_type == PartyType.PATIENT:
+            from app.models.models import Patient
+            patient = party.patient
+            if not patient:
+                patient = Patient(party_id=party.id)
+                db.session.add(patient)
+            
+            patient.first_name = party.first_name or ""
+            patient.last_name = party.last_name or ""
+            patient.phone = party.phone
+            patient.email = party.email
+            patient.address = party.address
+            patient.notes = party.notes
+            patient.treatment_status = party.treatment_status
+            patient.is_active = party.is_active
+
         db.session.commit()
         flash(f"{party.display_name} güncellendi.", "success")
         return redirect(url_for("parties.detail_party", party_id=party.id))
@@ -149,6 +205,11 @@ def edit_party(party_id):
 def delete_party(party_id):
     party = db.get_or_404(Party, party_id)
     party.is_active = False
+    
+    # Sync: Deactivate corresponding Patient record if it is a patient
+    if party.party_type == PartyType.PATIENT and party.patient:
+        party.patient.is_active = False
+        
     db.session.commit()
     flash(f"{party.display_name} silindi.", "warning")
     return redirect(url_for("parties.list_parties"))

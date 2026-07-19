@@ -20,9 +20,12 @@ def index():
         db.select(ExchangeRate).order_by(ExchangeRate.rate_date.desc()).limit(30)
     ).scalars().all()
 
+    smtp_password_configured = bool(settings_dict.get("smtp_password"))
+
     return render_template(
         "settings/index.html",
         settings=settings_dict,
+        smtp_password_configured=smtp_password_configured,
         exchange_rates=exchange_rates,
         today=date.today(),
     )
@@ -45,6 +48,13 @@ def update_settings():
 
     for key in submitted_keys:
         value = request.form.get(key, "").strip()
+        
+        if key == "smtp_password":
+            if not value:
+                continue
+            from app.services.security_service import encrypt_value
+            value = encrypt_value(value)
+
         setting = db.session.execute(
             db.select(Settings).where(Settings.key == key)
         ).scalar_one_or_none()
@@ -69,8 +79,13 @@ def add_exchange_rate():
         flash("Tarih ve kur değeri zorunludur.", "danger")
         return redirect(url_for("settings.index"))
 
-    rate_date = date.fromisoformat(rate_date_str)
-    eur_try_rate = float(rate_value)
+    from app.services.validation_service import parse_date, parse_float
+    rate_date = parse_date(rate_date_str)
+    eur_try_rate = parse_float(rate_value)
+
+    if not rate_date or eur_try_rate is None or eur_try_rate <= 0:
+        flash("Geçersiz tarih veya kur değeri girildi.", "danger")
+        return redirect(url_for("settings.index"))
 
     existing = db.session.execute(
         db.select(ExchangeRate).where(

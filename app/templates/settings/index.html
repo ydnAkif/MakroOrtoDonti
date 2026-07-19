@@ -81,7 +81,7 @@
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Şifre</label>
-                        <input type="password" class="form-control" name="smtp_password" value="{{ settings.get('smtp_password', '') }}">
+                        <input type="password" class="form-control" name="smtp_password" placeholder="{% if smtp_password_configured %}•••••••• (Değiştirmek istemiyorsanız boş bırakın){% else %}SMTP Şifresi{% endif %}">
                     </div>
                     <button type="submit" class="btn btn-primary">
                         <i class="bi bi-check-lg"></i> Kaydet

@@ -74,6 +74,8 @@ def _create_indexes(engine) -> None:
             "CREATE INDEX IF NOT EXISTS idx_payments_invoice ON payments(invoice_id)",
             "CREATE INDEX IF NOT EXISTS idx_payments_date ON payments(payment_date)",
             "CREATE INDEX IF NOT EXISTS idx_parties_referred_by ON parties(referred_by_id)",
+            "CREATE INDEX IF NOT EXISTS idx_login_attempts_ip ON login_attempts(ip_address)",
+            "CREATE INDEX IF NOT EXISTS idx_login_attempts_user ON login_attempts(username)",
         ]
         for stmt in indexes:
             conn.execute(text(stmt))
@@ -162,7 +164,16 @@ def _is_valid_bcrypt_hash(password_hash: str | None) -> bool:
 
 def _resolve_admin_password() -> tuple[str, bool]:
     env_password = os.environ.get("DEFAULT_ADMIN_PASSWORD", "").strip()
+    is_debug = os.environ.get("FLASK_DEBUG", "false").lower() == "true"
+    is_testing = os.environ.get("TESTING", "false").lower() == "true" or os.environ.get("PYTEST_CURRENT_TEST") is not None
+    
     if env_password:
+        if env_password.lower() in ("admin123", "admin", "123456", "password") and not is_debug and not is_testing:
+            # Reject weak password in production, generate a secure one-time password
+            random_pw = secrets.token_urlsafe(12)
+            print(f"\n[CRITICAL SECURITY WARNING] Weak DEFAULT_ADMIN_PASSWORD '{env_password}' rejected in production!")
+            print(f"Generating a random secure one-time password instead: {random_pw}\n")
+            return random_pw, True
         return env_password, False
     return secrets.token_urlsafe(12), True
 

@@ -3,7 +3,7 @@ from flask_login import login_required
 from datetime import date, timedelta
 
 from app.extensions import db
-from app.models.models import Patient, Invoice, Treatment, ExchangeRate, InvoiceItem
+from app.models.models import Patient, Invoice, Treatment, ExchangeRate, InvoiceItem, Party, PartyType
 
 dashboard_bp = Blueprint("dashboard", __name__)
 
@@ -12,7 +12,10 @@ dashboard_bp = Blueprint("dashboard", __name__)
 @login_required
 def index():
     total_patients = db.session.execute(
-        db.select(db.func.count(Patient.id)).where(Patient.is_active == True)
+        db.select(db.func.count(Party.id)).where(
+            Party.party_type == PartyType.PATIENT,
+            Party.is_active == True
+        )
     ).scalar() or 0
 
     total_treatments = db.session.execute(
@@ -48,9 +51,9 @@ def index():
     ).scalars().all()
 
     recent_patients = db.session.execute(
-        db.select(Patient)
-        .where(Patient.is_active == True)
-        .order_by(Patient.created_at.desc())
+        db.select(Party)
+        .where(Party.party_type == PartyType.PATIENT, Party.is_active == True)
+        .order_by(Party.created_at.desc())
         .limit(5)
     ).scalars().all()
 

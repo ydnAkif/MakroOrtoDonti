@@ -19,6 +19,11 @@ def get_smtp_config() -> dict:
         val = db.session.execute(
             db.select(Settings.value).where(Settings.key == key)
         ).scalar_one_or_none()
+        
+        if key == "smtp_password" and val:
+            from app.services.security_service import decrypt_value
+            val = decrypt_value(val)
+            
         config[key] = val or default
     return config
 

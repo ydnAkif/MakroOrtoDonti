@@ -190,14 +190,20 @@ def add_patient_treatment(patient_id):
         flash("Tedavi ve tarih seçimi zorunludur.", "danger")
         return redirect(url_for("patients.detail_patient", patient_id=patient_id))
 
-    treatment_date = date.fromisoformat(treatment_date_str)
+    from app.services.validation_service import parse_date, parse_float
+    treatment_date = parse_date(treatment_date_str)
+    if not treatment_date:
+        flash("Geçersiz tedavi tarihi.", "danger")
+        return redirect(url_for("patients.detail_patient", patient_id=patient_id))
+
+    price_override_val = parse_float(price_override) if price_override else None
 
     pt = PatientTreatment(
         patient_id=patient_id,
         treatment_id=treatment_id,
         treatment_date=treatment_date,
         notes=notes or None,
-        price_override_eur=float(price_override) if price_override else None,
+        price_override_eur=price_override_val,
     )
     db.session.add(pt)
     db.session.commit()

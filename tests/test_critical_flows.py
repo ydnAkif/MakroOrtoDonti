@@ -585,4 +585,68 @@ def test_party_api_info(client, app):
     assert data["party_type"] == party.party_type.value
 
 
-# ==================== TOTAL: 15 TEST ====================
+def test_smtp_password_encryption_decryption(app):
+    """SMTP şifreleme ve geri açma birim testi."""
+    with app.app_context():
+        from app.services.security_service import encrypt_value, decrypt_value
+        
+        test_pass = "mypass123!@#"
+        encrypted = encrypt_value(test_pass)
+        assert encrypted != test_pass
+        assert len(encrypted) > 0
+        
+        decrypted = decrypt_value(encrypted)
+        assert decrypted == test_pass
+        
+        # Test fallback to plaintext
+        plaintext_fallback = "legacy_plaintext"
+        assert decrypt_value(plaintext_fallback) == plaintext_fallback
+        
+        # Test empty input
+        assert encrypt_value("") == ""
+        assert decrypt_value("") == ""
+
+
+def test_login_rate_limiting_and_lockout(client, app):
+    """Giriş ekranında rate limiting ve lockout testi."""
+    # 5 failed login attempts
+    for _ in range(5):
+        response = client.post("/login", data={"username": "admin", "password": "wrong-password"})
+        assert response.status_code == 200
+        assert "Kullanıcı adı veya şifre hatalı" in response.get_data(as_text=True)
+
+    # 6th attempt should trigger lockout
+    response = client.post("/login", data={"username": "admin", "password": "wrong-password"})
+    assert response.status_code == 200
+    assert "Çok fazla başarısız giriş denemesi" in response.get_data(as_text=True)
+
+    # 7th attempt with correct password should also be blocked due to lockout
+    response = client.post("/login", data={"username": "admin", "password": "admin-pass"})
+    assert response.status_code == 200
+    assert "Çok fazla başarısız giriş denemesi" in response.get_data(as_text=True)
+
+
+def test_defensive_validation_exchange_rate(client, app):
+    """Geçersiz kur ekleme denemelerinde defensive validation testi."""
+    login(client, "admin", "admin-pass")
+
+    # Post invalid rate value
+    response = client.post(
+        "/settings/exchange-rate/add",
+        data={"rate_date": "2026-07-19", "eur_try_rate": "invalid-float-abc"},
+        follow_redirects=True
+    )
+    assert response.status_code == 200
+    assert "Geçersiz tarih veya kur değeri girildi" in response.get_data(as_text=True)
+
+    # Post invalid date value
+    response = client.post(
+        "/settings/exchange-rate/add",
+        data={"rate_date": "invalid-date", "eur_try_rate": "41.50"},
+        follow_redirects=True
+    )
+    assert response.status_code == 200
+    assert "Geçersiz tarih veya kur değeri girildi" in response.get_data(as_text=True)
+
+
+# ==================== TOTAL: 18 TEST ====================

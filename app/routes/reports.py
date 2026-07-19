@@ -4,7 +4,7 @@ from datetime import date, timedelta
 from sqlalchemy import func
 
 from app.extensions import db
-from app.models.models import Invoice, Patient, PatientTreatment, Treatment, TreatmentCategory, ExchangeRate
+from app.models.models import Invoice, Patient, PatientTreatment, Treatment, TreatmentCategory, ExchangeRate, Party, PartyType
 
 reports_bp = Blueprint("reports", __name__)
 
@@ -91,11 +91,11 @@ def index():
     # Patient count by status
     patient_stats = db.session.execute(
         db.select(
-            Patient.treatment_status,
-            func.count(Patient.id).label("count"),
+            Party.treatment_status,
+            func.count(Party.id).label("count"),
         )
-        .where(Patient.is_active == True)
-        .group_by(Patient.treatment_status)
+        .where(Party.party_type == PartyType.PATIENT, Party.is_active == True)
+        .group_by(Party.treatment_status)
     ).all()
 
     # Exchange rate history

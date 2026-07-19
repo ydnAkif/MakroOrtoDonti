@@ -87,8 +87,13 @@ def add_invoice():
             flash("Müşteri seçimi zorunludur.", "danger")
             return redirect(url_for("invoices.add_invoice"))
 
-        invoice_date = date.fromisoformat(invoice_date_str) if invoice_date_str else date.today()
-        due_date = date.fromisoformat(due_date_str) if due_date_str else None
+        from app.services.validation_service import parse_date
+        invoice_date = parse_date(invoice_date_str) if invoice_date_str else date.today()
+        due_date = parse_date(due_date_str) if due_date_str else None
+
+        if not invoice_date:
+            flash("Geçersiz fatura tarihi girildi.", "danger")
+            return redirect(url_for("invoices.add_invoice"))
 
         try:
             if items_json:

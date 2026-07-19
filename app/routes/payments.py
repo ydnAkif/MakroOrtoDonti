@@ -27,12 +27,19 @@ def list_payments():
                 Payment.reference.ilike(search_pattern),
             )
         )
+    from app.services.validation_service import parse_date, parse_enum
     if method:
-        query = query.where(Payment.method == PaymentMethod(method))
+        parsed_method = parse_enum(PaymentMethod, method)
+        if parsed_method:
+            query = query.where(Payment.method == parsed_method)
     if start_date:
-        query = query.where(Payment.payment_date >= date.fromisoformat(start_date))
+        parsed_start = parse_date(start_date)
+        if parsed_start:
+            query = query.where(Payment.payment_date >= parsed_start)
     if end_date:
-        query = query.where(Payment.payment_date <= date.fromisoformat(end_date))
+        parsed_end = parse_date(end_date)
+        if parsed_end:
+            query = query.where(Payment.payment_date <= parsed_end)
 
     query = query.order_by(Payment.payment_date.desc())
     payments = db.session.execute(query).scalars().all()
@@ -57,19 +64,28 @@ def list_payments():
 @login_required
 def add_payment():
     if request.method == "POST":
+        from app.services.validation_service import parse_date, parse_enum, parse_float
         invoice_id = request.form.get("invoice_id", type=int)
         payment_date_str = request.form.get("payment_date", "")
-        amount_eur = request.form.get("amount_eur", type=float)
-        method = PaymentMethod(request.form.get("method", "cash"))
+        amount_eur = parse_float(request.form.get("amount_eur", ""))
+        
+        parsed_method = parse_enum(PaymentMethod, request.form.get("method", "cash"))
+        if not parsed_method:
+            parsed_method = PaymentMethod.CASH
+            
         reference = request.form.get("reference", "").strip() or None
         notes = request.form.get("notes", "").strip() or None
 
-        if not invoice_id or not amount_eur or amount_eur <= 0:
-            flash("Fatura ve tutar seçimi zorunludur.", "danger")
+        if not invoice_id or amount_eur is None or amount_eur <= 0:
+            flash("Fatura ve geçerli tutar seçimi zorunludur.", "danger")
             return redirect(url_for("payments.add_payment"))
 
         invoice = db.get_or_404(Invoice, invoice_id)
-        payment_date = date.fromisoformat(payment_date_str) if payment_date_str else date.today()
+        
+        payment_date = parse_date(payment_date_str) if payment_date_str else date.today()
+        if not payment_date:
+            flash("Geçersiz ödeme tarihi girildi.", "danger")
+            return redirect(url_for("payments.add_payment"))
         
         # Get exchange rate for payment date
         rate = db.session.execute(
@@ -91,7 +107,7 @@ def add_payment():
             amount_eur=amount_eur,
             amount_try=amount_try,
             exchange_rate=rate.eur_to_try,
-            method=method,
+            method=parsed_method,
             reference=reference,
             notes=notes,
         )

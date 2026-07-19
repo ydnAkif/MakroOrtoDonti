@@ -101,6 +101,9 @@ class Party(Base, TimestampMixin):
     invoices: Mapped[list["Invoice"]] = relationship(
         back_populates="party", lazy="selectin"
     )
+    patient: Mapped["Patient"] = relationship(
+        back_populates="party", uselist=False, lazy="selectin"
+    )
 
     __table_args__ = (
         UniqueConstraint("name", "phone", "party_type", name="uq_party_identity"),
@@ -115,6 +118,10 @@ class Party(Base, TimestampMixin):
     @property
     def is_patient(self) -> bool:
         return self.party_type == PartyType.PATIENT
+
+    @property
+    def full_name(self) -> str:
+        return self.display_name
 
     def __repr__(self) -> str:
         return f"<Party {self.display_name} ({self.party_type.value})>"
@@ -170,7 +177,7 @@ class Patient(Base, TimestampMixin, SoftDeleteMixin):
     invoices: Mapped[list["Invoice"]] = relationship(
         back_populates="patient", lazy="selectin"
     )
-    party: Mapped["Party"] = relationship(lazy="selectin")
+    party: Mapped["Party"] = relationship(back_populates="patient", lazy="selectin")
 
     __table_args__ = (
         UniqueConstraint("first_name", "last_name", "phone", name="uq_patient_identity"),
@@ -419,3 +426,15 @@ class Payment(Base, TimestampMixin):
 
     def __repr__(self) -> str:
         return f"<Payment {self.invoice_id} €{self.amount_eur:.2f} ₺{self.amount_try:.2f}>"
+
+
+class LoginAttempt(Base, TimestampMixin):
+    __tablename__ = "login_attempts"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    ip_address: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
+    username: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+    is_successful: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
+    def __repr__(self) -> str:
+        return f"<LoginAttempt {self.username} from {self.ip_address} - {'SUCCESS' if self.is_successful else 'FAIL'} at {self.created_at}>"

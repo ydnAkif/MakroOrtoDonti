@@ -100,7 +100,7 @@ def get_rate_health(max_age_days: int = 2) -> dict:
 
 
 def ensure_daily_rate(max_age_days: int = 2) -> dict:
-    """Fetch today's rate once per process day and return health snapshot."""
+    """Fetch today's rate once per process day asynchronously and return current health snapshot immediately."""
     global _last_auto_check_date
 
     today = date.today()
@@ -113,13 +113,24 @@ def ensure_daily_rate(max_age_days: int = 2) -> dict:
 
         _last_auto_check_date = today
 
-        try:
-            fetch_and_store_rate()
-            status = get_rate_health(max_age_days=max_age_days)
-            status["updated_today"] = True
-            return status
-        except Exception as exc:
-            status = get_rate_health(max_age_days=max_age_days)
-            status["updated_today"] = False
-            status["error"] = str(exc)
-            return status
+        # Start asynchronous fetch in background thread so it doesn't block request
+        import threading
+        from flask import current_app
+        # Retrieve the real App object from current_app proxy
+        app = current_app._get_current_object()
+
+        def worker():
+            with app.app_context():
+                try:
+                    fetch_and_store_rate()
+                except Exception:
+                    pass
+
+        t = threading.Thread(target=worker)
+        t.daemon = True
+        t.start()
+
+        # Return status based on what is currently in DB immediately, no waiting!
+        status = get_rate_health(max_age_days=max_age_days)
+        status["updated_today"] = False
+        return status
