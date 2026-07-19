@@ -7,6 +7,7 @@ from fpdf.enums import XPos, YPos
 FONT_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "fonts")
 FONT_PATH = os.path.join(FONT_DIR, "DejaVuSans.ttf")
 FONT_PATH_BOLD = os.path.join(FONT_DIR, "DejaVuSans-Bold.ttf")
+LOGO_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "images", "brand-mark.svg")
 
 
 class InvoicePDF(FPDF):
@@ -74,22 +75,25 @@ class InvoicePDF(FPDF):
         return super().multi_cell(w, h, self._safe_text(text), *args, **kwargs)
 
     def header(self):
-        self.set_fill_color(*self.AQUA_DARK)
-        self.rect(12, 10, 17, 17, style="F")
-        self.set_xy(12, 10.5)
-        self.set_font(self.default_font, "B", 13)
-        self.set_text_color(255, 255, 255)
-        self.cell(17, 16, "M", align="C")
+        try:
+            self.image(LOGO_PATH, x=12, y=9.5, w=18, h=18, keep_aspect_ratio=True)
+        except Exception:
+            self.set_fill_color(*self.AQUA_DARK)
+            self.rect(12, 10, 17, 17, style="F")
+            self.set_xy(12, 10.5)
+            self.set_font(self.default_font, "B", 13)
+            self.set_text_color(255, 255, 255)
+            self.cell(17, 16, "M", align="C")
 
-        self.set_xy(34, 10)
+        self.set_xy(35, 10)
         self.set_font(self.default_font, "B", 15)
         self.set_text_color(*self.INK)
-        self.cell(105, 7, self.clinic_name)
-        self.set_xy(34, 18)
+        self.cell(104, 7, self.clinic_name)
+        self.set_xy(35, 18)
         self.set_font(self.default_font, "", 7.5)
         self.set_text_color(*self.MUTED)
         contacts = [value for value in (self.clinic_phone, self.clinic_email) if value]
-        self.cell(105, 5, "  |  ".join(contacts) or "Ortodonti ve klinik hizmetleri")
+        self.cell(104, 5, "  |  ".join(contacts) or "Ortodonti ve klinik hizmetleri")
 
         self.set_xy(145, 10)
         self.set_font(self.default_font, "B", 16)
