@@ -144,9 +144,17 @@ def add_payment():
     selected_invoice_id = request.args.get("invoice_id", type=int)
 
     # Get unpaid/partially paid invoices for dropdown
-    invoices_query = db.select(Invoice).where(Invoice.status.in_([Invoice.STATUS_PENDING, Invoice.STATUS_OVERDUE]))
     if selected_invoice_id:
-        invoices_query = invoices_query.or_(Invoice.id == selected_invoice_id)
+        invoices_query = db.select(Invoice).where(
+            db.or_(
+                Invoice.status.in_([Invoice.STATUS_PENDING, Invoice.STATUS_OVERDUE]),
+                Invoice.id == selected_invoice_id,
+            )
+        )
+    else:
+        invoices_query = db.select(Invoice).where(
+            Invoice.status.in_([Invoice.STATUS_PENDING, Invoice.STATUS_OVERDUE])
+        )
 
     invoices = db.session.execute(
         invoices_query.order_by(Invoice.invoice_date.desc())

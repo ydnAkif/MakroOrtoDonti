@@ -390,6 +390,10 @@ def test_payment_flow(client, app):
         assert invoice.status == "pending"
         assert invoice.total_eur == 500.0
 
+    # GET payment form with preselected invoice_id
+    response = client.get(f"/payments/add?invoice_id={inv_id}")
+    assert response.status_code == 200
+
     # 1. Kismi odeme (250 EUR)
     response = client.post("/payments/add", data={
         "invoice_id": inv_id,
