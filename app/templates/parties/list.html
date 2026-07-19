@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}{% if selected_type == 'patient' %}Hastalar{% elif selected_type == 'dentist_customer' %}Diş Hekimi Müşterileri{% elif selected_type == 'company_customer' %}Kurumsal Müşteriler{% else %}Kişiler{% endif %} - {{ clinic_name }}{% endblock %}
+{% block title %}{{ party_type_labels.get(selected_type, 'Kişiler') }} - {{ clinic_name }}{% endblock %}
 
 {% block content %}
 <header class="page-header">

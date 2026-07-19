@@ -86,6 +86,12 @@ def create_app(config_class=Config) -> Flask:
             "clinic_name": clinic_name,
             "rate_health": rate_health,
             "auto_rate_error": auto_rate_error,
+            "party_type_labels": {
+                "patient": "Hastalar",
+                "dentist_customer": "Diş Hekimi Müşterileri",
+                "company_customer": "Kurumsal Müşteriler",
+                "": "Kişiler",
+            },
         }
 
     return app
