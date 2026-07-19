@@ -490,6 +490,12 @@ textarea.form-control { min-height: 92px; }
     .mobile-bottom-nav { display: grid !important; }
 }
 
+@media (max-width: 420px) {
+    .navbar-brand .brand-copy { display: none; }
+    .navbar-brand { margin-right: auto; }
+    .dashboard-hero h1 { font-size: 2rem; }
+}
+
 .mobile-bottom-nav {
     position: fixed;
     z-index: 1025;

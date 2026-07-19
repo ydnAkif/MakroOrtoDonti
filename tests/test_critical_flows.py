@@ -17,6 +17,24 @@ def test_login_success(client):
     assert "Giriş başarılı!" in response.get_data(as_text=True)
 
 
+def test_ui_shell_uses_unique_mobile_navigation_target(client):
+    login(client, "admin", "admin-pass")
+    html = client.get("/").get_data(as_text=True)
+
+    assert html.count('id="mobileSidebar"') == 1
+    assert 'aria-controls="mobileSidebar"' in html
+    assert 'href="#main-content"' in html
+
+
+def test_party_form_has_unique_common_fields_and_active_default(client):
+    login(client, "admin", "admin-pass")
+    html = client.get("/parties/add").get_data(as_text=True)
+
+    for field_id in ("phone", "email", "address", "tax_id"):
+        assert html.count(f'id="{field_id}"') == 1
+    assert 'id="is_active" name="is_active" checked' in html
+
+
 def test_invoice_create_flow(client, app):
     login(client, "admin", "admin-pass")
 
