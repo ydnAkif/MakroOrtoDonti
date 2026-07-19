@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import date, timedelta
+from decimal import Decimal
 import io
 import json
 
@@ -96,13 +97,10 @@ def test_patient_add(client, app):
 
     with app.app_context():
         patient = db.session.execute(
-            db.select(Patient).where(Patient.first_name == "Zeynep", Patient.last_name == "Kaya")
+            db.select(Party).where(Party.first_name == "Zeynep", Party.last_name == "Kaya")
         ).scalar_one()
         assert patient.phone == "5559998877"
-        assert patient.party_id is not None
-        party = db.session.get(Party, patient.party_id)
-        assert party is not None
-        assert party.party_type == PartyType.PATIENT
+        assert patient.party_type == PartyType.PATIENT
 
 
 def test_patient_detail(client, app):
@@ -110,7 +108,7 @@ def test_patient_detail(client, app):
     login(client, "admin", "admin-pass")
 
     with app.app_context():
-        patient_id = db.session.execute(db.select(Patient).limit(1)).scalar_one().id
+        patient_id = db.session.execute(db.select(Party).where(Party.party_type == PartyType.PATIENT).limit(1)).scalar_one().id
 
     response = client.get(f"/patients/{patient_id}")
     assert response.status_code == 200
@@ -121,7 +119,7 @@ def test_patient_edit(client, app):
     login(client, "admin", "admin-pass")
 
     with app.app_context():
-        patient_id = db.session.execute(db.select(Patient).limit(1)).scalar_one().id
+        patient_id = db.session.execute(db.select(Party).where(Party.party_type == PartyType.PATIENT).limit(1)).scalar_one().id
 
     response = client.post(f"/patients/{patient_id}/edit", data={
         "first_name": "Guncellenmis",
@@ -133,11 +131,9 @@ def test_patient_edit(client, app):
     assert response.status_code == 302
 
     with app.app_context():
-        patient = db.session.get(Patient, patient_id)
+        patient = db.session.get(Party, patient_id)
         assert patient.first_name == "Guncellenmis"
         assert patient.treatment_status == "completed"
-        party = db.session.get(Party, patient.party_id)
-        assert party.first_name == "Guncellenmis"
 
 
 def test_patient_delete(client, app):
@@ -145,17 +141,14 @@ def test_patient_delete(client, app):
     login(client, "admin", "admin-pass")
 
     with app.app_context():
-        patient_id = db.session.execute(db.select(Patient).limit(1)).scalar_one().id
+        patient_id = db.session.execute(db.select(Party).where(Party.party_type == PartyType.PATIENT).limit(1)).scalar_one().id
 
     response = client.post(f"/patients/{patient_id}/delete", follow_redirects=False)
     assert response.status_code == 302
 
     with app.app_context():
-        patient = db.session.get(Patient, patient_id)
+        patient = db.session.get(Party, patient_id)
         assert patient.is_active is False
-        if patient.party_id:
-            party = db.session.get(Party, patient.party_id)
-            assert party.is_active is False
 
 
 def test_patient_add_treatment(client, app):
@@ -163,7 +156,7 @@ def test_patient_add_treatment(client, app):
     login(client, "admin", "admin-pass")
 
     with app.app_context():
-        patient_id = db.session.execute(db.select(Patient).limit(1)).scalar_one().id
+        patient_id = db.session.execute(db.select(Party).where(Party.party_type == PartyType.PATIENT).limit(1)).scalar_one().id
         treatment_id = db.session.execute(
             db.select(Treatment).where(Treatment.name == "Crown")
         ).scalar_one().id
@@ -179,7 +172,7 @@ def test_patient_add_treatment(client, app):
     with app.app_context():
         count = db.session.execute(
             db.select(PatientTreatment).where(
-                PatientTreatment.patient_id == patient_id,
+                PatientTreatment.party_id == patient_id,
                 PatientTreatment.treatment_id == treatment_id,
             )
         ).scalars().all()
@@ -532,7 +525,7 @@ def test_invoice_amount_discount(client, app):
             db.select(Invoice).order_by(Invoice.id.desc())
         ).scalar_one()
         item = invoice.items[0]
-        assert abs(item.line_total_eur - 250.0) < 0.01
+        assert item.line_total_eur == Decimal("250.00")
 
 
 def test_invoice_search(client, app):
@@ -791,7 +784,7 @@ def test_recalculate_totals_includes_discount_and_vat(client, app):
             db.select(Invoice).order_by(Invoice.id.desc())
         ).scalar_one()
         # total_eur should include discount and VAT
-        assert abs(invoice.total_eur - 216.0) < 0.01
+        assert invoice.total_eur == Decimal("216.00")
         assert invoice.total_try > 0
 
 
@@ -1001,4 +994,4 @@ def test_invoice_vat_in_totals(client, app):
             db.select(Invoice).order_by(Invoice.id.desc())
         ).scalar_one()
         # 100 EUR + 20% VAT = 120 EUR
-        assert abs(invoice.total_eur - 120.0) < 0.01
+        assert invoice.total_eur == Decimal("120.00")

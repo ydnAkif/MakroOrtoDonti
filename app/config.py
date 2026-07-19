@@ -52,3 +52,7 @@ class Config:
 
     # Only enable when the app is behind a trusted reverse proxy.
     TRUST_PROXY = os.environ.get("TRUST_PROXY", "false").lower() == "true"
+    FORCE_HSTS = os.environ.get("FORCE_HSTS", "false").lower() == "true"
+    MAX_PAGE_SIZE = int(os.environ.get("MAX_PAGE_SIZE", "100"))
+    AUDIT_RETENTION_DAYS = int(os.environ.get("AUDIT_RETENTION_DAYS", "3650"))
+    SENTRY_DSN = os.environ.get("SENTRY_DSN", "")

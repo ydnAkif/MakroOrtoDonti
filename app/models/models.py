@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime
+from decimal import Decimal, ROUND_HALF_UP
 from enum import Enum as PyEnum
 from typing import TYPE_CHECKING
 
@@ -8,9 +9,9 @@ from flask_login import UserMixin
 from sqlalchemy import (
     Boolean,
     DateTime,
-    Float,
     ForeignKey,
     Integer,
+    Numeric,
     String,
     Text,
     UniqueConstraint,
@@ -133,6 +134,9 @@ class Party(Base, TimestampMixin):
     patient: Mapped["Patient"] = relationship(
         back_populates="party", uselist=False, lazy="selectin"
     )
+    treatments: Mapped[list["PatientTreatment"]] = relationship(
+        back_populates="party", lazy="selectin"
+    )
 
     __table_args__ = (
         UniqueConstraint("name", "phone", "party_type", name="uq_party_identity"),
@@ -156,6 +160,24 @@ class Party(Base, TimestampMixin):
         return f"<Party {self.display_name} ({self.party_type.value})>"
 
 
+MONEY_SCALE = Decimal("0.01")
+RATE_SCALE = Decimal("0.0001")
+PERCENT_SCALE = Decimal("0.01")
+
+
+def money(value: object) -> Decimal:
+    """Convert a monetary input without passing through binary floating point."""
+    if value is None:
+        return Decimal("0.00")
+    return Decimal(str(value)).quantize(MONEY_SCALE, rounding=ROUND_HALF_UP)
+
+
+def rate_decimal(value: object) -> Decimal:
+    if value is None:
+        return Decimal("0.0000")
+    return Decimal(str(value)).quantize(RATE_SCALE, rounding=ROUND_HALF_UP)
+
+
 class Treatment(Base, TimestampMixin):
     __tablename__ = "treatments"
 
@@ -165,7 +187,7 @@ class Treatment(Base, TimestampMixin):
     category: Mapped[str] = mapped_column(
         String(50), nullable=False, default=TreatmentCategory.OTHER
     )
-    price_eur: Mapped[float] = mapped_column(Float, nullable=False)
+    price_eur: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, index=True)
 
     patient_treatments: Mapped[list["PatientTreatment"]] = relationship(
@@ -184,6 +206,7 @@ class Treatment(Base, TimestampMixin):
 
 
 class Patient(Base, TimestampMixin, SoftDeleteMixin):
+    """Read-only legacy compatibility model; new clinical data belongs to Party."""
     __tablename__ = "patients"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -224,26 +247,28 @@ class PatientTreatment(Base, TimestampMixin):
     __tablename__ = "patient_treatments"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    patient_id: Mapped[int] = mapped_column(ForeignKey("patients.id"), nullable=False, index=True)
+    patient_id: Mapped[int | None] = mapped_column(ForeignKey("patients.id"), nullable=True, index=True)
+    party_id: Mapped[int] = mapped_column(ForeignKey("parties.id"), nullable=False, index=True)
     treatment_id: Mapped[int] = mapped_column(
         ForeignKey("treatments.id"), nullable=False, index=True
     )
     treatment_date: Mapped[date] = mapped_column(nullable=False, index=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
-    price_override_eur: Mapped[float | None] = mapped_column(Float, nullable=True)
+    price_override_eur: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
     is_completed: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
     patient: Mapped["Patient"] = relationship(back_populates="patient_treatments")
+    party: Mapped["Party"] = relationship(back_populates="treatments")
     treatment: Mapped["Treatment"] = relationship(back_populates="patient_treatments")
 
     @property
-    def effective_price_eur(self) -> float:
+    def effective_price_eur(self) -> Decimal:
         if self.price_override_eur is not None:
             return self.price_override_eur
         return self.treatment.price_eur
 
     def __repr__(self) -> str:
-        return f"<PatientTreatment patient={self.patient_id} treatment={self.treatment_id}>"
+        return f"<PatientTreatment party={self.party_id} treatment={self.treatment_id}>"
 
 
 class ExchangeRate(Base, TimestampMixin):
@@ -251,7 +276,7 @@ class ExchangeRate(Base, TimestampMixin):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     rate_date: Mapped[date] = mapped_column(nullable=False, index=True)
-    eur_to_try: Mapped[float] = mapped_column(Float, nullable=False)
+    eur_to_try: Mapped[Decimal] = mapped_column(Numeric(12, 4), nullable=False)
     source: Mapped[str] = mapped_column(String(50), default="ecb", nullable=False)
 
     __table_args__ = (
@@ -271,9 +296,9 @@ class Invoice(Base, TimestampMixin):
     invoice_number: Mapped[str] = mapped_column(String(30), nullable=False, unique=True, index=True)
     invoice_date: Mapped[date] = mapped_column(nullable=False, index=True)
     due_date: Mapped[date | None] = mapped_column(nullable=True)
-    total_eur: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
-    total_try: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
-    exchange_rate: Mapped[float] = mapped_column(Float, nullable=False)
+    total_eur: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False, default=Decimal("0.00"))
+    total_try: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False, default=Decimal("0.00"))
+    exchange_rate: Mapped[Decimal] = mapped_column(Numeric(12, 4), nullable=False)
     status: Mapped[str] = mapped_column(
         String(20), default="pending", nullable=False, index=True
     )
@@ -299,8 +324,8 @@ class Invoice(Base, TimestampMixin):
     STATUS_CANCELLED = "cancelled"
 
     def recalculate_totals(self) -> None:
-        self.total_eur = sum(item.line_total_eur + item.vat_amount_eur for item in self.items)
-        self.total_try = sum(item.line_total_try + item.vat_amount_try for item in self.items)
+        self.total_eur = money(sum((item.line_total_eur + item.vat_amount_eur for item in self.items), Decimal("0")))
+        self.total_try = money(sum((item.line_total_try + item.vat_amount_try for item in self.items), Decimal("0")))
 
     @property
     def category_keys(self) -> list[str]:
@@ -337,40 +362,40 @@ class InvoiceItem(Base, TimestampMixin):
     reference_id: Mapped[int | None] = mapped_column(Integer, nullable=True)  # for product/service/lab
     description: Mapped[str] = mapped_column(String(300), nullable=False)
     quantity: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
-    unit_price_eur: Mapped[float] = mapped_column(Float, nullable=False)
-    unit_price_try: Mapped[float] = mapped_column(Float, nullable=False)
-    vat_rate: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    unit_price_eur: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    unit_price_try: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
+    vat_rate: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False, default=Decimal("0.00"))
     discount_type: Mapped[str | None] = mapped_column(String(20), nullable=True)  # percent, amount
-    discount_value: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    discount_value: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=Decimal("0.00"))
 
     invoice: Mapped["Invoice"] = relationship(back_populates="items")
     treatment: Mapped["Treatment"] = relationship(back_populates="invoice_items")
 
     @property
-    def line_total_eur(self) -> float:
+    def line_total_eur(self) -> Decimal:
         base = self.unit_price_eur * self.quantity
         if self.discount_type == "percent":
-            return base * (1 - self.discount_value / 100)
+            return money(base * (Decimal("1") - self.discount_value / Decimal("100")))
         elif self.discount_type == "amount":
             return base - self.discount_value
         return base
 
     @property
-    def line_total_try(self) -> float:
+    def line_total_try(self) -> Decimal:
         base = self.unit_price_try * self.quantity
         if self.discount_type == "percent":
-            return base * (1 - self.discount_value / 100)
+            return money(base * (Decimal("1") - self.discount_value / Decimal("100")))
         elif self.discount_type == "amount":
             return base - self.discount_value
         return base
 
     @property
-    def vat_amount_eur(self) -> float:
-        return self.line_total_eur * (self.vat_rate / 100)
+    def vat_amount_eur(self) -> Decimal:
+        return money(self.line_total_eur * (self.vat_rate / Decimal("100")))
 
     @property
-    def vat_amount_try(self) -> float:
-        return self.line_total_try * (self.vat_rate / 100)
+    def vat_amount_try(self) -> Decimal:
+        return money(self.line_total_try * (self.vat_rate / Decimal("100")))
 
     def __repr__(self) -> str:
         return f"<InvoiceItem {self.description} x{self.quantity} ({self.item_type.value})>"
@@ -459,9 +484,9 @@ class Payment(Base, TimestampMixin):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     invoice_id: Mapped[int] = mapped_column(ForeignKey("invoices.id"), nullable=False, index=True)
     payment_date: Mapped[date] = mapped_column(nullable=False, index=True)
-    amount_eur: Mapped[float] = mapped_column(Float, nullable=False)
-    amount_try: Mapped[float] = mapped_column(Float, nullable=False)
-    exchange_rate: Mapped[float] = mapped_column(Float, nullable=False)
+    amount_eur: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
+    amount_try: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
+    exchange_rate: Mapped[Decimal] = mapped_column(Numeric(12, 4), nullable=False)
     method: Mapped[str] = mapped_column(SQLEnum(PaymentMethod), nullable=False, default=PaymentMethod.CASH)
     reference: Mapped[str | None] = mapped_column(String(100), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -482,3 +507,22 @@ class LoginAttempt(Base, TimestampMixin):
 
     def __repr__(self) -> str:
         return f"<LoginAttempt {self.username} from {self.ip_address} - {'SUCCESS' if self.is_successful else 'FAIL'} at {self.created_at}>"
+
+
+class AuditLog(Base):
+    """Append-only trace of data mutations; application code never updates rows."""
+    __tablename__ = "audit_logs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    occurred_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=lambda: datetime.now().astimezone(), index=True)
+    actor_user_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"), nullable=True, index=True)
+    actor_username: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    action: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
+    entity_type: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+    entity_id: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True)
+    request_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    ip_address: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    endpoint: Mapped[str | None] = mapped_column(String(150), nullable=True)
+    changes_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    actor: Mapped["User | None"] = relationship(lazy="joined")

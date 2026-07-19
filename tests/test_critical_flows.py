@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date, timedelta
+from decimal import Decimal
 import json
 import pytest
 
@@ -174,7 +175,7 @@ def test_invoice_category_and_date_rate_api(client, app):
             "treatment_id": treatment.id,
             "description": treatment.name,
             "quantity": 1,
-            "unit_price_eur": treatment.price_eur,
+            "unit_price_eur": float(treatment.price_eur),
         }]),
     })
     assert response.status_code == 302
@@ -408,7 +409,6 @@ def test_changing_patient_type_deactivates_legacy_patient(client, app):
             db.select(Party).where(Party.party_type == PartyType.PATIENT)
         ).scalar_one()
         party_id = party.id
-        patient_id = party.patient.id
 
     response = client.post(
         f"/parties/{party_id}/edit",
@@ -424,10 +424,8 @@ def test_changing_patient_type_deactivates_legacy_patient(client, app):
 
     with app.app_context():
         party = db.session.get(Party, party_id)
-        patient = db.session.get(Patient, patient_id)
         assert party.party_type == PartyType.COMPANY_CUSTOMER
         assert party.is_active is True
-        assert patient.is_active is False
 
 
 @pytest.mark.parametrize("price,category", [("-1", "other"), ("nan", "other"), ("10", "invalid")])
@@ -507,7 +505,7 @@ def test_invoice_flexible_items(client, app):
             "treatment_id": t.id,
             "description": t.name,
             "quantity": 1,
-            "unit_price_eur": t.price_eur,
+            "unit_price_eur": float(t.price_eur),
         })
     # Custom item (product)
     items.append({
@@ -590,9 +588,9 @@ def test_invoice_vat_discount_calculations(client, app):
         # Base: 2 * 100 = 200 EUR
         # Iskonto %10: 200 * 0.9 = 180 EUR
         # KDV %20: 180 * 1.2 = 216 EUR
-        assert abs(item.line_total_eur - 180.0) < 0.01
-        assert abs(item.vat_amount_eur - 36.0) < 0.01
-        assert abs(item.line_total_eur + item.vat_amount_eur - 216.0) < 0.01
+        assert item.line_total_eur == Decimal("180.00")
+        assert item.vat_amount_eur == Decimal("36.00")
+        assert item.line_total_eur + item.vat_amount_eur == Decimal("216.00")
 
 
 def test_payment_flow(client, app):
@@ -767,16 +765,15 @@ def test_reports_aging_report(client, app):
     assert b"Raporlar" in response.data
 
 
-def test_legacy_invoice_compatibility(client, app):
-    """Eski patient_id + treatment_ids formatinin hala calismasi."""
+def test_party_treatment_invoice_compatibility(client, app):
+    """Party + treatment_ids geçiş formatı çalışır."""
     login(client, "admin", "admin-pass")
 
     with app.app_context():
         pt = db.session.execute(db.select(PatientTreatment)).scalar_one()
 
-    # Eski format: patient_id + treatment_ids
     response = client.post("/invoices/add", data={
-        "patient_id": pt.patient_id,
+        "party_id": pt.party_id,
         "invoice_date": date.today().isoformat(),
         "treatment_ids": [str(pt.id)],
         "notes": "Legacy format testi",
@@ -789,8 +786,8 @@ def test_legacy_invoice_compatibility(client, app):
         invoice = db.session.execute(
             db.select(Invoice).order_by(Invoice.id.desc())
         ).scalar_one()
-        assert invoice.party_id is not None  # Party'ye baglandi
-        assert invoice.patient_id == pt.patient_id  # Eskisi de kaldi
+        assert invoice.party_id == pt.party_id
+        assert invoice.patient_id is None
 
 
 def test_invoice_api_treatment_price(client, app):

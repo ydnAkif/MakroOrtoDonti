@@ -79,9 +79,9 @@ def add_exchange_rate():
         flash("Tarih ve kur değeri zorunludur.", "danger")
         return redirect(url_for("settings.index"))
 
-    from app.services.validation_service import parse_date, parse_float
+    from app.services.validation_service import parse_date, parse_decimal
     rate_date = parse_date(rate_date_str)
-    eur_try_rate = parse_float(rate_value)
+    eur_try_rate = parse_decimal(rate_value, "0.0001")
 
     if not rate_date or eur_try_rate is None or eur_try_rate <= 0:
         flash("Geçersiz tarih veya kur değeri girildi.", "danger")

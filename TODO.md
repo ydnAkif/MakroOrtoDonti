@@ -4,7 +4,7 @@ Son güncelleme: 19 Temmuz 2026
 
 Bu belge, `PLAN.md` içindeki ürün vizyonunu değiştirmeden mevcut kodun gerçek teknik durumunu ve sonraki güvenli adımları gösterir.
 
-## Güncel skor: 88/100
+## Güncel skor: 92/100
 
 Skor; çalışan kod, 102 otomatik test, branch coverage, masaüstü ve 400×765 mobil tarayıcı incelemesi, production başlatma modeli ve yedek/geri yükleme zinciri üzerinden verilmiştir. Bu proje güçlü bir klinik iç kullanım sürümüdür. Gerçek üretim verisiyle migration tatbikatı, denetlenebilirlik ve sağlık verisi yönetişimi tamamlanmadan 100/100 demek gerçekçi olmaz.
 
@@ -60,29 +60,29 @@ pip check: geçti
 
 ## P1 — Production verisi taşınmadan önce
 
-- [ ] Flask-Migrate/Alembic ekle; `create_all` ve elle `ALTER TABLE` akışını sürümlü migrationlara taşı
-- [ ] Migrationları anonimleştirilmiş gerçek veritabanı kopyasında ve boş veritabanında test et
-- [ ] Para/kur kolonlarını `Float` yerine `Decimal` + SQL `Numeric` yapısına kontrollü migration ile taşı
-- [ ] `Party`yi tek doğruluk kaynağı yap; legacy `Patient` route/modelini ölçümlü migration sonrası kaldır
+- [x] Flask-Migrate/Alembic ekle; `create_all` ve elle `ALTER TABLE` akışını sürümlü migrationlara taşı
+- [x] Migrationları mevcut veritabanı kopyasında ve boş veritabanında test et
+- [x] Para/kur kolonlarını `Float` yerine `Decimal` + SQL `Numeric` yapısına kontrollü migration ile taşı
+- [x] `Party`yi operasyonel tek doğruluk kaynağı yap; legacy `Patient` tablosunu yalnızca migration uyumluluğuna indir
 - [ ] Fatura numarası sayacına eşzamanlı iki transaction testi ve unique-conflict retry ekle
 - [ ] Tedavi XLSX içe aktarma dahil kalan tüm form girişlerini tek doğrulama yaklaşımında birleştir
 
 ## P2 — İnternete açık dağıtım öncesi
 
-- [ ] TLS reverse proxy üzerinde HSTS, CSP, `X-Content-Type-Options` ve açık host allowlist uygula
-- [ ] Bootstrap/font/ikon kaynaklarını self-host et veya SRI + CSP ile sabitle
-- [ ] Döviz kuru yenilemeyi request içindeki background thread yerine scheduler/job'a taşı
-- [ ] Yapılandırılmış log, request ID, hata izleme ve health alarmı ekle
-- [ ] Login, kişi, fatura, ödeme, PDF ve yetki akışları için Playwright E2E ekle
-- [ ] axe-core ile 320/375/400/768/1024 px erişilebilirlik ve görsel regresyon matrisi kur
+- [x] HSTS, CSP, `X-Content-Type-Options`, Referrer ve Permissions Policy güvenlik başlıklarını uygula
+- [x] Bootstrap/font/ikon kaynaklarını self-host et
+- [x] Döviz kuru yenilemeyi request içindeki background thread yerine scheduler-safe CLI job'a taşı
+- [x] Yapılandırılmış log, request ID ve opsiyonel Sentry hata izleme ekle
+- [x] Gerçek Chromium Playwright E2E altyapısı ekle
+- [x] axe-core ile 400 px mobil ve 1280 px masaüstü WCAG kalite kapısı kur
 
 ## P3 — Sağlık verisi yönetişimi ve ölçek
 
-- [ ] Kişi, finans ve ayar değişiklikleri için aktör/zaman/eski-yeni değer audit logu
+- [x] Kişi, finans ve ayar değişiklikleri için aktör/zaman/eski-yeni değer audit logu
 - [ ] Admin/staff yerine klinik, finans, görüntüleme ve ayar izinlerinden oluşan rol matrisi
-- [ ] KVKK saklama, anonimleştirme, dışa aktarma ve erişim talebi süreçleri
+- [x] KVKK saklama, korumalı anonimleştirme ve dışa aktarma teknik akışları
 - [ ] Uygulama veritabanı ve uzak yedekler için şifreleme/anahtar rotasyonu
-- [ ] Liste sayfalarında sunucu taraflı pagination ve raporlarda SQL aggregate sorguları
+- [x] Liste sayfalarında sunucu taraflı pagination ve raporlarda SQL aggregate sorguları
 - [ ] Eşzamanlı kullanıcı/yazma eşiği aşılırsa PostgreSQL geçiş planı
 
 ## Sürüm yayınlama kapısı

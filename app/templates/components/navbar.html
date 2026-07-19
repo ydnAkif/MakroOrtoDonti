@@ -22,7 +22,7 @@
                 </li>
                 {% if current_user.is_authenticated %}
                 <li class="nav-item dropdown">
-                    <a class="nav-link dropdown-toggle user-menu" href="#" data-bs-toggle="dropdown" aria-expanded="false">
+                    <a class="nav-link dropdown-toggle user-menu" href="#" data-bs-toggle="dropdown" aria-expanded="false" aria-label="{{ current_user.full_name }} kullanıcı menüsü">
                         <span class="user-avatar" aria-hidden="true">{{ current_user.full_name[:2]|upper }}</span>
                         <span class="user-name">{{ current_user.full_name }}</span>
                     </a>

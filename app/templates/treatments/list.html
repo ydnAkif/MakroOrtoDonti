@@ -94,6 +94,7 @@
 {% endblock %}
 
 {% block scripts %}
+{% include "components/pagination.html" %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const table = document.getElementById('treatmentsTable');

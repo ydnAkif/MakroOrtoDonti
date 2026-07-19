@@ -1,5 +1,6 @@
 from collections import defaultdict
 from datetime import date, timedelta
+from decimal import Decimal
 
 from flask import Blueprint, render_template, request
 from flask_login import login_required
@@ -66,8 +67,8 @@ def _resolve_period(today: date) -> tuple[date, date, str]:
 def _trend_rows(start: date, end: date, invoices: list[Invoice], payments: list[Payment]) -> list[dict]:
     day_span = (end - start).days + 1
     use_months = day_span > 100
-    values: dict[tuple[int, int] | date, dict[str, float]] = defaultdict(
-        lambda: {"issued": 0.0, "collected": 0.0}
+    values: dict[tuple[int, int] | date, dict[str, Decimal]] = defaultdict(
+        lambda: {"issued": Decimal("0.00"), "collected": Decimal("0.00")}
     )
 
     def key_for(value: date):
@@ -132,19 +133,35 @@ def index():
         .order_by(Invoice.invoice_date)
     ).scalars().all()
 
-    issued_eur = sum(invoice.total_eur for invoice in invoices)
-    issued_try = sum(invoice.total_try for invoice in invoices)
-    collected_eur = sum(payment.amount_eur for payment in payments)
-    collected_try = sum(payment.amount_try for payment in payments)
+    issued_eur, issued_try = db.session.execute(
+        db.select(
+            db.func.coalesce(db.func.sum(Invoice.total_eur), 0),
+            db.func.coalesce(db.func.sum(Invoice.total_try), 0),
+        ).where(
+            Invoice.invoice_date.between(start_date, end_date),
+            Invoice.is_deleted == False,
+            Invoice.status != Invoice.STATUS_CANCELLED,
+        )
+    ).one()
+    collected_eur, collected_try = db.session.execute(
+        db.select(
+            db.func.coalesce(db.func.sum(Payment.amount_eur), 0),
+            db.func.coalesce(db.func.sum(Payment.amount_try), 0),
+        ).join(Invoice, Payment.invoice_id == Invoice.id).where(
+            Payment.payment_date.between(start_date, end_date),
+            Invoice.is_deleted == False,
+            Invoice.status != Invoice.STATUS_CANCELLED,
+        )
+    ).one()
 
-    outstanding_eur = 0.0
-    outstanding_try = 0.0
-    overdue_eur = 0.0
+    outstanding_eur = Decimal("0.00")
+    outstanding_try = Decimal("0.00")
+    overdue_eur = Decimal("0.00")
     aging = {
-        "not_due": {"label": "Vadesi gelmedi", "count": 0, "amount": 0.0},
-        "days_0_30": {"label": "0-30 gün", "count": 0, "amount": 0.0},
-        "days_31_60": {"label": "31-60 gün", "count": 0, "amount": 0.0},
-        "days_61_plus": {"label": "61+ gün", "count": 0, "amount": 0.0},
+        "not_due": {"label": "Vadesi gelmedi", "count": 0, "amount": Decimal("0.00")},
+        "days_0_30": {"label": "0-30 gün", "count": 0, "amount": Decimal("0.00")},
+        "days_31_60": {"label": "31-60 gün", "count": 0, "amount": Decimal("0.00")},
+        "days_61_plus": {"label": "61+ gün", "count": 0, "amount": Decimal("0.00")},
     }
     receivable_count = 0
     for invoice in receivable_invoices:
@@ -153,15 +170,15 @@ def index():
             for payment in invoice.payments
             if payment.payment_date <= end_date
         )
-        remaining_eur = max(invoice.total_eur - paid_eur, 0.0)
-        if remaining_eur <= 0.01:
+        remaining_eur = max(invoice.total_eur - paid_eur, Decimal("0.00"))
+        if remaining_eur <= Decimal("0.01"):
             continue
         receivable_count += 1
 
         # Preserve the invoice's fixed exchange-rate basis for book-value TRY.
         # Payment-date TRY values cannot be subtracted without mixing rates.
-        remaining_ratio = remaining_eur / invoice.total_eur if invoice.total_eur else 0.0
-        remaining_try = max(invoice.total_try * remaining_ratio, 0.0)
+        remaining_ratio = remaining_eur / invoice.total_eur if invoice.total_eur else Decimal("0")
+        remaining_try = max(invoice.total_try * remaining_ratio, Decimal("0.00"))
         outstanding_eur += remaining_eur
         outstanding_try += remaining_try
         due_reference = invoice.due_date or invoice.invoice_date
@@ -180,7 +197,7 @@ def index():
             overdue_eur += remaining_eur
 
     treatment_totals: dict[int, dict] = {}
-    category_totals: dict[str, dict] = defaultdict(lambda: {"count": 0, "amount_eur": 0.0})
+    category_totals: dict[str, dict] = defaultdict(lambda: {"count": 0, "amount_eur": Decimal("0.00")})
     for invoice in invoices:
         for item in invoice.items:
             item_type = item.item_type.value if isinstance(item.item_type, InvoiceItemType) else str(item.item_type)
@@ -194,7 +211,7 @@ def index():
                     "name": item.treatment.name,
                     "category": item.treatment.category,
                     "count": 0,
-                    "amount_eur": 0.0,
+                    "amount_eur": Decimal("0.00"),
                 })
                 row["count"] += quantity
                 row["amount_eur"] += amount_eur
@@ -246,10 +263,10 @@ def index():
 
     trend_rows = _trend_rows(start_date, end_date, invoices, payments)
     max_trend_value = max(
-        (max(row["issued"], row["collected"]) for row in trend_rows), default=1.0
-    ) or 1.0
-    max_category_amount = max((row["amount_eur"] for row in category_stats), default=1.0) or 1.0
-    max_aging_amount = max((row["amount"] for row in aging.values()), default=1.0) or 1.0
+        (max(row["issued"], row["collected"]) for row in trend_rows), default=Decimal("1")
+    ) or Decimal("1")
+    max_category_amount = max((row["amount_eur"] for row in category_stats), default=Decimal("1")) or Decimal("1")
+    max_aging_amount = max((row["amount"] for row in aging.values()), default=Decimal("1")) or Decimal("1")
 
     return render_template(
         "reports/index.html",

@@ -3,6 +3,7 @@ import sqlite3
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager
 from flask_wtf.csrf import CSRFProtect
+from flask_migrate import Migrate
 from sqlalchemy import event
 from sqlalchemy.engine import Engine
 
@@ -19,6 +20,7 @@ def configure_sqlite_connection(dbapi_connection, _connection_record):
 db = SQLAlchemy()
 login_manager = LoginManager()
 csrf = CSRFProtect()
+migrate = Migrate(compare_type=True, render_as_batch=True)
 login_manager.login_view = "auth.login"
 login_manager.login_message = "Lütfen giriş yapın."
 login_manager.login_message_category = "warning"
