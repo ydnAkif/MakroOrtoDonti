@@ -210,7 +210,7 @@
                     data-search-placeholder="Katalogdan tedavi ara veya seçin...">
               <option value="">Tedavi seçiniz...</option>
               {% for t in treatments %}
-              <option value="{{ t.id }}" data-price="{{ t.price_eur }}">{{ t.name }} (€{{ "{:,.2f}".format(t.price_eur) }})</option>
+              <option value="{{ t.id }}" data-price="{{ t.price_eur }}" data-description="{{ t.description or t.name }}">{{ t.name }} (€{{ "{:,.2f}".format(t.price_eur) }})</option>
               {% endfor %}
             </select>
           </div>
@@ -403,7 +403,7 @@ document.addEventListener('change', function(e) {
         if (val) {
             const treatment = treatments.find(t => t.id == val);
             if (treatment) {
-                document.getElementById('item-description').value = treatment.name;
+                document.getElementById('item-description').value = treatment.description || treatment.name;
                 document.getElementById('item-unit-price-eur').value = treatment.price_eur;
             }
         }

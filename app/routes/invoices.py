@@ -152,7 +152,12 @@ def add_invoice():
 
     # Prepare treatments for JSON serialization
     treatments_json = [
-        {"id": t.id, "name": t.name, "price_eur": t.price_eur}
+        {
+            "id": t.id,
+            "name": t.name,
+            "description": t.description or t.name,
+            "price_eur": t.price_eur,
+        }
         for t in treatments
     ]
 
