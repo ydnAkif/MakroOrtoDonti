@@ -20,7 +20,7 @@ def main():
         generated_password = seed_sample_data()
 
         print("Veritabanı başarıyla oluşturuldu!")
-        print("Dosya: data/makroortodonti.db")
+        print(f"Veritabanı: {app.config['SQLALCHEMY_DATABASE_URI']}")
         print("")
         print("Giriş bilgileri:")
         print("  Kullanıcı: admin")

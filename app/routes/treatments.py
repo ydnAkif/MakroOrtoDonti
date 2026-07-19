@@ -47,7 +47,8 @@ def list_treatments():
         query = query.where(Treatment.name.ilike(f"%{search}%"))
 
     query = query.order_by(Treatment.category, Treatment.name)
-    treatments = db.session.execute(query).scalars().all()
+    pagination = db.paginate(query, page=max(request.args.get("page", 1, type=int), 1), per_page=30, max_per_page=100, error_out=False)
+    treatments = pagination.items
 
     categories = TreatmentCategory.ALL
     category_labels = {
@@ -70,6 +71,7 @@ def list_treatments():
         category_labels=category_labels,
         selected_category=category,
         search=search,
+        pagination=pagination,
     )
 
 
@@ -320,7 +322,7 @@ def api_update_treatment():
             "id": treatment.id,
             "name": treatment.name,
             "category": treatment.category,
-            "price_eur": treatment.price_eur,
+            "price_eur": float(treatment.price_eur),
             "description": treatment.description or "",
         }
     })

@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 from datetime import date
+from decimal import Decimal
+import threading
 
 import bcrypt
 import pytest
+from werkzeug.serving import make_server
 
 from app import create_app
 from app.extensions import db
@@ -95,6 +98,7 @@ def app():
         db.session.add(
             PatientTreatment(
                 patient_id=patient.id,
+                party_id=party.id,
                 treatment_id=treatments_seed[0].id,
                 treatment_date=date.today(),
                 price_override_eur=55.0,
@@ -124,3 +128,57 @@ def login(client, username: str, password: str):
         data={"username": username, "password": password},
         follow_redirects=True,
     )
+
+
+@pytest.fixture(scope="session")
+def live_server_url(tmp_path_factory):
+    db_path = tmp_path_factory.mktemp("e2e") / "makro.db"
+
+    class E2EConfig:
+        TESTING = True
+        DEBUG = False
+        SECRET_KEY = "e2e-session-key-longer-than-thirty-two-characters"
+        ENCRYPTION_KEY = "e2e-encryption-key-longer-than-thirty-two-characters"
+        SQLALCHEMY_DATABASE_URI = f"sqlite:///{db_path}"
+        SQLALCHEMY_TRACK_MODIFICATIONS = False
+        WTF_CSRF_ENABLED = True
+        SESSION_COOKIE_SECURE = False
+        TRUST_PROXY = False
+        FORCE_HSTS = False
+        MAX_CONTENT_LENGTH = 16 * 1024 * 1024
+        AUDIT_RETENTION_DAYS = 3650
+
+    e2e_app = create_app(E2EConfig)
+    with e2e_app.app_context():
+        Base.metadata.create_all(bind=db.engine)
+        db.session.add(User(
+            username="admin", full_name="E2E Admin", role="admin",
+            password_hash=bcrypt.hashpw(b"admin-pass", bcrypt.gensalt()).decode(),
+        ))
+        db.session.add(Party(
+            party_type=PartyType.PATIENT, name="E2E Hasta", first_name="E2E",
+            last_name="Hasta", phone="5551112233",
+        ))
+        db.session.add(Treatment(name="E2E Muayene", category="other", price_eur=Decimal("50.00")))
+        db.session.add(ExchangeRate(rate_date=date.today(), eur_to_try=Decimal("40.0000"), source="ecb"))
+        db.session.commit()
+
+    server = make_server("127.0.0.1", 0, e2e_app)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    yield f"http://127.0.0.1:{server.server_port}"
+    server.shutdown()
+    thread.join(timeout=5)
+    with e2e_app.app_context():
+        db.session.remove()
+        db.engine.dispose()
+
+
+@pytest.fixture
+def authenticated_page(page, live_server_url):
+    page.goto(f"{live_server_url}/login")
+    page.get_by_label("Kullanıcı Adı").fill("admin")
+    page.get_by_label("Şifre").fill("admin-pass")
+    page.get_by_role("button", name="Giriş Yap").click()
+    page.wait_for_url(f"{live_server_url}/")
+    return page

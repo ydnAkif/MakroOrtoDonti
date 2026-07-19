@@ -2,6 +2,7 @@
 testpaths = ["tests"]
 addopts = "--tb=short -q"
 pythonpath = ["."]
+markers = ["e2e: real browser end-to-end and accessibility tests"]
 
 [tool.coverage.run]
 source = ["app"]

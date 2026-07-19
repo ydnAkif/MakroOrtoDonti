@@ -1,22 +1,29 @@
 /* Makro Ortodonti — clinical operations design system */
+@font-face {
+    font-family: "Manrope";
+    src: url("../vendor/fonts/manrope.woff2") format("woff2");
+    font-display: swap;
+    font-style: normal;
+    font-weight: 400 800;
+}
 :root {
     --ink-950: #102e3a;
     --ink-800: #244653;
     --ink-600: #58717b;
-    --ink-400: #8ba0a8;
+    --ink-400: #58717b;
     --canvas: #f3f8f8;
     --surface: #ffffff;
     --surface-raised: #fbfdfd;
     --line: #dce8e9;
     --line-strong: #cbdadc;
-    --aqua-700: #188c8a;
+    --aqua-700: #0b6f70;
     --aqua-600: #20a6a2;
     --aqua-500: #39bfb3;
     --aqua-100: #def5f1;
     --sky-500: #35afd0;
     --coral-500: #e27c67;
     --amber-500: #d8a03b;
-    --success-500: #2d9b73;
+    --success-500: #176a4a;
     --danger-500: #cf5b62;
     --sidebar-width: 248px;
     --topbar-height: 76px;
@@ -26,7 +33,7 @@
     --shadow-sm: 0 1px 2px rgba(16, 46, 58, .03), 0 7px 18px rgba(16, 46, 58, .04);
     --shadow-md: 0 18px 45px rgba(16, 46, 58, .10);
     --bs-primary: var(--aqua-700);
-    --bs-primary-rgb: 24, 140, 138;
+    --bs-primary-rgb: 11, 111, 112;
     --bs-body-font-family: "Manrope", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     --bs-body-color: var(--ink-950);
     --bs-body-bg: var(--canvas);

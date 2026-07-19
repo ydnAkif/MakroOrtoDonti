@@ -1,10 +1,10 @@
 import logging
 import os
 
-from flask import Flask, g, request
+from flask import Flask, g, request, url_for
 
 from .config import Config, is_insecure_secret
-from .extensions import db, login_manager, csrf
+from .extensions import db, login_manager, csrf, migrate
 from . import user_loader  # noqa: F401 - registers user_loader
 
 
@@ -39,6 +39,12 @@ def create_app(config_class=Config) -> Flask:
     db.init_app(app)
     login_manager.init_app(app)
     csrf.init_app(app)
+    migrate.init_app(app, db)
+
+    # Register transactional audit listeners before handling requests.
+    from .services import audit_service  # noqa: F401
+    from .services.observability import init_observability
+    init_observability(app)
 
     from .routes.auth import auth_bp
     from .routes.dashboard import dashboard_bp
@@ -51,6 +57,7 @@ def create_app(config_class=Config) -> Flask:
     from .routes.whatsapp import whatsapp_bp
     from .routes.reports import reports_bp
     from .routes.health import health_bp
+    from .routes.privacy import privacy_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(dashboard_bp)
@@ -63,18 +70,7 @@ def create_app(config_class=Config) -> Flask:
     app.register_blueprint(whatsapp_bp, url_prefix="/whatsapp")
     app.register_blueprint(reports_bp, url_prefix="/reports")
     app.register_blueprint(health_bp)
-
-    @app.before_request
-    def auto_refresh_exchange_rate():
-        if request.endpoint in {"static", "health.health_check"}:
-            return
-
-        from .services.exchange_service import ensure_daily_rate
-
-        try:
-            g.rate_auto_status = ensure_daily_rate(max_age_days=2)
-        except Exception:
-            g.rate_auto_status = None
+    app.register_blueprint(privacy_bp, url_prefix="/privacy")
 
     @app.context_processor
     def inject_globals():
@@ -97,14 +93,16 @@ def create_app(config_class=Config) -> Flask:
             logger.debug("Kur sağlık bilgisi okunamadı", exc_info=True)
             rate_health = None
         auto_rate_error = None
-        status = getattr(g, "rate_auto_status", None)
-        if status and status.get("error"):
-            auto_rate_error = status["error"]
+        def page_url(page: int) -> str:
+            args = request.args.to_dict(flat=True)
+            args["page"] = page
+            return url_for(request.endpoint, **(request.view_args or {}), **args)
 
         return {
             "clinic_name": clinic_name,
             "rate_health": rate_health,
             "auto_rate_error": auto_rate_error,
+            "page_url": page_url,
             "party_type_labels": {
                 "patient": "Hastalar",
                 "dentist_customer": "Diş Hekimi Müşterileri",
@@ -112,5 +110,23 @@ def create_app(config_class=Config) -> Flask:
                 "": "Kişiler",
             },
         }
+
+    @app.cli.command("refresh-exchange-rate")
+    def refresh_exchange_rate_command():
+        """Scheduler-safe daily exchange-rate job."""
+        from .services.exchange_service import fetch_and_store_rate
+        rate = fetch_and_store_rate()
+        print(f"EUR/TRY rate stored: {rate}")
+
+    @app.cli.command("purge-expired-audit-logs")
+    def purge_expired_audit_logs_command():
+        """Delete audit rows older than the configured retention period."""
+        from datetime import datetime, timedelta, timezone
+        from .models.models import AuditLog
+        days = int(app.config.get("AUDIT_RETENTION_DAYS", 3650))
+        cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=days)
+        result = db.session.execute(db.delete(AuditLog).where(AuditLog.occurred_at < cutoff))
+        db.session.commit()
+        print(f"Purged {result.rowcount or 0} audit rows older than {days} days")
 
     return app

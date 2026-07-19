@@ -11,6 +11,7 @@ from app.models.models import (
 )
 from app.models.invoice_service import InvoiceService
 from app.authz import roles_required
+from sqlalchemy import String, case, cast
 
 invoices_bp = Blueprint("invoices", __name__)
 
@@ -34,10 +35,27 @@ def list_invoices():
             )
         )
 
-    query = query.order_by(Invoice.invoice_date.desc())
-    invoices = db.session.execute(query).scalars().all()
     if category:
-        invoices = [invoice for invoice in invoices if category in invoice.category_keys]
+        category_expr = case(
+            (InvoiceItem.item_type == InvoiceItemType.TREATMENT, Treatment.category),
+            else_=db.func.lower(cast(InvoiceItem.item_type, String)),
+        )
+        categorized = (
+            db.select(InvoiceItem.invoice_id.label("invoice_id"))
+            .outerjoin(Treatment, InvoiceItem.treatment_id == Treatment.id)
+            .group_by(InvoiceItem.invoice_id)
+        )
+        if category == "mixed":
+            categorized = categorized.having(db.func.count(db.distinct(category_expr)) > 1)
+        else:
+            categorized = categorized.having(
+                db.func.max(case((category_expr == category, 1), else_=0)) == 1
+            )
+        query = query.where(Invoice.id.in_(categorized))
+
+    query = query.order_by(Invoice.invoice_date.desc())
+    pagination = db.paginate(query, page=max(request.args.get("page", 1, type=int), 1), per_page=30, max_per_page=100, error_out=False)
+    invoices = pagination.items
 
     return render_template(
         "invoices/list.html",
@@ -46,6 +64,7 @@ def list_invoices():
         selected_category=category,
         category_labels=INVOICE_CATEGORY_LABELS,
         search=search,
+        pagination=pagination,
     )
 
 
@@ -167,7 +186,7 @@ def add_invoice():
             "id": t.id,
             "name": t.name,
             "description": t.description or t.name,
-            "price_eur": t.price_eur,
+            "price_eur": float(t.price_eur),
             "category": t.category,
             "category_label": INVOICE_CATEGORY_LABELS.get(t.category, t.category),
         }
@@ -292,7 +311,7 @@ def get_treatment_price(treatment_id):
     pt = db.session.get(PatientTreatment, treatment_id)
     if pt:
         return jsonify({
-            "price_eur": pt.effective_price_eur,
+        "price_eur": float(pt.effective_price_eur),
             "treatment_name": pt.treatment.name,
         })
     return jsonify({"error": "Not found"}), 404
@@ -336,7 +355,7 @@ def get_exchange_rate_for_date():
         return jsonify({"error": "Bu tarih için kur bulunamadı"}), 404
 
     return jsonify({
-        "rate": rate.eur_to_try,
+        "rate": float(rate.eur_to_try),
         "rate_date": rate.rate_date.isoformat(),
         "display_date": rate.rate_date.strftime("%d.%m.%Y"),
         "source": rate.source,

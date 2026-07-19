@@ -1,6 +1,7 @@
 from flask import Blueprint, render_template, redirect, url_for, flash, request
 from flask_login import login_required
 from datetime import date
+from decimal import Decimal
 
 from app.extensions import db
 from app.models.models import Payment, PaymentMethod, Invoice, ExchangeRate
@@ -9,8 +10,8 @@ from app.authz import roles_required
 payments_bp = Blueprint("payments", __name__)
 
 
-def _payment_status(invoice: Invoice, total_paid_eur: float, as_of: date) -> str:
-    if total_paid_eur >= invoice.total_eur - 0.01:
+def _payment_status(invoice: Invoice, total_paid_eur: Decimal, as_of: date) -> str:
+    if total_paid_eur >= invoice.total_eur - Decimal("0.01"):
         return Invoice.STATUS_PAID
     if invoice.due_date and invoice.due_date < as_of:
         return Invoice.STATUS_OVERDUE
@@ -49,8 +50,17 @@ def list_payments():
         if parsed_end:
             query = query.where(Payment.payment_date <= parsed_end)
 
+    filtered_ids = query.with_only_columns(Payment.id).order_by(None).subquery()
+    total_eur, total_try = db.session.execute(
+        db.select(
+            db.func.coalesce(db.func.sum(Payment.amount_eur), 0),
+            db.func.coalesce(db.func.sum(Payment.amount_try), 0),
+        ).where(Payment.id.in_(db.select(filtered_ids.c.id)))
+    ).one()
+
     query = query.order_by(Payment.payment_date.desc())
-    payments = db.session.execute(query).scalars().all()
+    pagination = db.paginate(query, page=max(request.args.get("page", 1, type=int), 1), per_page=30, max_per_page=100, error_out=False)
+    payments = pagination.items
 
     # Pending/Unpaid invoices
     pending_invoices = db.session.execute(
@@ -61,10 +71,6 @@ def list_payments():
         )
         .order_by(Invoice.invoice_date.desc())
     ).scalars().all()
-
-    # Totals
-    total_eur = sum(p.amount_eur for p in payments)
-    total_try = sum(p.amount_try for p in payments)
 
     method_labels = {
         "cash": "Nakit",
@@ -85,6 +91,7 @@ def list_payments():
         search=search,
         start_date=start_date,
         end_date=end_date,
+        pagination=pagination,
     )
 
 
@@ -92,10 +99,10 @@ def list_payments():
 @login_required
 def add_payment():
     if request.method == "POST":
-        from app.services.validation_service import parse_date, parse_enum, parse_float
+        from app.services.validation_service import parse_date, parse_enum, parse_decimal
         invoice_id = request.form.get("invoice_id", type=int)
         payment_date_str = request.form.get("payment_date", "")
-        amount_eur = parse_float(request.form.get("amount_eur", ""))
+        amount_eur = parse_decimal(request.form.get("amount_eur", ""))
         
         parsed_method = parse_enum(PaymentMethod, request.form.get("method", "cash"))
         if not parsed_method:
@@ -130,11 +137,11 @@ def add_payment():
             flash("Ödeme tarihi için döviz kuru bulunamadı.", "danger")
             return redirect(url_for("payments.add_payment"))
         
-        amount_try = round(amount_eur * rate.eur_to_try, 2)
+        amount_try = (amount_eur * rate.eur_to_try).quantize(Decimal("0.01"))
 
         total_paid_before = sum(p.amount_eur for p in invoice.payments)
-        remaining_eur = max(invoice.total_eur - total_paid_before, 0.0)
-        if amount_eur > remaining_eur + 0.01:
+        remaining_eur = max(invoice.total_eur - total_paid_before, Decimal("0.00"))
+        if amount_eur > remaining_eur + Decimal("0.01"):
             flash(
                 f"Ödeme kalan €{remaining_eur:,.2f} bakiyeyi aşamaz.",
                 "danger",

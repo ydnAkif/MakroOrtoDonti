@@ -7,7 +7,6 @@ import secrets
 from datetime import date
 
 import bcrypt
-from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from .base import Base
@@ -34,51 +33,11 @@ DATABASE_PATH = os.path.join(DATABASE_DIR, "makroortodonti.db")
 
 
 def init_db() -> None:
-    """Create tables using Flask-SQLAlchemy's engine (must be called inside app context)."""
-    from flask import current_app
-    from app.extensions import db
+    """Upgrade the configured database to the latest Alembic revision."""
+    from flask_migrate import upgrade
 
     os.makedirs(DATABASE_DIR, exist_ok=True)
-    with current_app.app_context():
-        Base.metadata.create_all(bind=db.engine)
-        _migrate_columns(db.engine)
-        _create_indexes(db.engine)
-
-
-def _migrate_columns(engine) -> None:
-    """Add columns to existing tables for schema evolution."""
-    with engine.begin() as conn:
-        cols = [r[1] for r in conn.execute(text("PRAGMA table_info(parties)")).fetchall()]
-        if "referred_by_id" not in cols:
-            conn.execute(text("ALTER TABLE parties ADD COLUMN referred_by_id INTEGER REFERENCES parties(id)"))
-
-
-def _create_indexes(engine) -> None:
-    with engine.begin() as conn:
-        indexes = [
-            "CREATE INDEX IF NOT EXISTS idx_patients_name ON patients(last_name, first_name)",
-            "CREATE INDEX IF NOT EXISTS idx_patient_treatments_date ON patient_treatments(treatment_date)",
-            "CREATE INDEX IF NOT EXISTS idx_invoices_patient ON invoices(patient_id, invoice_date)",
-            "CREATE INDEX IF NOT EXISTS idx_invoices_status_date ON invoices(status, invoice_date)",
-            "CREATE INDEX IF NOT EXISTS idx_invoice_items_invoice ON invoice_items(invoice_id)",
-            "CREATE INDEX IF NOT EXISTS idx_treatments_category ON treatments(category, is_active)",
-            "CREATE INDEX IF NOT EXISTS idx_exchange_rates_date ON exchange_rates(rate_date DESC)",
-            "CREATE INDEX IF NOT EXISTS idx_settings_key ON settings(key)",
-            "CREATE INDEX IF NOT EXISTS idx_users_username ON users(username)",
-            "CREATE INDEX IF NOT EXISTS idx_whatsapp_status ON whatsapp_sessions(status)",
-            "CREATE INDEX IF NOT EXISTS idx_parties_type ON parties(party_type)",
-            "CREATE INDEX IF NOT EXISTS idx_parties_name ON parties(name)",
-            "CREATE INDEX IF NOT EXISTS idx_parties_active ON parties(is_active)",
-            "CREATE INDEX IF NOT EXISTS idx_invoices_party ON invoices(party_id, invoice_date)",
-            "CREATE INDEX IF NOT EXISTS idx_invoice_items_type ON invoice_items(item_type)",
-            "CREATE INDEX IF NOT EXISTS idx_payments_invoice ON payments(invoice_id)",
-            "CREATE INDEX IF NOT EXISTS idx_payments_date ON payments(payment_date)",
-            "CREATE INDEX IF NOT EXISTS idx_parties_referred_by ON parties(referred_by_id)",
-            "CREATE INDEX IF NOT EXISTS idx_login_attempts_ip ON login_attempts(ip_address)",
-            "CREATE INDEX IF NOT EXISTS idx_login_attempts_user ON login_attempts(username)",
-        ]
-        for stmt in indexes:
-            conn.execute(text(stmt))
+    upgrade()
 
 
 def migrate_patients_to_parties() -> int:

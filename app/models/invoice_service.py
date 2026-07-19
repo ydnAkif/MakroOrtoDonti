@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import date
-from math import isfinite
+from decimal import Decimal, InvalidOperation
 from typing import Optional, List, Dict, Any
 
 from sqlalchemy import select, update
@@ -33,29 +33,29 @@ def _normalize_item(item_data: Dict[str, Any]) -> Dict[str, Any]:
         raise ValueError(f"Miktar sıfırdan büyük olmalıdır (girilen: {quantity}).")
 
     try:
-        unit_price = float(item_data.get("unit_price_eur"))
-    except (TypeError, ValueError) as exc:
+        unit_price = Decimal(str(item_data.get("unit_price_eur"))).quantize(Decimal("0.01"))
+    except (TypeError, ValueError, InvalidOperation) as exc:
         raise ValueError("Birim fiyat sayısal olmalıdır.") from exc
-    if not isfinite(unit_price) or unit_price < 0:
+    if not unit_price.is_finite() or unit_price < 0:
         raise ValueError(f"Birim fiyat negatif olamaz (girilen: {unit_price}).")
 
     try:
-        vat_rate = float(item_data.get("vat_rate", 0.0))
-    except (TypeError, ValueError) as exc:
+        vat_rate = Decimal(str(item_data.get("vat_rate", 0))).quantize(Decimal("0.01"))
+    except (TypeError, ValueError, InvalidOperation) as exc:
         raise ValueError("KDV oranı sayısal olmalıdır.") from exc
-    if not isfinite(vat_rate) or not 0.0 <= vat_rate <= 100.0:
+    if not vat_rate.is_finite() or not Decimal("0") <= vat_rate <= Decimal("100"):
         raise ValueError(f"KDV oranı 0 ile 100 arasında olmalıdır (girilen: {vat_rate}).")
 
     discount_type = item_data.get("discount_type") or None
     if discount_type not in {None, "percent", "amount"}:
         raise ValueError("İskonto tipi percent veya amount olmalıdır.")
     try:
-        discount_value = float(item_data.get("discount_value", 0.0) or 0.0)
-    except (TypeError, ValueError) as exc:
+        discount_value = Decimal(str(item_data.get("discount_value", 0) or 0)).quantize(Decimal("0.01"))
+    except (TypeError, ValueError, InvalidOperation) as exc:
         raise ValueError("İskonto değeri sayısal olmalıdır.") from exc
-    if not isfinite(discount_value) or discount_value < 0:
+    if not discount_value.is_finite() or discount_value < 0:
         raise ValueError(f"İskonto değeri negatif olamaz (girilen: {discount_value}).")
-    if discount_type == "percent" and discount_value > 100.0:
+    if discount_type == "percent" and discount_value > Decimal("100"):
         raise ValueError(f"Yüzde iskonto 100'ü aşamaz (girilen: {discount_value}).")
     if discount_type == "amount" and discount_value > unit_price * quantity:
         raise ValueError(
@@ -183,7 +183,7 @@ class InvoiceService:
         for item_data in normalized_items:
             item_type = item_data["item_type"]
             unit_eur = item_data["unit_price_eur"]
-            unit_try = round(unit_eur * rate, 2)
+            unit_try = (unit_eur * rate).quantize(Decimal("0.01"))
             
             item = InvoiceItem(
                 invoice_id=invoice.id,
@@ -220,13 +220,8 @@ class InvoiceService:
         rate = InvoiceService.get_exchange_rate(session, invoice_date)
         invoice_number = InvoiceService.generate_invoice_number(session, invoice_date)
 
-        # Find patient_id from first treatment for backward compatibility
-        first_treatment = session.get(PatientTreatment, treatment_ids[0]) if treatment_ids else None
-        patient_id = first_treatment.patient_id if first_treatment else None
-
         invoice = Invoice(
             party_id=party_id,
-            patient_id=patient_id,  # backward compatibility
             invoice_number=invoice_number,
             invoice_date=invoice_date,
             due_date=due_date,
@@ -242,7 +237,7 @@ class InvoiceService:
                 raise ValueError(f"PatientTreatment {tid} not found")
             treatment = pt.treatment
             unit_eur = pt.effective_price_eur
-            unit_try = round(unit_eur * rate, 2)
+            unit_try = (unit_eur * rate).quantize(Decimal("0.01"))
 
             item = InvoiceItem(
                 invoice_id=invoice.id,

@@ -43,7 +43,7 @@
                     {% for patient in patients %}
                     <tr>
                         <td>
-                            <a href="{{ url_for('patients.detail_patient', patient_id=patient.patient.id if patient.patient else patient.id) }}" class="text-decoration-none fw-bold">
+                            <a href="{{ url_for('patients.detail_patient', patient_id=patient.id) }}" class="text-decoration-none fw-bold">
                                 {{ patient.full_name }}
                             </a>
                         </td>

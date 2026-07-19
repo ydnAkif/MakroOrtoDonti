@@ -19,7 +19,7 @@ Makro Ortodonti; hasta ve müşteri kayıtlarını, tedavi kataloğunu, EUR bazl
 
 - Python 3.13+
 - Flask, Flask-Login, Flask-WTF ve Flask-SQLAlchemy
-- SQLite ve SQLAlchemy 2
+- SQLite, SQLAlchemy 2, Alembic/Flask-Migrate ve kesin ölçekli `Numeric` finans alanları
 - Jinja2, Bootstrap 5 ve özel tasarım sistemi
 - fpdf2, OpenPyXL ve Neonize
 - Gunicorn production sunucusu
@@ -49,6 +49,9 @@ Uygulama varsayılan olarak `http://127.0.0.1:5000` adresinde açılır. `init_d
 | `FLASK_DEBUG` | Development debug modu | `false` |
 | `SESSION_COOKIE_SECURE` | Cookie'yi yalnızca HTTPS üzerinden gönderir | `false` |
 | `TRUST_PROXY` | Tek ve güvenilen reverse proxy başlıklarını kabul eder | `false` |
+| `FORCE_HSTS` | TLS reverse proxy doğrulandıktan sonra HSTS başlığı gönderir | `false` |
+| `AUDIT_RETENTION_DAYS` | Denetim kayıtlarının saklama süresi | `3650` |
+| `SENTRY_DSN` | PII göndermeyen opsiyonel production hata izleme | Boş |
 | `PORT`, `BIND`, `WORKERS` | Gunicorn ağ ve worker ayarları | `8000`, `0.0.0.0`, en fazla 4 worker |
 
 Her anahtar için ayrı güçlü bir değer üretmek için komutu iki kez çalıştırın:
@@ -65,6 +68,8 @@ Production ortamında `SECRET_KEY` veya `ENCRYPTION_KEY` eksik, 32 karakterden k
 export SECRET_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
 export ENCRYPTION_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
 export SESSION_COOKIE_SECURE=true
+export FORCE_HSTS=true
+flask --app run:app db upgrade
 python run_production.py
 ```
 
@@ -76,6 +81,40 @@ curl http://127.0.0.1:8000/health
 ```
 
 SQLite küçük klinik ekipleri için uygundur. Yoğun eşzamanlı yazma veya çok sunuculu dağıtım gerekiyorsa PostgreSQL'e geçiş planlanmalıdır.
+
+## Migration ve veri geçişi
+
+Yeni kurulum ve mevcut veritabanı aynı Alembic zincirini kullanır:
+
+```bash
+python backup.py backup
+flask --app run:app db upgrade
+flask --app run:app db current
+```
+
+İlk revision eski `Patient` kayıtlarını `Party` ile eşler, tedavi geçmişini `party_id` üzerine taşır ve finans kolonlarını `Numeric` yapar. SQLite batch geçişi sonunda foreign-key kontrolü başarısızsa migration da başarısız olur. Uygulama yeni legacy `Patient` satırı üretmez; tablo yalnızca kontrollü geriye dönük veri geçişi için tutulur.
+
+## Zamanlanmış işler
+
+Döviz kuru artık kullanıcı isteği içinden thread başlatmaz. Sistem cron'u veya platform scheduler'ı günde bir kez şu komutu çalıştırmalıdır:
+
+```bash
+flask --app run:app refresh-exchange-rate
+```
+
+Audit saklama politikasını uygulamak için günlük/haftalık olarak:
+
+```bash
+flask --app run:app purge-expired-audit-logs
+```
+
+## Denetim ve KVKK
+
+- ORM değişiklikleri aktör, endpoint, IP ve `X-Request-ID` ile aynı transaction içinde `audit_logs` tablosuna yazılır.
+- Admin denetim ekranı: `/privacy/audit`.
+- Kişi veri paketi: `/privacy/parties/<id>/export`.
+- Anonimleştirme, açık finansal kayıt varsa `409` ile reddedilir.
+- `AUDIT_RETENTION_DAYS` yalnızca kurumun onaylı saklama politikasına göre ayarlanmalıdır.
 
 ## Veritabanı yedekleme
 
@@ -106,11 +145,12 @@ Yerel backup dizini tek başına felaket kurtarma çözümü değildir. Yedekler
 ```bash
 pytest
 pytest --cov=app --cov-report=term-missing --cov-fail-under=70
+pytest tests/e2e --browser chromium
 python -m compileall -q app backup.py run.py run_production.py
 python -m pip check
 ```
 
-GitHub Actions, her push ve pull request için Python 3.13/3.14 üzerinde derleme, test ve branch coverage kapısını çalıştırır.
+GitHub Actions, her push ve pull request için Python 3.13/3.14 üzerinde derleme, Playwright Chromium kurulumu, test ve branch coverage kapısını çalıştırır. E2E paketi masaüstü ve 400×765 mobil axe WCAG taraması yapar.
 
 ## Güvenlik notları
 
@@ -118,6 +158,8 @@ GitHub Actions, her push ve pull request için Python 3.13/3.14 üzerinde derlem
 - Parolalar bcrypt ile hashlenir; SMTP şifresi ayrı `ENCRYPTION_KEY` üzerinden Fernet ile doğrulamalı olarak şifrelenir.
 - Eski XOR/Base64 biçimindeki SMTP şifreleri güvenli biçimde çözülemez. Güncellemeden sonra Ayarlar ekranından SMTP şifresini bir kez yeniden kaydedin.
 - Fatura satırları sunucuda doğrulanır; negatif tutar, geçersiz KDV/iskonto ve eksik referans reddedilir.
+- Bootstrap, ikonlar, font ve axe varlıkları self-host edilir; çalışma zamanında üçüncü taraf CDN çağrısı yoktur.
+- CSP, `X-Content-Type-Options`, Referrer Policy, Permissions Policy ve `X-Request-ID` her yanıta eklenir; HSTS yalnızca doğrulanmış HTTPS ortamında açılır.
 - Hasta ve finans verileri KVKK kapsamındadır. Veritabanı, yedekler ve uygulama logları yalnızca yetkili kişilerce erişilebilir olmalıdır.
 
 ## Proje yapısı

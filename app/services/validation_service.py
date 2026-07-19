@@ -1,5 +1,6 @@
 from datetime import date
 from enum import Enum
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
 def parse_date(date_str: str) -> date | None:
     """Safely parse an ISO date string, returning None if malformed or empty."""
@@ -13,6 +14,18 @@ def parse_date(date_str: str) -> date | None:
 def parse_float(val_str: str) -> float | None:
     """Safely parse a string value to float, returning None if malformed or empty."""
     if not val_str:
+        return None
+
+def parse_decimal(val_str: str, scale: str = "0.01") -> Decimal | None:
+    """Parse user-entered decimal values without binary floating-point conversion."""
+    if not val_str:
+        return None
+    try:
+        value = Decimal(str(val_str).strip().replace(",", "."))
+        if not value.is_finite():
+            return None
+        return value.quantize(Decimal(scale), rounding=ROUND_HALF_UP)
+    except (InvalidOperation, ValueError, TypeError):
         return None
     try:
         return float(val_str.strip().replace(",", "."))  # handle decimal commas too
