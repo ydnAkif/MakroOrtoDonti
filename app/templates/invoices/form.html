@@ -56,9 +56,7 @@
                         data-email="{{ p.email or '' }}" data-address="{{ p.address or '' }}"
                         data-tax-id="{{ p.tax_id or '' }}"
                         {% if selected_party_id and p.id == selected_party_id %}selected{% endif %}>
-                  {{ p.display_name }} <span class="badge bg-{% if p.party_type.value == 'patient' %}primary{% elif p.party_type.value == 'dentist_customer' %}success{% else %}info{% endif %} ms-2">
-                    {{ p.party_type.value|title }}
-                  </span>
+                  {{ p.display_name }} ({% if p.party_type.value == 'patient' %}Hasta{% elif p.party_type.value == 'dentist_customer' %}Diş Hekimi{% else %}Kurumsal Müşteri{% endif %})
                 </option>
                 {% endfor %}
               </select>

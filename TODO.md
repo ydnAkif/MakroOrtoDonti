@@ -15,7 +15,7 @@
 1. Hasta listesi Party id ile Patient route'una gidiyor (id uyumsuzlugu riski)
 
 - **Dosya:** `app/templates/patients/list.html:46-47`
-- **Durum:** ⏳ Beklemede
+- **Durum:** ✅ Düzeltildi
 - **Etki:** Yanlis kayit/404/500, veri guveni azalir.
 
 2. SMTP sifresi plaintext tutuluyor ve ayarlar ekraninda geri yazdiriliyor
@@ -40,7 +40,7 @@
 5. Form parse noktalarinda defensive validation eksik (bad input -> 500 riski)
 
 - **Dosya:** `app/routes/settings.py:72-73`, `app/routes/payments.py:31-35,63,72`, `app/routes/parties.py:59,63,120,124`, `app/routes/invoices.py:90-91`, `app/routes/patients.py:193`
-- **Durum:** ⏳ Beklemede
+- **Durum:** ✅ Düzeltildi
 
 6. Dashboard/Reports metrikleri Party-first degil
 
@@ -57,7 +57,7 @@
 8. Party-Patient cift modelde drift riski (kismi senkron)
 
 - **Dosya:** `app/routes/parties.py`, `app/routes/patients.py`
-- **Durum:** ⏳ Beklemede
+- **Durum:** ✅ Düzeltildi
 
 ---
 

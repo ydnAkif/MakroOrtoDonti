@@ -44,7 +44,7 @@
             <input type="hidden" name="type" value="{{ selected_type }}">
             <div class="input-group">
                 <span class="input-group-text"><i class="bi bi-search"></i></span>
-                <input type="text" class="form-control" name="search" value="{{ search }}" 
+                <input type="text" class="form-control js-table-filter" data-target="tbody tr" name="search" value="{{ search }}" 
                        placeholder="Ad, telefon veya e-posta ile ara...">
                 <button type="submit" class="btn btn-primary">Ara</button>
                 {% if search %}
@@ -83,7 +83,9 @@
                         </td>
                         <td>
                             <span class="badge bg-{% if p.party_type.value == 'patient' %}primary{% elif p.party_type.value == 'dentist_customer' %}success{% else %}info{% endif %}">
-                                {{ p.party_type.value|title }}
+                                {% if p.party_type.value == 'patient' %}Hasta
+                                {% elif p.party_type.value == 'dentist_customer' %}Diş Hekimi
+                                {% else %}Kurumsal{% endif %}
                             </span>
                         </td>
                         <td>{{ p.phone or '-' }}</td>

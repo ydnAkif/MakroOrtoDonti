@@ -28,20 +28,13 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        var placeholder = select.dataset.searchPlaceholder || 'Yazdikca ara...';
+        var placeholder = select.dataset.searchPlaceholder || 'Yazdıka ara...';
         var options = Array.from(select.options).filter(function(opt) {
             return opt.value;
         });
 
         var wrapper = document.createElement('div');
         wrapper.className = 'typeahead-wrapper';
-
-        var hiddenInput = document.createElement('input');
-        hiddenInput.type = 'hidden';
-        hiddenInput.name = select.name;
-        if (select.id) {
-            hiddenInput.id = select.id;
-        }
 
         var input = document.createElement('input');
         input.type = 'text';
@@ -52,27 +45,22 @@ document.addEventListener('DOMContentLoaded', function() {
         var list = document.createElement('div');
         list.className = 'typeahead-list list-group shadow-sm';
 
-        if (select.required) {
-            hiddenInput.required = true;
-            select.required = false;
-        }
-
+        // Set initial value in input
         if (select.value) {
             var selectedOption = options.find(function(opt) { return opt.value === select.value; });
             if (selectedOption) {
-                hiddenInput.value = selectedOption.value;
                 input.value = selectedOption.textContent.trim();
             }
         }
 
-        select.removeAttribute('name');
+        // Hide the original select (but keep id, name, and option elements intact!)
         select.classList.add('d-none');
 
+        // Insert wrapper before select
         select.parentNode.insertBefore(wrapper, select);
         wrapper.appendChild(input);
-        wrapper.appendChild(hiddenInput);
         wrapper.appendChild(list);
-        wrapper.appendChild(select);
+        wrapper.appendChild(select); // move select inside wrapper for tidy hierarchy
 
         function renderList(query) {
             var nq = normalizeText(query);
@@ -92,10 +80,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 btn.className = 'list-group-item list-group-item-action';
                 btn.textContent = opt.textContent.trim();
                 btn.addEventListener('mousedown', function() {
-                    hiddenInput.value = opt.value;
+                    select.value = opt.value;
                     input.value = opt.textContent.trim();
                     list.style.display = 'none';
-                    hiddenInput.dispatchEvent(new Event('change', { bubbles: true }));
+                    // Dispatch change event on the original select so page scripts trigger
+                    select.dispatchEvent(new Event('change', { bubbles: true }));
                 });
                 list.appendChild(btn);
             });
@@ -104,7 +93,8 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         input.addEventListener('input', function() {
-            hiddenInput.value = '';
+            select.value = ''; // clear select until an item is explicitly clicked
+            select.dispatchEvent(new Event('change', { bubbles: true }));
             renderList(input.value);
         });
 
@@ -115,6 +105,15 @@ document.addEventListener('DOMContentLoaded', function() {
         input.addEventListener('blur', function() {
             window.setTimeout(function() {
                 list.style.display = 'none';
+                // If user blurs without picking an item and has typed something that doesn't match, or cleared it
+                if (!select.value) {
+                    input.value = '';
+                } else {
+                    var selectedOption = options.find(function(opt) { return opt.value === select.value; });
+                    if (selectedOption) {
+                        input.value = selectedOption.textContent.trim();
+                    }
+                }
             }, 120);
         });
 

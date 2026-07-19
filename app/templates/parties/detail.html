@@ -31,7 +31,9 @@
             <div class="card-body">
                 <h5>{{ party.display_name }}</h5>
                 <span class="badge bg-{% if party.party_type.value == 'patient' %}primary{% elif party.party_type.value == 'dentist_customer' %}success{% else %}info{% endif %} mb-2">
-                    {{ party.party_type.value|title }}
+                    {% if party.party_type.value == 'patient' %}Hasta
+                    {% elif party.party_type.value == 'dentist_customer' %}Diş Hekimi Müşterisi
+                    {% else %}Kurumsal Müşteri{% endif %}
                 </span>
                 <hr>
                 {% if party.phone %}

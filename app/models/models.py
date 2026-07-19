@@ -32,7 +32,8 @@ class TreatmentCategory:
     SURGICAL = "surgical"
     PREVENTIVE = "preventive"
     RESTORATIVE = "restorative"
-    ENDODONTIC = "periodontic"
+    PERIODONTIC = "periodontic"
+    ENDODONTIC = "endodontic"
     IMPLANT = "implant"
     COSMETIC = "cosmetic"
     OTHER = "other"
@@ -43,6 +44,7 @@ class TreatmentCategory:
         SURGICAL,
         PREVENTIVE,
         RESTORATIVE,
+        PERIODONTIC,
         ENDODONTIC,
         IMPLANT,
         COSMETIC,

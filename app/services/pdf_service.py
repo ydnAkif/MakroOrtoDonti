@@ -10,12 +10,13 @@ FONT_PATH_BOLD = os.path.join(FONT_DIR, "DejaVuSans-Bold.ttf")
 
 
 class InvoicePDF(FPDF):
-    def __init__(self, clinic_name="Makro Ortodonti", clinic_address="", clinic_phone="", clinic_email=""):
+    def __init__(self, clinic_name="Makro Ortodonti", clinic_address="", clinic_phone="", clinic_email="", logo_path=None):
         super().__init__()
         self.clinic_name = clinic_name
         self.clinic_address = clinic_address
         self.clinic_phone = clinic_phone
         self.clinic_email = clinic_email
+        self.logo_path = logo_path
 
         self.default_font = "Helvetica"
         if os.path.exists(FONT_PATH):
@@ -70,17 +71,35 @@ class InvoicePDF(FPDF):
         return super().multi_cell(w, h, self._safe_text(text), *args, **kwargs)
 
     def header(self):
+        has_logo = False
+        if self.logo_path and os.path.exists(self.logo_path):
+            try:
+                self.image(self.logo_path, x=10, y=10, w=25)
+                has_logo = True
+            except Exception:
+                pass
+        
+        if has_logo:
+            self.set_x(40)
+        else:
+            self.set_x(10)
+
         self.set_font(self.default_font, "B", 18)
         self.set_text_color(0, 102, 153)
-        self.cell(0, 10, self.clinic_name, ln=True, align="C")
+        self.cell(0, 10, self.clinic_name, ln=True, align="L" if has_logo else "C")
+        
         self.set_font(self.default_font, "", 9)
         self.set_text_color(100, 100, 100)
+        
         if self.clinic_address:
-            self.cell(0, 5, self.clinic_address, ln=True, align="C")
+            if has_logo: self.set_x(40)
+            self.cell(0, 5, self.clinic_address, ln=True, align="L" if has_logo else "C")
         if self.clinic_phone:
-            self.cell(0, 5, f"Tel: {self.clinic_phone}", ln=True, align="C")
+            if has_logo: self.set_x(40)
+            self.cell(0, 5, f"Tel: {self.clinic_phone}", ln=True, align="L" if has_logo else "C")
         if self.clinic_email:
-            self.cell(0, 5, f"E-posta: {self.clinic_email}", ln=True, align="C")
+            if has_logo: self.set_x(40)
+            self.cell(0, 5, f"E-posta: {self.clinic_email}", ln=True, align="L" if has_logo else "C")
         self.ln(5)
         self.set_draw_color(0, 102, 153)
         self.set_line_width(0.5)
@@ -243,12 +262,36 @@ def generate_invoice_pdf(invoice) -> bytes:
     clinic_address_val = get_setting("clinic_address")
     clinic_phone_val = get_setting("clinic_phone")
     clinic_email_val = get_setting("clinic_email")
+    clinic_logo_path_val = get_setting("clinic_logo_path")
+
+    # Locate actual logo path
+    logo_path = None
+    if clinic_logo_path_val:
+        if os.path.isabs(clinic_logo_path_val):
+            if os.path.exists(clinic_logo_path_val):
+                logo_path = clinic_logo_path_val
+        else:
+            app_dir = os.path.dirname(os.path.dirname(__file__))
+            p = os.path.join(app_dir, clinic_logo_path_val)
+            if os.path.exists(p):
+                logo_path = p
+    
+    if not logo_path:
+        app_dir = os.path.dirname(os.path.dirname(__file__))
+        p = os.path.join(app_dir, "app", "static", "images", "logo.png")
+        if os.path.exists(p):
+            logo_path = p
+        else:
+            p = os.path.join(app_dir, "static", "images", "logo.png")
+            if os.path.exists(p):
+                logo_path = p
 
     pdf = InvoicePDF(
         clinic_name=clinic_name_val,
         clinic_address=clinic_address_val,
         clinic_phone=clinic_phone_val,
         clinic_email=clinic_email_val,
+        logo_path=logo_path,
     )
     pdf.alias_nb_pages()
     pdf.add_page()

@@ -1,4 +1,4 @@
-# 🦷 MAKRO ORTO DENTİ - Proje Planı
+# 🦷 MAKRO ORTODONTİ - Proje Planı
 
 > **Ortodonti Uygulaması** | Müşteri Kayıtları, Fatura Yönetimi, WhatsApp/E-posta Entegrasyonu
 
@@ -310,7 +310,7 @@ CREATE TABLE settings (
 );
 
 -- Örnek ayarlar:
--- clinic_name: "Makro Orto Denti"
+-- clinic_name: "Makro Ortodonti"
 -- clinic_address: "İstanbul, Türkiye"
 -- clinic_phone: "+90 212 XXX XX XX"
 -- clinic_email: "info@makroorto.com"
@@ -672,7 +672,7 @@ Mevcut modüler yapı ile kolayca eklenebilir:
 
 ## 📞 İletişim
 
-**Proje:** Makro Orto Denti
+**Proje:** Makro Ortodonti
 **Geliştirici:** opencode
 **Başlangıç:** 2026
 
