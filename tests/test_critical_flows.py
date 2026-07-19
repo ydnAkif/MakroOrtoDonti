@@ -2,11 +2,12 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 import json
+import pytest
 
 from app.extensions import db
 from app.models.models import (
     ExchangeRate, Invoice, InvoiceItem, InvoiceItemType,
-    PatientTreatment, Party, PartyType, Payment, PaymentMethod, Settings, Treatment
+    Patient, PatientTreatment, Party, PartyType, Payment, PaymentMethod, Settings, Treatment
 )
 from conftest import login
 
@@ -146,6 +147,8 @@ def test_invoice_form_totals_and_item_modal_reset_contract(client):
     assert "line-vat-eur" not in html
     assert "function resetItemForm" in html
     assert "hidden.bs.modal" in html
+    assert "tr.innerHTML" not in html
+    assert "description.textContent = item.description" in html
 
 
 def test_invoice_category_and_date_rate_api(client, app):
@@ -223,6 +226,78 @@ def test_reports_use_payments_for_collections_without_double_counting(client, ap
 
     report_after_payment = client.get("/reports/").get_data(as_text=True)
     assert "€20.00" in report_after_payment
+
+
+def test_reports_include_old_receivables_and_keep_invoice_rate_basis(client, app):
+    login(client, "admin", "admin-pass")
+    old_date = date.today().replace(day=1) - timedelta(days=10)
+
+    with app.app_context():
+        party = db.session.execute(db.select(Party).limit(1)).scalar_one()
+        invoice = Invoice(
+            party_id=party.id,
+            invoice_number="MKR-OLD-0001",
+            invoice_date=old_date,
+            due_date=old_date,
+            total_eur=100.0,
+            total_try=4000.0,
+            exchange_rate=40.0,
+            status=Invoice.STATUS_PENDING,
+        )
+        db.session.add(invoice)
+        db.session.flush()
+        db.session.add(Payment(
+            invoice_id=invoice.id,
+            payment_date=date.today(),
+            amount_eur=50.0,
+            amount_try=2500.0,
+            exchange_rate=50.0,
+            method=PaymentMethod.CASH,
+        ))
+        db.session.commit()
+
+    current_report = client.get("/reports/").get_data(as_text=True)
+    assert "1 açık fatura" in current_report
+    assert "₺2,000.00" in current_report
+
+    historical_report = client.get(
+        f"/reports/?period=custom&start_date={old_date}&end_date={old_date}"
+    ).get_data(as_text=True)
+    assert "€100.00" in historical_report
+    assert "₺4,000.00" in historical_report
+
+
+def test_payment_rejects_amount_above_remaining_balance(client, app):
+    login(client, "admin", "admin-pass")
+    with app.app_context():
+        party = db.session.execute(db.select(Party).limit(1)).scalar_one()
+        invoice = Invoice(
+            party_id=party.id,
+            invoice_number="MKR-PAY-0001",
+            invoice_date=date.today(),
+            due_date=date.today() + timedelta(days=10),
+            total_eur=100.0,
+            total_try=4000.0,
+            exchange_rate=40.0,
+            status=Invoice.STATUS_PENDING,
+        )
+        db.session.add(invoice)
+        db.session.commit()
+        invoice_id = invoice.id
+
+    response = client.post(
+        "/payments/add",
+        data={
+            "invoice_id": invoice_id,
+            "payment_date": date.today().isoformat(),
+            "amount_eur": "100.02",
+            "method": "cash",
+        },
+        follow_redirects=True,
+    )
+    assert "bakiyeyi aşamaz" in response.get_data(as_text=True)
+    with app.app_context():
+        assert db.session.execute(db.select(db.func.count(Payment.id))).scalar_one() == 0
 
 
 # ==================== YENI TESTLER ====================
@@ -323,6 +398,56 @@ def test_party_crud_company_customer(client, app):
         assert party.party_type == PartyType.COMPANY_CUSTOMER
         assert party.contact_person == "Ali Veli"
         assert party.contact_phone == "+905551112233"
+
+
+def test_changing_patient_type_deactivates_legacy_patient(client, app):
+    login(client, "admin", "admin-pass")
+
+    with app.app_context():
+        party = db.session.execute(
+            db.select(Party).where(Party.party_type == PartyType.PATIENT)
+        ).scalar_one()
+        party_id = party.id
+        patient_id = party.patient.id
+
+    response = client.post(
+        f"/parties/{party_id}/edit",
+        data={
+            "party_type": "company_customer",
+            "name": "Ayse Saglik Ltd.",
+            "phone": "5551112233",
+            "is_active": "on",
+        },
+        follow_redirects=False,
+    )
+    assert response.status_code == 302
+
+    with app.app_context():
+        party = db.session.get(Party, party_id)
+        patient = db.session.get(Patient, patient_id)
+        assert party.party_type == PartyType.COMPANY_CUSTOMER
+        assert party.is_active is True
+        assert patient.is_active is False
+
+
+@pytest.mark.parametrize("price,category", [("-1", "other"), ("nan", "other"), ("10", "invalid")])
+def test_treatment_route_rejects_invalid_financial_values(client, app, price, category):
+    login(client, "admin", "admin-pass")
+
+    with app.app_context():
+        before = db.session.scalar(db.select(db.func.count(Treatment.id)))
+
+    response = client.post(
+        "/treatments/add",
+        data={"name": "Invalid treatment", "category": category, "price_eur": price},
+        follow_redirects=True,
+    )
+    assert response.status_code == 200
+    assert "Geçersiz" in response.get_data(as_text=True) or "negatif" in response.get_data(as_text=True)
+
+    with app.app_context():
+        after = db.session.scalar(db.select(db.func.count(Treatment.id)))
+        assert after == before
 
 
 def test_party_type_filter(client, app):
@@ -713,9 +838,9 @@ def test_smtp_password_encryption_decryption(app):
         decrypted = decrypt_value(encrypted)
         assert decrypted == test_pass
         
-        # Test fallback to plaintext
-        plaintext_fallback = "legacy_plaintext"
-        assert decrypt_value(plaintext_fallback) == plaintext_fallback
+        import pytest
+        with pytest.raises(ValueError, match="Failed to decrypt"):
+            decrypt_value("legacy_plaintext")
         
         # Test empty input
         assert encrypt_value("") == ""

@@ -1,22 +1,22 @@
 <nav class="sidebar-nav" aria-label="Uygulama bölümleri">
     <div class="nav-section-label">Çalışma alanı</div>
     <ul class="nav flex-column">
-        <li class="nav-item"><a class="nav-link {% if request.endpoint == 'dashboard.index' %}active{% endif %}" href="{{ url_for('dashboard.index') }}" {% if request.endpoint == 'dashboard.index' %}aria-current="page"{% endif %}><i class="bi bi-grid-1x2"></i><span>Genel bakış</span></a></li>
-        <li class="nav-item"><a class="nav-link {% if 'parties' in request.endpoint|default('') or 'patients' in request.endpoint|default('') %}active{% endif %}" href="{{ url_for('parties.list_parties') }}"><i class="bi bi-people"></i><span>Kişiler</span></a></li>
-        <li class="nav-item"><a class="nav-link {% if 'treatment' in request.endpoint|default('') %}active{% endif %}" href="{{ url_for('treatments.list_treatments') }}"><i class="bi bi-clipboard2-pulse"></i><span>Tedavi kataloğu</span></a></li>
+        <li class="nav-item"><a class="nav-link {% if request.endpoint == 'dashboard.index' %}active{% endif %}" href="{{ url_for('dashboard.index') }}" {% if request.endpoint == 'dashboard.index' %}aria-current="page"{% endif %}><i class="bi bi-grid-1x2" aria-hidden="true"></i><span>Genel bakış</span></a></li>
+        <li class="nav-item"><a class="nav-link {% if 'parties' in request.endpoint|default('') or 'patients' in request.endpoint|default('') %}active{% endif %}" href="{{ url_for('parties.list_parties') }}" {% if 'parties' in request.endpoint|default('') or 'patients' in request.endpoint|default('') %}aria-current="page"{% endif %}><i class="bi bi-people" aria-hidden="true"></i><span>Kişiler</span></a></li>
+        <li class="nav-item"><a class="nav-link {% if 'treatment' in request.endpoint|default('') %}active{% endif %}" href="{{ url_for('treatments.list_treatments') }}" {% if 'treatment' in request.endpoint|default('') %}aria-current="page"{% endif %}><i class="bi bi-clipboard2-pulse" aria-hidden="true"></i><span>Tedavi kataloğu</span></a></li>
     </ul>
 
     <div class="nav-section-label">Finans</div>
     <ul class="nav flex-column">
-        <li class="nav-item"><a class="nav-link {% if 'invoice' in request.endpoint|default('') %}active{% endif %}" href="{{ url_for('invoices.list_invoices') }}"><i class="bi bi-receipt"></i><span>Faturalar</span></a></li>
-        <li class="nav-item"><a class="nav-link {% if 'payment' in request.endpoint|default('') %}active{% endif %}" href="{{ url_for('payments.list_payments') }}"><i class="bi bi-wallet2"></i><span>Tahsilatlar</span></a></li>
-        <li class="nav-item"><a class="nav-link {% if 'report' in request.endpoint|default('') %}active{% endif %}" href="{{ url_for('reports.index') }}"><i class="bi bi-bar-chart-line"></i><span>Raporlar</span></a></li>
+        <li class="nav-item"><a class="nav-link {% if 'invoice' in request.endpoint|default('') %}active{% endif %}" href="{{ url_for('invoices.list_invoices') }}" {% if 'invoice' in request.endpoint|default('') %}aria-current="page"{% endif %}><i class="bi bi-receipt" aria-hidden="true"></i><span>Faturalar</span></a></li>
+        <li class="nav-item"><a class="nav-link {% if 'payment' in request.endpoint|default('') %}active{% endif %}" href="{{ url_for('payments.list_payments') }}" {% if 'payment' in request.endpoint|default('') %}aria-current="page"{% endif %}><i class="bi bi-wallet2" aria-hidden="true"></i><span>Tahsilatlar</span></a></li>
+        <li class="nav-item"><a class="nav-link {% if 'report' in request.endpoint|default('') %}active{% endif %}" href="{{ url_for('reports.index') }}" {% if 'report' in request.endpoint|default('') %}aria-current="page"{% endif %}><i class="bi bi-bar-chart-line" aria-hidden="true"></i><span>Raporlar</span></a></li>
     </ul>
 
     <div class="nav-section-label">Bağlantılar</div>
     <ul class="nav flex-column">
-        <li class="nav-item"><a class="nav-link {% if 'whatsapp' in request.endpoint|default('') %}active{% endif %}" href="{{ url_for('whatsapp.index') }}"><i class="bi bi-whatsapp"></i><span>WhatsApp</span></a></li>
-        <li class="nav-item"><a class="nav-link {% if 'settings' in request.endpoint|default('') %}active{% endif %}" href="{{ url_for('settings.index') }}"><i class="bi bi-sliders"></i><span>Ayarlar</span></a></li>
+        <li class="nav-item"><a class="nav-link {% if 'whatsapp' in request.endpoint|default('') %}active{% endif %}" href="{{ url_for('whatsapp.index') }}" {% if 'whatsapp' in request.endpoint|default('') %}aria-current="page"{% endif %}><i class="bi bi-whatsapp" aria-hidden="true"></i><span>WhatsApp</span></a></li>
+        <li class="nav-item"><a class="nav-link {% if 'settings' in request.endpoint|default('') %}active{% endif %}" href="{{ url_for('settings.index') }}" {% if 'settings' in request.endpoint|default('') %}aria-current="page"{% endif %}><i class="bi bi-sliders" aria-hidden="true"></i><span>Ayarlar</span></a></li>
     </ul>
 
     <div class="sidebar-footer">

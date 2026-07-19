@@ -42,11 +42,11 @@ def send_invoice_email(invoice) -> tuple[bool, str]:
     if not recipient_email:
         return False, "Müşterinin e-posta adresi bulunmuyor."
 
-    smtp_config = get_smtp_config()
-    if not smtp_config["smtp_username"] or not smtp_config["smtp_password"]:
-        return False, "SMTP ayarları yapılandırılmamış."
-
     try:
+        smtp_config = get_smtp_config()
+        if not smtp_config["smtp_username"] or not smtp_config["smtp_password"]:
+            return False, "SMTP ayarları yapılandırılmamış."
+
         from app.services.pdf_service import generate_invoice_pdf
         pdf_bytes = generate_invoice_pdf(invoice)
 
@@ -85,5 +85,8 @@ Makro Ortodonti"""
 
         return True, "E-posta başarıyla gönderildi."
 
-    except Exception as e:
-        return False, str(e)
+    except ValueError:
+        return False, "SMTP şifresi çözülemedi. Ayarlar ekranından şifreyi yeniden kaydedin."
+    except Exception as exc:
+        current_app.logger.exception("Fatura e-postası gönderilemedi")
+        return False, f"E-posta gönderilemedi: {exc}"

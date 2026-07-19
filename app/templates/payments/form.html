@@ -146,14 +146,12 @@ document.addEventListener('DOMContentLoaded', function() {
         
         const totalEur = parseFloat(option.dataset.totalEur) || 0;
         const balanceEur = parseFloat(option.dataset.balanceEur) || totalEur;
-        const status = option.dataset.status;
-        
         // Auto-fill amount with balance
         amountEur.value = balanceEur.toFixed(2);
         updateTryAmount();
         
         // Show balance info
-        balanceText.innerHTML = `<strong>Kalan Borç:</strong> €${balanceEur.toFixed(2)} / ₺${(balanceEur * (parseFloat(paymentRate.value) || currentRate)).toFixed(2)} | Toplam: €${totalEur.toFixed(2)}`;
+        balanceText.textContent = `Kalan borç: €${balanceEur.toFixed(2)} / ₺${(balanceEur * (parseFloat(paymentRate.value) || currentRate)).toFixed(2)} · Toplam: €${totalEur.toFixed(2)}`;
         balanceInfo.style.display = 'block';
         
         // Set reference based on payment method
@@ -162,12 +160,20 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     
-    // Update rate when date changes (would need API call in real app)
-    paymentDate.addEventListener('change', function() {
-        // In a real app, you'd fetch the rate for this date
-        // For now, just use current rate
-        paymentRate.value = currentRate.toFixed(4);
-        updateTryAmount();
+    paymentDate.addEventListener('change', async function() {
+        if (!this.value) return;
+        try {
+            const response = await fetch(`/invoices/api/exchange-rate?date=${encodeURIComponent(this.value)}`);
+            if (!response.ok) throw new Error('rate unavailable');
+            const data = await response.json();
+            currentRate = Number(data.rate);
+            paymentRate.value = currentRate.toFixed(4);
+            updateTryAmount();
+            if (invoiceSelect.value) invoiceSelect.dispatchEvent(new Event('change'));
+        } catch (_error) {
+            paymentRate.value = '';
+            amountTry.value = '';
+        }
     });
     
     // Initialize

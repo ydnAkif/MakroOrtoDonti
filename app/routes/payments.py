@@ -9,6 +9,14 @@ from app.authz import roles_required
 payments_bp = Blueprint("payments", __name__)
 
 
+def _payment_status(invoice: Invoice, total_paid_eur: float, as_of: date) -> str:
+    if total_paid_eur >= invoice.total_eur - 0.01:
+        return Invoice.STATUS_PAID
+    if invoice.due_date and invoice.due_date < as_of:
+        return Invoice.STATUS_OVERDUE
+    return Invoice.STATUS_PENDING
+
+
 @payments_bp.route("/")
 @login_required
 def list_payments():
@@ -17,7 +25,7 @@ def list_payments():
     start_date = request.args.get("start_date", "")
     end_date = request.args.get("end_date", "")
 
-    query = db.select(Payment).join(Invoice)
+    query = db.select(Payment).join(Invoice).where(Invoice.is_deleted == False)
 
     if search:
         search_pattern = f"%{search}%"
@@ -47,7 +55,10 @@ def list_payments():
     # Pending/Unpaid invoices
     pending_invoices = db.session.execute(
         db.select(Invoice)
-        .where(Invoice.status.in_([Invoice.STATUS_PENDING, Invoice.STATUS_OVERDUE]))
+        .where(
+            Invoice.status.in_([Invoice.STATUS_PENDING, Invoice.STATUS_OVERDUE]),
+            Invoice.is_deleted == False,
+        )
         .order_by(Invoice.invoice_date.desc())
     ).scalars().all()
 
@@ -98,6 +109,9 @@ def add_payment():
             return redirect(url_for("payments.add_payment"))
 
         invoice = db.get_or_404(Invoice, invoice_id)
+        if invoice.is_deleted or invoice.status == Invoice.STATUS_CANCELLED:
+            flash("Silinmiş veya iptal edilmiş faturaya ödeme eklenemez.", "danger")
+            return redirect(url_for("payments.add_payment"))
         
         payment_date = parse_date(payment_date_str) if payment_date_str else date.today()
         if not payment_date:
@@ -118,6 +132,15 @@ def add_payment():
         
         amount_try = round(amount_eur * rate.eur_to_try, 2)
 
+        total_paid_before = sum(p.amount_eur for p in invoice.payments)
+        remaining_eur = max(invoice.total_eur - total_paid_before, 0.0)
+        if amount_eur > remaining_eur + 0.01:
+            flash(
+                f"Ödeme kalan €{remaining_eur:,.2f} bakiyeyi aşamaz.",
+                "danger",
+            )
+            return redirect(url_for("payments.add_payment", invoice_id=invoice.id))
+
         payment = Payment(
             invoice_id=invoice_id,
             payment_date=payment_date,
@@ -131,11 +154,8 @@ def add_payment():
         db.session.add(payment)
         
         # Check if invoice is fully paid
-        total_paid_eur = sum(p.amount_eur for p in invoice.payments) + amount_eur
-        if total_paid_eur >= invoice.total_eur - 0.01:  # Small tolerance
-            invoice.status = Invoice.STATUS_PAID
-        elif invoice.status == Invoice.STATUS_OVERDUE:
-            invoice.status = Invoice.STATUS_PENDING
+        total_paid_eur = total_paid_before + amount_eur
+        invoice.status = _payment_status(invoice, total_paid_eur, payment_date)
         
         db.session.commit()
         flash(f"Ödeme kaydedildi: €{amount_eur:,.2f} (₺{amount_try:,.2f})", "success")
@@ -149,11 +169,13 @@ def add_payment():
             db.or_(
                 Invoice.status.in_([Invoice.STATUS_PENDING, Invoice.STATUS_OVERDUE]),
                 Invoice.id == selected_invoice_id,
-            )
+            ),
+            Invoice.is_deleted == False,
         )
     else:
         invoices_query = db.select(Invoice).where(
-            Invoice.status.in_([Invoice.STATUS_PENDING, Invoice.STATUS_OVERDUE])
+            Invoice.status.in_([Invoice.STATUS_PENDING, Invoice.STATUS_OVERDUE]),
+            Invoice.is_deleted == False,
         )
 
     invoices = db.session.execute(
@@ -179,16 +201,12 @@ def delete_payment(payment_id):
     invoice = payment.invoice
     
     # Recalculate invoice status
-    payment_eur = payment.amount_eur
     db.session.delete(payment)
-    
-    remaining_paid = sum(p.amount_eur for p in invoice.payments)
-    if remaining_paid <= 0:
-        invoice.status = Invoice.STATUS_PENDING
-    elif remaining_paid >= invoice.total_eur - 0.01:
-        invoice.status = Invoice.STATUS_PAID
-    else:
-        invoice.status = Invoice.STATUS_PENDING
+
+    remaining_paid = sum(
+        p.amount_eur for p in invoice.payments if p.id != payment.id
+    )
+    invoice.status = _payment_status(invoice, remaining_paid, date.today())
     
     db.session.commit()
     flash("Ödeme silindi.", "warning")

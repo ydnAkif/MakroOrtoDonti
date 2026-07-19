@@ -17,6 +17,7 @@ from datetime import date
 import bcrypt
 
 from app import create_app
+from app.config import DEFAULT_DEV_SECRET, PLACEHOLDER_SECRET
 from app.extensions import db
 from app.models.base import Base
 from app.models.models import (
@@ -39,6 +40,23 @@ class CsrfConfig:
     WTF_CSRF_TIME_LIMIT = None  # Disable token expiry so tests are stable
 
 
+class InsecureProductionConfig:
+    TESTING = False
+    DEBUG = False
+    SECRET_KEY = DEFAULT_DEV_SECRET
+    SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"
+    SQLALCHEMY_TRACK_MODIFICATIONS = False
+
+
+class MissingEncryptionKeyProductionConfig:
+    TESTING = False
+    DEBUG = False
+    SECRET_KEY = "session-key-that-is-longer-than-thirty-two-characters"
+    ENCRYPTION_KEY = PLACEHOLDER_SECRET
+    SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"
+    SQLALCHEMY_TRACK_MODIFICATIONS = False
+
+
 @pytest.fixture()
 def csrf_app():
     app = create_app(CsrfConfig)
@@ -51,10 +69,24 @@ def csrf_app():
         db.session.commit()
     yield app
 
+    with app.app_context():
+        db.session.remove()
+        db.engine.dispose()
+
 
 @pytest.fixture()
 def csrf_client(csrf_app):
     return csrf_app.test_client()
+
+
+def test_production_rejects_default_secret():
+    with pytest.raises(RuntimeError, match="SECRET_KEY"):
+        create_app(InsecureProductionConfig)
+
+
+def test_production_requires_separate_encryption_key():
+    with pytest.raises(RuntimeError, match="ENCRYPTION_KEY"):
+        create_app(MissingEncryptionKeyProductionConfig)
 
 
 # ──────────────────────────────────────────────

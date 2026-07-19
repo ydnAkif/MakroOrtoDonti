@@ -47,7 +47,7 @@
             class="alert alert-warning d-flex align-items-center"
             role="alert"
           >
-            <i class="bi bi-exclamation-triangle me-2"></i>
+            <i class="bi bi-exclamation-triangle me-2" aria-hidden="true"></i>
             <div>
               Döviz kuru güncel değil. {% if rate_health.last_date %} Son kayıt:
               {{ rate_health.last_date.strftime('%d.%m.%Y') }} ({{
@@ -75,6 +75,7 @@
               type="button"
               class="btn-close"
               data-bs-dismiss="alert"
+              aria-label="Bildirimi kapat"
             ></button>
           </div>
           {% endfor %} {% endif %} {% endwith %} {% block content %}{% endblock
@@ -83,11 +84,11 @@
 
     {% if current_user.is_authenticated %}
     <nav class="mobile-bottom-nav" aria-label="Hızlı erişim">
-      <a href="{{ url_for('dashboard.index') }}" class="{% if request.endpoint == 'dashboard.index' %}active{% endif %}"><i class="bi bi-grid-1x2"></i><span>Panel</span></a>
-      <a href="{{ url_for('parties.list_parties') }}" class="{% if 'parties' in request.endpoint|default('') %}active{% endif %}"><i class="bi bi-people"></i><span>Kişiler</span></a>
-      <a href="{{ url_for('invoices.list_invoices') }}" class="{% if 'invoice' in request.endpoint|default('') %}active{% endif %}"><i class="bi bi-receipt"></i><span>Faturalar</span></a>
-      <a href="{{ url_for('payments.list_payments') }}" class="{% if 'payment' in request.endpoint|default('') %}active{% endif %}"><i class="bi bi-wallet2"></i><span>Tahsilat</span></a>
-      <a href="{{ url_for('settings.index') }}" class="{% if request.endpoint == 'settings.index' %}active{% endif %}"><i class="bi bi-sliders"></i><span>Ayarlar</span></a>
+      <a href="{{ url_for('dashboard.index') }}" class="{% if request.endpoint == 'dashboard.index' %}active{% endif %}" {% if request.endpoint == 'dashboard.index' %}aria-current="page"{% endif %}><i class="bi bi-grid-1x2" aria-hidden="true"></i><span>Panel</span></a>
+      <a href="{{ url_for('parties.list_parties') }}" class="{% if 'parties' in request.endpoint|default('') %}active{% endif %}" {% if 'parties' in request.endpoint|default('') %}aria-current="page"{% endif %}><i class="bi bi-people" aria-hidden="true"></i><span>Kişiler</span></a>
+      <a href="{{ url_for('invoices.list_invoices') }}" class="{% if 'invoice' in request.endpoint|default('') %}active{% endif %}" {% if 'invoice' in request.endpoint|default('') %}aria-current="page"{% endif %}><i class="bi bi-receipt" aria-hidden="true"></i><span>Faturalar</span></a>
+      <a href="{{ url_for('payments.list_payments') }}" class="{% if 'payment' in request.endpoint|default('') %}active{% endif %}" {% if 'payment' in request.endpoint|default('') %}aria-current="page"{% endif %}><i class="bi bi-wallet2" aria-hidden="true"></i><span>Tahsilat</span></a>
+      <a href="{{ url_for('settings.index') }}" class="{% if request.endpoint == 'settings.index' %}active{% endif %}" {% if request.endpoint == 'settings.index' %}aria-current="page"{% endif %}><i class="bi bi-sliders" aria-hidden="true"></i><span>Ayarlar</span></a>
     </nav>
     {% endif %}
 

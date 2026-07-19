@@ -5,7 +5,9 @@ Production entrypoint — starts Gunicorn with sensible defaults.
 Usage:
     python run_production.py
 
-Environment variables (all optional, have safe defaults):
+Environment variables:
+    SECRET_KEY           Strong session-signing key (required)
+    ENCRYPTION_KEY       Separate key for encrypted settings (required)
     PORT                 TCP port to listen on (default: 8000)
     WORKERS              Gunicorn worker processes (default: 2*CPU+1)
     BIND                 Full bind address, overrides PORT (default: 0.0.0.0:<PORT>)
@@ -15,8 +17,8 @@ Environment variables (all optional, have safe defaults):
     TIMEOUT              Worker timeout in seconds (default: 60)
     KEEPALIVE            Keep-alive timeout in seconds (default: 5)
 
-The SECRET_KEY environment variable MUST be set to a strong, random value;
-the application will refuse to start without it (see app/config.py).
+SECRET_KEY and ENCRYPTION_KEY MUST be separate strong, random values;
+the application refuses to start without them (see app/config.py).
 """
 
 import multiprocessing
@@ -24,7 +26,23 @@ import os
 import sys
 
 
+from app.config import is_insecure_secret
+
+
 def main() -> None:
+    invalid_keys = [
+        key
+        for key in ("SECRET_KEY", "ENCRYPTION_KEY")
+        if is_insecure_secret(os.environ.get(key, ""))
+    ]
+    if invalid_keys:
+        print(
+            "ERROR: Production için ayrı, güçlü ve kalıcı anahtarlar gerekli: "
+            + ", ".join(invalid_keys),
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
     try:
         import gunicorn.app.wsgiapp  # noqa: F401
     except ImportError:
@@ -37,7 +55,8 @@ def main() -> None:
 
     port = os.environ.get("PORT", "8000")
     bind = os.environ.get("BIND", f"0.0.0.0:{port}")
-    workers = os.environ.get("WORKERS", str(multiprocessing.cpu_count() * 2 + 1))
+    default_workers = min(multiprocessing.cpu_count() * 2 + 1, 4)
+    workers = os.environ.get("WORKERS", str(default_workers))
     log_level = os.environ.get("LOG_LEVEL", "info")
     access_log = os.environ.get("ACCESS_LOG", "-")
     error_log = os.environ.get("ERROR_LOG", "-")

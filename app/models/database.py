@@ -168,10 +168,14 @@ def _resolve_admin_password() -> tuple[str, bool]:
     is_testing = os.environ.get("TESTING", "false").lower() == "true" or os.environ.get("PYTEST_CURRENT_TEST") is not None
     
     if env_password:
-        if env_password.lower() in ("admin123", "admin", "123456", "password") and not is_debug and not is_testing:
+        if (
+            (len(env_password) < 12 or env_password.lower() in ("admin123", "admin", "123456", "password"))
+            and not is_debug
+            and not is_testing
+        ):
             # Reject weak password in production, generate a secure one-time password
             random_pw = secrets.token_urlsafe(12)
-            print(f"\n[CRITICAL SECURITY WARNING] Weak DEFAULT_ADMIN_PASSWORD '{env_password}' rejected in production!")
+            print("\n[CRITICAL SECURITY WARNING] Weak DEFAULT_ADMIN_PASSWORD rejected in production!")
             print(f"Generating a random secure one-time password instead: {random_pw}\n")
             return random_pw, True
         return env_password, False

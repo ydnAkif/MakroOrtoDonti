@@ -3,7 +3,7 @@
 
 {% block content %}
 <header class="page-header">
-    <div><span class="page-eyebrow">Finansal görünüm</span><h1>Raporlar</h1><p class="page-description">Fatura, gerçek tahsilat ve açık bakiyeyi aynı dönem üzerinden karşılaştırın.</p></div>
+    <div><span class="page-eyebrow">Finansal görünüm</span><h1>Raporlar</h1><p class="page-description">Dönem hareketlerini ve dönem sonundaki toplam alacak durumunu birlikte izleyin.</p></div>
 </header>
 
 <form method="GET" class="card report-filter mb-4" aria-label="Rapor dönemi">
@@ -40,7 +40,7 @@
     <div class="report-pulse-grid">
         <div><span>Faturalandırılan</span><strong>€{{ "{:,.2f}".format(issued_eur) }}</strong><small>₺{{ "{:,.2f}".format(issued_try) }} · {{ invoice_count }} fatura</small></div>
         <div><span>Gerçek tahsilat</span><strong>€{{ "{:,.2f}".format(collected_eur) }}</strong><small>₺{{ "{:,.2f}".format(collected_try) }} · {{ payment_count }} hareket</small></div>
-        <div><span>Açık bakiye</span><strong>€{{ "{:,.2f}".format(outstanding_eur) }}</strong><small>₺{{ "{:,.2f}".format(outstanding_try) }} dönem bakiyesi</small></div>
+        <div><span>Dönem sonu açık bakiye</span><strong>€{{ "{:,.2f}".format(outstanding_eur) }}</strong><small>₺{{ "{:,.2f}".format(outstanding_try) }} · {{ receivable_count }} açık fatura</small></div>
     </div>
     <div class="report-ratio-track"><span style="width: {{ [collection_ratio, 100]|min }}%"></span></div>
 </section>

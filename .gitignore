@@ -5,6 +5,8 @@ __pycache__/
 venv/
 .venv/
 data/*.db
+data/backups/
+data/*.pre-restore-*.db
 app/data/*.db
 instance/
 *.pyc

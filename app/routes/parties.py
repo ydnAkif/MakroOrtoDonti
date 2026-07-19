@@ -18,7 +18,13 @@ def list_parties():
     query = db.select(Party).where(Party.is_active == True)
 
     if party_type:
-        query = query.where(Party.party_type == PartyType(party_type))
+        from app.services.validation_service import parse_enum
+
+        parsed_type = parse_enum(PartyType, party_type)
+        if parsed_type is None:
+            flash("Geçersiz kişi tipi.", "warning")
+            return redirect(url_for("parties.list_parties"))
+        query = query.where(Party.party_type == parsed_type)
     
     if search:
         search_pattern = f"%{search}%"
@@ -146,6 +152,7 @@ def edit_party(party_id):
 
     if request.method == "POST":
         from app.services.validation_service import parse_date, parse_enum
+        previous_type = party.party_type
         party_type = parse_enum(PartyType, request.form.get("party_type", ""))
         if not party_type:
             flash("Geçersiz müşteri tipi seçildi.", "danger")
@@ -188,6 +195,9 @@ def edit_party(party_id):
             patient.notes = party.notes
             patient.treatment_status = party.treatment_status
             patient.is_active = party.is_active
+        elif previous_type == PartyType.PATIENT and party.patient:
+            # Keep the legacy compatibility row from appearing as an active patient.
+            party.patient.is_active = False
 
         db.session.commit()
         flash(f"{party.display_name} güncellendi.", "success")

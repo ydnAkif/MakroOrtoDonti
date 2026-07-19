@@ -1,6 +1,7 @@
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "--tb=short -q"
+pythonpath = ["."]
 
 [tool.coverage.run]
 source = ["app"]
@@ -10,6 +11,7 @@ branch = true
 [tool.coverage.report]
 show_missing = true
 fail_under = 70
+skip_covered = true
 exclude_lines = [
     "pragma: no cover",
     "if TYPE_CHECKING:",
