@@ -16,7 +16,7 @@
     <div class="col-md-8">
         <div class="card border-0 shadow-sm">
             <div class="card-header bg-white d-flex justify-content-between align-items-center">
-                <h5 class="mb-0"><i class="bi bi-receipt"></i> {{ invoice.invoice_number }}</h5>
+                <div><span class="page-eyebrow mb-1">{{ invoice.category_label }}</span><h5 class="mb-0"><i class="bi bi-receipt"></i> {{ invoice.invoice_number }}</h5></div>
                 <div>
                     <a href="{{ url_for('invoices.download_pdf', invoice_id=invoice.id) }}" class="btn btn-sm btn-outline-danger">
                         <i class="bi bi-file-pdf"></i> PDF İndir
@@ -39,7 +39,14 @@
                         {% if invoice.due_date %}
                         <p class="text-muted mb-0">Son Ödeme: {{ invoice.due_date.strftime('%d.%m.%Y') }}</p>
                         {% endif %}
+                        <p class="mb-0 mt-2"><span class="invoice-category-badge"><i class="bi bi-tag"></i>{{ invoice.category_label }}</span></p>
                     </div>
+                </div>
+
+                <div class="rate-strip mb-4">
+                    <span class="rate-strip-icon"><i class="bi bi-currency-exchange"></i></span>
+                    <div><span class="d-block small text-muted">Faturada sabitlenen EUR/TRY kuru</span><strong>1 EUR = ₺{{ "{:,.4f}".format(invoice.exchange_rate) }}</strong>
+                    <small class="text-muted ms-2">{% if rate_record %}{{ rate_record.rate_date.strftime('%d.%m.%Y') }} tarihli kur{% else %}{{ invoice.invoice_date.strftime('%d.%m.%Y') }} fatura tarihi{% endif %}</small></div>
                 </div>
 
                 <!-- Items Table -->
@@ -47,7 +54,8 @@
                     <table class="table">
                         <thead class="table-light">
                             <tr>
-                                <th>Tedavi</th>
+                                <th>Kalem</th>
+                                <th>Kategori</th>
                                 <th>Adet</th>
                                 <th class="text-end">Birim (EUR)</th>
                                 <th class="text-end">Birim (TRY)</th>
@@ -58,6 +66,8 @@
                             {% for item in invoice.items %}
                             <tr>
                                 <td>{{ item.description }}</td>
+                                {% set item_category = item.treatment.category if item.treatment else item.item_type.value %}
+                                <td><span class="invoice-category-badge">{{ category_labels.get(item_category, item_category) }}</span></td>
                                 <td>{{ item.quantity }}</td>
                                 <td class="text-end">€{{ "{:,.2f}".format(item.unit_price_eur) }}</td>
                                 <td class="text-end">₺{{ "{:,.2f}".format(item.unit_price_try) }}</td>
@@ -67,15 +77,15 @@
                         </tbody>
                         <tfoot>
                             <tr class="table-light">
-                                <td colspan="4" class="text-end"><strong>Kur (1 EUR =)</strong></td>
+                                <td colspan="5" class="text-end"><strong>Fatura tarihi kuru (1 EUR =)</strong></td>
                                 <td class="text-end">₺{{ "{:,.4f}".format(invoice.exchange_rate) }}</td>
                             </tr>
                             <tr class="table-light">
-                                <td colspan="4" class="text-end"><strong>Toplam (EUR)</strong></td>
+                                <td colspan="5" class="text-end"><strong>Toplam (EUR)</strong></td>
                                 <td class="text-end">€{{ "{:,.2f}".format(invoice.total_eur) }}</td>
                             </tr>
                             <tr class="table-primary">
-                                <td colspan="4" class="text-end"><strong>TOPLAM (TRY)</strong></td>
+                                <td colspan="5" class="text-end"><strong>TOPLAM (TRY)</strong></td>
                                 <td class="text-end"><strong>₺{{ "{:,.2f}".format(invoice.total_try) }}</strong></td>
                             </tr>
                         </tfoot>

@@ -24,7 +24,16 @@
                         <option value="cancelled" {% if selected_status == 'cancelled' %}selected{% endif %}>İptal</option>
                     </select>
                 </div>
-                <div class="col-md-7">
+                <div class="col-md-3">
+                    <label class="form-label">Kategori</label>
+                    <select name="category" class="form-select" onchange="this.form.submit()">
+                        <option value="">Tüm kategoriler</option>
+                        {% for key, label in category_labels.items() if key != 'mixed' %}
+                        <option value="{{ key }}" {% if selected_category == key %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-4">
                     <label class="form-label">Ara</label>
                     <input type="text" class="form-control js-table-filter" data-target="tbody tr" name="search" value="{{ search }}" placeholder="Fatura no veya hasta adı ile ara...">
                 </div>
@@ -45,6 +54,7 @@
                     <tr>
                         <th>Fatura No</th>
                         <th>Hasta</th>
+                        <th>Kategori</th>
                         <th>Tarih</th>
                         <th>Toplam (EUR)</th>
                         <th>Toplam (TRY)</th>
@@ -57,6 +67,7 @@
                     <tr>
                         <td><a href="{{ url_for('invoices.detail_invoice', invoice_id=invoice.id) }}" class="fw-bold">{{ invoice.invoice_number }}</a></td>
                         <td>{{ invoice.party.display_name if invoice.party else (invoice.patient.full_name if invoice.patient else '-') }}</td>
+                        <td><span class="invoice-category-badge"><i class="bi bi-tag"></i>{{ invoice.category_label }}</span></td>
                         <td>{{ invoice.invoice_date.strftime('%d.%m.%Y') }}</td>
                         <td>€{{ "{:,.2f}".format(invoice.total_eur) }}</td>
                         <td>₺{{ "{:,.2f}".format(invoice.total_try) }}</td>
@@ -78,7 +89,7 @@
                         </td>
                     </tr>
                     {% else %}
-                    <tr><td colspan="7" class="text-center text-muted py-4">
+                    <tr><td colspan="8" class="empty-state text-muted"><i class="bi bi-receipt"></i>
                         {% if search %}"{{ search }}" için sonuç bulunamadı.{% else %}Henüz fatura bulunmuyor.{% endif %}
                     </td></tr>
                     {% endfor %}

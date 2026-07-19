@@ -2,162 +2,131 @@
 {% block title %}Raporlar - {{ clinic_name }}{% endblock %}
 
 {% block content %}
-<header class="page-header"><div><span class="page-eyebrow">{{ today.strftime('%d.%m.%Y') }}</span><h1>Raporlar</h1><p class="page-description">Gelir performansını, tedavi dağılımını ve hasta durumlarını karşılaştırın.</p></div></header>
+<header class="page-header">
+    <div><span class="page-eyebrow">Finansal görünüm</span><h1>Raporlar</h1><p class="page-description">Fatura, gerçek tahsilat ve açık bakiyeyi aynı dönem üzerinden karşılaştırın.</p></div>
+</header>
 
-<!-- Revenue Cards -->
+<form method="GET" class="card report-filter mb-4" aria-label="Rapor dönemi">
+    <div class="card-body">
+        <div class="row g-3 align-items-end">
+            <div class="col-lg-3 col-md-4">
+                <label class="form-label" for="period">Hazır dönem</label>
+                <select class="form-select" id="period" name="period">
+                    <option value="this_month" {% if selected_period == 'this_month' %}selected{% endif %}>Bu ay</option>
+                    <option value="last_30" {% if selected_period == 'last_30' %}selected{% endif %}>Son 30 gün</option>
+                    <option value="this_year" {% if selected_period == 'this_year' %}selected{% endif %}>Bu yıl</option>
+                    <option value="last_year" {% if selected_period == 'last_year' %}selected{% endif %}>Geçen yıl</option>
+                    <option value="custom" {% if selected_period == 'custom' %}selected{% endif %}>Özel tarih</option>
+                </select>
+            </div>
+            <div class="col-lg-3 col-md-3">
+                <label class="form-label" for="start_date">Başlangıç</label>
+                <input class="form-control" type="date" id="start_date" name="start_date" value="{{ start_date.isoformat() }}">
+            </div>
+            <div class="col-lg-3 col-md-3">
+                <label class="form-label" for="end_date">Bitiş</label>
+                <input class="form-control" type="date" id="end_date" name="end_date" value="{{ end_date.isoformat() }}">
+            </div>
+            <div class="col-lg-3 col-md-2"><button class="btn btn-primary w-100" type="submit"><i class="bi bi-arrow-repeat"></i>Raporu güncelle</button></div>
+        </div>
+    </div>
+</form>
+
+<section class="report-pulse mb-4" aria-labelledby="pulse-title">
+    <div class="report-pulse-heading">
+        <div><span class="page-eyebrow text-white-50">{{ start_date.strftime('%d.%m.%Y') }} - {{ end_date.strftime('%d.%m.%Y') }}</span><h2 id="pulse-title">Dönemin finansal nabzı</h2></div>
+        <div class="report-ratio"><span>Tahsilat / fatura</span><strong>%{{ "{:.1f}".format(collection_ratio) }}</strong></div>
+    </div>
+    <div class="report-pulse-grid">
+        <div><span>Faturalandırılan</span><strong>€{{ "{:,.2f}".format(issued_eur) }}</strong><small>₺{{ "{:,.2f}".format(issued_try) }} · {{ invoice_count }} fatura</small></div>
+        <div><span>Gerçek tahsilat</span><strong>€{{ "{:,.2f}".format(collected_eur) }}</strong><small>₺{{ "{:,.2f}".format(collected_try) }} · {{ payment_count }} hareket</small></div>
+        <div><span>Açık bakiye</span><strong>€{{ "{:,.2f}".format(outstanding_eur) }}</strong><small>₺{{ "{:,.2f}".format(outstanding_try) }} dönem bakiyesi</small></div>
+    </div>
+    <div class="report-ratio-track"><span style="width: {{ [collection_ratio, 100]|min }}%"></span></div>
+</section>
+
 <div class="row g-3 mb-4">
     <div class="col-md-4">
-        <div class="card border-0 shadow-sm h-100">
-            <div class="card-body">
-                <h6 class="text-muted">Bu Ayın Geliri</h6>
-                <h3 class="text-success mb-1">€{{ "{:,.2f}".format(monthly_revenue.total_eur or 0) }}</h3>
-                <p class="text-muted mb-0">₺{{ "{:,.2f}".format(monthly_revenue.total_try or 0) }}</p>
-                <small class="text-muted">{{ month_start.strftime('%B %Y') }}</small>
-            </div>
-        </div>
+        <article class="card metric-card h-100" style="--metric-color: var(--danger-500); --metric-tint: rgba(207,91,98,.12);"><div class="card-body"><span class="metric-icon"><i class="bi bi-calendar2-x"></i></span><div class="metric-label">Vadesi geçen</div><p class="metric-value">€{{ "{:,.2f}".format(overdue_eur) }}</p></div></article>
     </div>
     <div class="col-md-4">
-        <div class="card border-0 shadow-sm h-100">
-            <div class="card-body">
-                <h6 class="text-muted">Yılın Toplam Geliri</h6>
-                <h3 class="text-primary mb-1">€{{ "{:,.2f}".format(yearly_revenue.total_eur or 0) }}</h3>
-                <p class="text-muted mb-0">₺{{ "{:,.2f}".format(yearly_revenue.total_try or 0) }}</p>
-                <small class="text-muted">{{ year_start.strftime('%Y') }}</small>
-            </div>
-        </div>
+        <article class="card metric-card h-100"><div class="card-body"><span class="metric-icon"><i class="bi bi-receipt-cutoff"></i></span><div class="metric-label">Dönem faturası</div><p class="metric-value">{{ invoice_count }}</p></div></article>
     </div>
     <div class="col-md-4">
-        <div class="card border-0 shadow-sm h-100">
-            <div class="card-body">
-                <h6 class="text-muted">Bekleyen Tutar</h6>
-                <h3 class="text-warning mb-1">€{{ "{:,.2f}".format(pending_amounts.total_eur or 0) }}</h3>
-                <p class="text-muted mb-0">₺{{ "{:,.2f}".format(pending_amounts.total_try or 0) }}</p>
-                <small class="text-muted">{{ pending_amounts.count or 0 }} fatura bekliyor</small>
+        <article class="card metric-card h-100" style="--metric-color: var(--sky-500); --metric-tint: rgba(53,175,208,.13);"><div class="card-body"><span class="metric-icon"><i class="bi bi-currency-exchange"></i></span><div class="metric-label">Dönem sonu EUR/TRY</div><p class="metric-value">{% if current_rate %}₺{{ "{:,.4f}".format(current_rate.eur_to_try) }}{% else %}-{% endif %}</p>{% if rate_delta is not none %}<small class="text-muted">Önceki kura göre {{ '+' if rate_delta >= 0 else '' }}{{ "{:.4f}".format(rate_delta) }}</small>{% endif %}</div></article>
+    </div>
+</div>
+
+<section class="card mb-4" aria-labelledby="trend-title">
+    <div class="card-header d-flex justify-content-between align-items-center"><div><span class="page-eyebrow mb-1">Dönem akışı</span><h2 class="h5 mb-0" id="trend-title">Fatura ve tahsilat ritmi</h2></div><div class="report-legend"><span><i class="issued"></i>Fatura</span><span><i class="collected"></i>Tahsilat</span></div></div>
+    <div class="card-body">
+        {% for row in trend_rows %}
+        <div class="report-trend-row">
+            <span class="report-trend-label">{{ row.label }}</span>
+            <div class="report-trend-bars">
+                <div title="Fatura: €{{ '{:,.2f}'.format(row.issued) }}"><span class="issued" style="width: {{ (row.issued / max_trend_value * 100)|round(1) }}%"></span></div>
+                <div title="Tahsilat: €{{ '{:,.2f}'.format(row.collected) }}"><span class="collected" style="width: {{ (row.collected / max_trend_value * 100)|round(1) }}%"></span></div>
             </div>
+            <span class="report-trend-value">€{{ "{:,.0f}".format(row.collected) }}</span>
         </div>
+        {% else %}<div class="empty-state text-muted"><i class="bi bi-activity"></i>Bu dönemde finans hareketi yok.</div>{% endfor %}
+    </div>
+</section>
+
+<div class="row g-4 mb-4">
+    <div class="col-xl-7">
+        <section class="card h-100" aria-labelledby="treatment-title">
+            <div class="card-header"><span class="page-eyebrow mb-1">Klinik üretim</span><h2 class="h5 mb-0" id="treatment-title">En çok faturalanan tedaviler</h2></div>
+            <div class="card-body p-0"><div class="table-responsive"><table class="table table-hover"><thead><tr><th>Tedavi</th><th>Kategori</th><th class="text-end">Adet</th><th class="text-end">Tutar</th></tr></thead><tbody>
+                {% for stat in treatment_stats %}<tr><td><strong>{{ stat.name }}</strong></td><td><span class="invoice-category-badge">{{ category_labels.get(stat.category, stat.category) }}</span></td><td class="text-end">{{ stat.count }}</td><td class="text-end fw-bold">€{{ "{:,.2f}".format(stat.amount_eur) }}</td></tr>
+                {% else %}<tr><td colspan="4" class="empty-state text-muted"><i class="bi bi-clipboard2-pulse"></i>Bu dönemde faturalanmış tedavi yok.</td></tr>{% endfor %}
+            </tbody></table></div></div>
+        </section>
+    </div>
+    <div class="col-xl-5">
+        <section class="card h-100" aria-labelledby="category-title">
+            <div class="card-header"><span class="page-eyebrow mb-1">Gelir bileşimi</span><h2 class="h5 mb-0" id="category-title">Fatura kategorileri</h2></div>
+            <div class="card-body">
+                {% for stat in category_stats %}<div class="report-category-row"><div><span>{{ category_labels.get(stat.category, stat.category) }}</span><strong>€{{ "{:,.2f}".format(stat.amount_eur) }}</strong></div><div class="progress"><span style="width: {{ (stat.amount_eur / max_category_amount * 100)|round(1) }}%"></span></div><small>{{ stat.count }} kalem</small></div>
+                {% else %}<div class="empty-state text-muted"><i class="bi bi-tags"></i>Kategori verisi oluşmadı.</div>{% endfor %}
+            </div>
+        </section>
     </div>
 </div>
 
 <div class="row g-4">
-    <!-- Treatment Statistics -->
-    <div class="col-md-6">
-        <div class="card border-0 shadow-sm">
-            <div class="card-header bg-white">
-                <h5 class="mb-0"><i class="bi bi-heart-pulse"></i> En Çok Yapılan Tedaviler</h5>
-            </div>
-            <div class="card-body p-0">
-                <div class="table-responsive">
-                    <table class="table table-hover mb-0">
-                        <thead class="table-light">
-                            <tr>
-                                <th>Tedavi</th>
-                                <th>Kategori</th>
-                                <th class="text-end">Sayı</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for stat in treatment_stats %}
-                            <tr>
-                                <td>{{ stat.name }}</td>
-                                <td><span class="badge bg-light text-dark">{{ category_labels.get(stat.category, stat.category) }}</span></td>
-                                <td class="text-end fw-bold">{{ stat.count }}</td>
-                            </tr>
-                            {% else %}
-                            <tr><td colspan="3" class="text-center text-muted py-3">Henüz veri yok.</td></tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
+    <div class="col-lg-4">
+        <section class="card h-100" aria-labelledby="aging-title"><div class="card-header"><h2 class="h5 mb-0" id="aging-title"><i class="bi bi-hourglass-split"></i> Alacak yaşlandırma</h2></div><div class="card-body">
+            {% for row in aging_rows %}<div class="aging-row"><div><span>{{ row.label }}</span><small>{{ row.count }} fatura</small></div><strong>€{{ "{:,.2f}".format(row.amount) }}</strong><div class="aging-bar"><span style="width: {{ (row.amount / max_aging_amount * 100)|round(1) }}%"></span></div></div>{% endfor %}
+        </div></section>
     </div>
-
-    <!-- Category Statistics -->
-    <div class="col-md-6">
-        <div class="card border-0 shadow-sm">
-            <div class="card-header bg-white">
-                <h5 class="mb-0"><i class="bi bi-pie-chart"></i> Kategorilere Göre Dağılım</h5>
-            </div>
-            <div class="card-body">
-                {% for stat in category_stats %}
-                <div class="mb-3">
-                    <div class="d-flex justify-content-between mb-1">
-                        <span>{{ category_labels.get(stat.category, stat.category) }}</span>
-                        <span class="fw-bold">{{ stat.count }}</span>
-                    </div>
-                    <div class="progress" style="height: 8px;">
-                        {% set pct = (stat.count / max_category_count * 100)|int if max_category_count > 0 else 0 %}
-                        <div class="progress-bar bg-primary" style="width: {{ pct }}%"></div>
-                    </div>
-                </div>
-                {% else %}
-                <p class="text-center text-muted">Henüz veri yok.</p>
-                {% endfor %}
-            </div>
-        </div>
+    <div class="col-lg-4">
+        <section class="card h-100" aria-labelledby="status-title"><div class="card-header"><h2 class="h5 mb-0" id="status-title"><i class="bi bi-pie-chart"></i> Fatura durumları</h2></div><div class="card-body">
+            {% for row in invoice_statuses %}<div class="status-count-row"><span>{{ row.label }}</span><strong>{{ row.count }}</strong></div>{% endfor %}
+            <hr>
+            <h3 class="h6 mb-3">Hasta durumları</h3>
+            {% for row in patient_stats %}<div class="status-count-row"><span>{{ row.label }}</span><strong>{{ row.count }}</strong></div>{% else %}<p class="text-muted small">Aktif hasta kaydı yok.</p>{% endfor %}
+        </div></section>
     </div>
-
-    <!-- Patient Status -->
-    <div class="col-md-6">
-        <div class="card border-0 shadow-sm">
-            <div class="card-header bg-white">
-                <h5 class="mb-0"><i class="bi bi-people"></i> Hasta Durumu</h5>
-            </div>
-            <div class="card-body">
-                {% for stat in patient_stats %}
-                <div class="d-flex justify-content-between align-items-center mb-2">
-                    <span>
-                        {% set st = (stat.treatment_status or 'active')|lower %}
-                        {% if st == 'active' %}
-                            <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 px-2 py-1"><i class="bi bi-activity me-1"></i> Aktif</span>
-                        {% elif st == 'completed' %}
-                            <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 px-2 py-1"><i class="bi bi-check-circle me-1"></i> Tamamlandı</span>
-                        {% elif st == 'planned' %}
-                            <span class="badge bg-info bg-opacity-10 text-info border border-info border-opacity-25 px-2 py-1"><i class="bi bi-calendar-event me-1"></i> Planlandı</span>
-                        {% elif st == 'on_hold' %}
-                            <span class="badge bg-warning bg-opacity-10 text-warning border border-warning border-opacity-25 px-2 py-1"><i class="bi bi-pause-circle me-1"></i> Beklemede</span>
-                        {% else %}
-                            <span class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-25 px-2 py-1"><i class="bi bi-circle me-1"></i> Pasif</span>
-                        {% endif %}
-                    </span>
-                    <span class="fw-bold">{{ stat.count }} hasta</span>
-                </div>
-                {% else %}
-                <p class="text-center text-muted">Henüz hasta yok.</p>
-                {% endfor %}
-            </div>
-        </div>
-    </div>
-
-    <!-- Exchange Rates -->
-    <div class="col-md-6">
-        <div class="card border-0 shadow-sm">
-            <div class="card-header bg-white">
-                <h5 class="mb-0"><i class="bi bi-currency-exchange"></i> Kur Geçmişi</h5>
-            </div>
-            <div class="card-body p-0">
-                <div class="table-responsive" style="max-height: 300px;">
-                    <table class="table table-hover mb-0">
-                        <thead class="table-light sticky-top">
-                            <tr>
-                                <th>Tarih</th>
-                                <th class="text-end">EUR/TRY</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for rate in exchange_rates %}
-                            <tr>
-                                <td>{{ rate.rate_date.strftime('%d.%m.%Y') }}</td>
-                                <td class="text-end">₺{{ "{:,.4f}".format(rate.eur_to_try) }}</td>
-                            </tr>
-                            {% else %}
-                            <tr><td colspan="2" class="text-center text-muted py-3">Henüz kur verisi yok.</td></tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
+    <div class="col-lg-4">
+        <section class="card h-100" aria-labelledby="rates-title"><div class="card-header"><h2 class="h5 mb-0" id="rates-title"><i class="bi bi-currency-exchange"></i> EUR/TRY kur geçmişi</h2></div><div class="card-body p-0"><div class="table-responsive report-rate-table"><table class="table"><thead><tr><th>Tarih</th><th class="text-end">Kur</th></tr></thead><tbody>
+            {% for rate in exchange_rates %}<tr><td>{{ rate.rate_date.strftime('%d.%m.%Y') }}</td><td class="text-end fw-bold">₺{{ "{:,.4f}".format(rate.eur_to_try) }}</td></tr>{% else %}<tr><td colspan="2" class="empty-state text-muted">Kur kaydı yok.</td></tr>{% endfor %}
+        </tbody></table></div></div></section>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('period').addEventListener('change', function() {
+    if (this.value !== 'custom') {
+        document.getElementById('start_date').value = '';
+        document.getElementById('end_date').value = '';
+        this.form.submit();
+    }
+});
+document.querySelectorAll('#start_date, #end_date').forEach(input => input.addEventListener('change', function() {
+    document.getElementById('period').value = 'custom';
+}));
+</script>
 {% endblock %}

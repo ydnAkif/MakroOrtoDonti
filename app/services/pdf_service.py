@@ -1,7 +1,7 @@
 import os
+
 from fpdf import FPDF
 from fpdf.enums import XPos, YPos
-from datetime import date
 
 
 FONT_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "fonts")
@@ -10,14 +10,32 @@ FONT_PATH_BOLD = os.path.join(FONT_DIR, "DejaVuSans-Bold.ttf")
 
 
 class InvoicePDF(FPDF):
-    def __init__(self, clinic_name="Makro Ortodonti", clinic_address="", clinic_phone="", clinic_email="", logo_path=None):
+    INK = (16, 46, 58)
+    MUTED = (88, 113, 123)
+    AQUA = (32, 166, 162)
+    AQUA_DARK = (24, 140, 138)
+    AQUA_PALE = (230, 247, 245)
+    SKY_PALE = (235, 247, 250)
+    LINE = (220, 232, 233)
+    SURFACE = (247, 250, 250)
+    DANGER = (207, 91, 98)
+
+    def __init__(
+        self,
+        clinic_name="Makro Ortodonti",
+        clinic_address="",
+        clinic_phone="",
+        clinic_email="",
+        clinic_tax_id="",
+        footer_text="",
+    ):
         super().__init__()
         self.clinic_name = clinic_name
         self.clinic_address = clinic_address
         self.clinic_phone = clinic_phone
         self.clinic_email = clinic_email
-        self.logo_path = logo_path
-
+        self.clinic_tax_id = clinic_tax_id
+        self.footer_text = footer_text
         self.default_font = "Helvetica"
         if os.path.exists(FONT_PATH):
             try:
@@ -26,36 +44,21 @@ class InvoicePDF(FPDF):
                     self.add_font("DejaVu", "B", FONT_PATH_BOLD)
                 self.default_font = "DejaVu"
             except Exception:
-                # If custom font files are invalid/corrupt, continue with a core font.
                 self.default_font = "Helvetica"
+        self.set_margins(12, 15, 12)
+        self.set_auto_page_break(auto=True, margin=24)
 
     def _safe_text(self, text):
-        if text is None:
-            return ""
-        value = str(text)
+        value = "" if text is None else str(text)
         if self.default_font == "DejaVu":
             return value
-
-        # Core fonts cannot reliably render all Unicode characters.
         replacements = {
-            "₺": "TRY ",
-            "€": "EUR ",
-            "ı": "i",
-            "İ": "I",
-            "ş": "s",
-            "Ş": "S",
-            "ğ": "g",
-            "Ğ": "G",
-            "ü": "u",
-            "Ü": "U",
-            "ö": "o",
-            "Ö": "O",
-            "ç": "c",
-            "Ç": "C",
+            "₺": "TRY ", "€": "EUR ", "ı": "i", "İ": "I", "ş": "s",
+            "Ş": "S", "ğ": "g", "Ğ": "G", "ü": "u", "Ü": "U",
+            "ö": "o", "Ö": "O", "ç": "c", "Ç": "C",
         }
-        for src, target in replacements.items():
-            value = value.replace(src, target)
-
+        for source, target in replacements.items():
+            value = value.replace(source, target)
         return value.encode("cp1252", errors="replace").decode("cp1252")
 
     def cell(self, w=0, h=0, text="", *args, **kwargs):
@@ -71,247 +74,239 @@ class InvoicePDF(FPDF):
         return super().multi_cell(w, h, self._safe_text(text), *args, **kwargs)
 
     def header(self):
-        has_logo = False
-        if self.logo_path and os.path.exists(self.logo_path):
-            try:
-                self.image(self.logo_path, x=10, y=10, w=25)
-                has_logo = True
-            except Exception:
-                pass
-        
-        if has_logo:
-            self.set_x(40)
-        else:
-            self.set_x(10)
+        self.set_fill_color(*self.AQUA_DARK)
+        self.rect(12, 10, 17, 17, style="F")
+        self.set_xy(12, 10.5)
+        self.set_font(self.default_font, "B", 13)
+        self.set_text_color(255, 255, 255)
+        self.cell(17, 16, "M", align="C")
 
-        self.set_font(self.default_font, "B", 18)
-        self.set_text_color(0, 102, 153)
-        self.cell(0, 10, self.clinic_name, ln=True, align="L" if has_logo else "C")
-        
-        self.set_font(self.default_font, "", 9)
-        self.set_text_color(100, 100, 100)
-        
-        if self.clinic_address:
-            if has_logo: self.set_x(40)
-            self.cell(0, 5, self.clinic_address, ln=True, align="L" if has_logo else "C")
-        if self.clinic_phone:
-            if has_logo: self.set_x(40)
-            self.cell(0, 5, f"Tel: {self.clinic_phone}", ln=True, align="L" if has_logo else "C")
-        if self.clinic_email:
-            if has_logo: self.set_x(40)
-            self.cell(0, 5, f"E-posta: {self.clinic_email}", ln=True, align="L" if has_logo else "C")
-        self.ln(5)
-        self.set_draw_color(0, 102, 153)
-        self.set_line_width(0.5)
-        self.line(10, self.get_y(), 200, self.get_y())
-        self.ln(5)
+        self.set_xy(34, 10)
+        self.set_font(self.default_font, "B", 15)
+        self.set_text_color(*self.INK)
+        self.cell(105, 7, self.clinic_name)
+        self.set_xy(34, 18)
+        self.set_font(self.default_font, "", 7.5)
+        self.set_text_color(*self.MUTED)
+        contacts = [value for value in (self.clinic_phone, self.clinic_email) if value]
+        self.cell(105, 5, "  |  ".join(contacts) or "Ortodonti ve klinik hizmetleri")
+
+        self.set_xy(145, 10)
+        self.set_font(self.default_font, "B", 16)
+        self.set_text_color(*self.AQUA_DARK)
+        self.cell(53, 8, "FATURA", align="R")
+        self.set_xy(145, 19)
+        self.set_font(self.default_font, "", 7)
+        self.set_text_color(*self.MUTED)
+        self.cell(53, 5, "EUR / TRY", align="R")
+
+        self.set_draw_color(*self.LINE)
+        self.set_line_width(.35)
+        self.line(12, 32, 198, 32)
+        self.set_y(38)
 
     def footer(self):
-        self.set_y(-15)
-        self.set_font(self.default_font, "", 8)
-        self.set_text_color(150, 150, 150)
-        self.cell(0, 10, f"Sayfa {self.page_no()}/{{nb}}", align="C")
+        self.set_y(-19)
+        self.set_draw_color(*self.LINE)
+        self.line(12, self.get_y(), 198, self.get_y())
+        self.ln(2)
+        self.set_font(self.default_font, "", 6.5)
+        self.set_text_color(*self.MUTED)
+        if self.footer_text:
+            self.cell(140, 6, self.footer_text[:105])
+        else:
+            self.cell(140, 6, "Bu belge elektronik ortamda oluşturulmuştur.")
+        self.cell(46, 6, f"Sayfa {self.page_no()}/{{nb}}", align="R")
 
-    def add_invoice_info(self, invoice_number, invoice_date, due_date, status):
-        self.set_font(self.default_font, "B", 14)
-        self.set_text_color(0, 0, 0)
-        self.cell(0, 10, "FATURA", ln=True, align="R")
+    def _card(self, x, y, w, h, fill=None):
+        fill = fill or self.SURFACE
+        self.set_fill_color(*fill)
+        self.set_draw_color(*self.LINE)
+        self.rect(x, y, w, h, style="DF")
 
-        self.set_font(self.default_font, "", 10)
-        self.set_text_color(80, 80, 80)
-        self.cell(0, 6, f"Fatura No: {invoice_number}", ln=True, align="R")
-        self.cell(0, 6, f"Tarih: {invoice_date.strftime('%d.%m.%Y') if hasattr(invoice_date, 'strftime') else str(invoice_date)}", ln=True, align="R")
-        if due_date:
-            self.cell(0, 6, f"Son Ödeme: {due_date.strftime('%d.%m.%Y') if hasattr(due_date, 'strftime') else str(due_date)}", ln=True, align="R")
+    def add_summary(self, invoice, customer, rate_date):
+        y = self.get_y()
+        self._card(12, y, 112, 43)
+        self._card(128, y, 70, 43, self.AQUA_PALE)
 
-        status_tr = {
-            "pending": "Bekliyor",
-            "paid": "Ödendi",
-            "overdue": "Gecikmiş",
-            "cancelled": "İptal",
+        self.set_xy(18, y + 6)
+        self.set_font(self.default_font, "B", 7)
+        self.set_text_color(*self.AQUA_DARK)
+        self.cell(95, 5, "FATURA EDİLEN")
+        self.set_xy(18, y + 12)
+        self.set_font(self.default_font, "B", 11)
+        self.set_text_color(*self.INK)
+        self.cell(95, 6, customer["name"][:48])
+        self.set_font(self.default_font, "", 7.5)
+        self.set_text_color(*self.MUTED)
+        info = [customer.get("phone"), customer.get("email"), customer.get("tax_id")]
+        line_y = y + 21
+        for value in [value for value in info if value][:3]:
+            self.set_xy(18, line_y)
+            self.cell(95, 5, str(value)[:65])
+            line_y += 5
+
+        status_labels = {
+            "pending": "Bekliyor", "paid": "Ödendi", "overdue": "Gecikmiş", "cancelled": "İptal",
         }
-        self.cell(0, 6, f"Durum: {status_tr.get(status, status)}", ln=True, align="R")
-        self.ln(5)
+        self.set_xy(134, y + 6)
+        self.set_font(self.default_font, "B", 10)
+        self.set_text_color(*self.INK)
+        self.cell(58, 6, invoice.invoice_number, align="R")
+        rows = [
+            ("Fatura tarihi", invoice.invoice_date.strftime("%d.%m.%Y")),
+            ("Son ödeme", invoice.due_date.strftime("%d.%m.%Y") if invoice.due_date else "-"),
+            ("Kategori", invoice.category_label),
+            ("Durum", status_labels.get(invoice.status, invoice.status)),
+        ]
+        row_y = y + 15
+        for label, value in rows:
+            self.set_xy(134, row_y)
+            self.set_font(self.default_font, "", 6.7)
+            self.set_text_color(*self.MUTED)
+            self.cell(25, 5, label)
+            self.set_font(self.default_font, "B", 6.7)
+            self.set_text_color(*self.INK)
+            self.cell(33, 5, str(value)[:22], align="R")
+            row_y += 6
 
-    def add_patient_info(self, patient):
-        """Legacy method for backward compatibility."""
-        self.add_customer_info({
-            "name": patient.full_name,
-            "phone": patient.phone,
-            "email": patient.email,
-            "address": patient.address,
-        })
+        self.set_y(y + 48)
+        self.set_fill_color(*self.SKY_PALE)
+        self.set_draw_color(188, 224, 232)
+        self.rect(12, self.get_y(), 186, 15, style="DF")
+        self.set_xy(18, self.get_y() + 3)
+        self.set_font(self.default_font, "B", 8.5)
+        self.set_text_color(*self.INK)
+        self.cell(110, 8, f"Fatura tarihi kuru: 1 EUR = {invoice.exchange_rate:,.4f} TRY")
+        self.set_font(self.default_font, "", 7)
+        self.set_text_color(*self.MUTED)
+        date_text = rate_date.strftime("%d.%m.%Y") if rate_date else invoice.invoice_date.strftime("%d.%m.%Y")
+        self.cell(64, 8, f"Kur tarihi: {date_text}", align="R")
+        self.set_y(self.get_y() + 19)
 
-    def add_customer_info(self, customer):
-        """Add customer info (works for both patient and party)."""
-        self.set_font(self.default_font, "B", 11)
-        self.set_text_color(0, 102, 153)
-        self.cell(0, 8, "Müşteri Bilgileri", ln=True)
-        self.set_draw_color(0, 102, 153)
-        self.line(10, self.get_y(), 80, self.get_y())
-        self.ln(3)
-
-        self.set_font(self.default_font, "", 10)
-        self.set_text_color(0, 0, 0)
-        self.cell(0, 6, f"Ad Soyad: {customer['name']}", ln=True)
-        if customer.get('phone'):
-            self.cell(0, 6, f"Telefon: {customer['phone']}", ln=True)
-        if customer.get('email'):
-            self.cell(0, 6, f"E-posta: {customer['email']}", ln=True)
-        if customer.get('address'):
-            self.cell(0, 6, f"Adres: {customer['address']}", ln=True)
-        self.ln(5)
-
-    def add_items_table(self, items, exchange_rate):
-        self.set_font(self.default_font, "B", 11)
-        self.set_text_color(0, 102, 153)
-        self.cell(0, 8, "Tedavi Detayları", ln=True)
-        self.set_draw_color(0, 102, 153)
-        self.line(10, self.get_y(), 200, self.get_y())
-        self.ln(3)
-
-        self.set_font(self.default_font, "B", 9)
-        self.set_fill_color(0, 102, 153)
+    def _table_header(self):
+        widths = (68, 31, 12, 27, 18, 30)
+        labels = ("Kalem", "Kategori", "Adet", "Birim EUR", "KDV", "Toplam TRY")
+        self.set_fill_color(*self.INK)
         self.set_text_color(255, 255, 255)
-        self.cell(80, 8, "Tedavi", border=1, fill=True)
-        self.cell(15, 8, "Adet", border=1, fill=True, align="C")
-        self.cell(35, 8, "Birim (EUR)", border=1, fill=True, align="R")
-        self.cell(35, 8, "Birim (TRY)", border=1, fill=True, align="R")
-        self.cell(25, 8, "Toplam (TRY)", border=1, fill=True, align="R")
+        self.set_font(self.default_font, "B", 7)
+        for width, label in zip(widths, labels):
+            align = "R" if label in ("Birim EUR", "KDV", "Toplam TRY") else ("C" if label == "Adet" else "L")
+            self.cell(width, 8, label, border=0, fill=True, align=align)
         self.ln()
 
-        self.set_font(self.default_font, "", 9)
-        self.set_text_color(0, 0, 0)
-        fill = False
-        for item in items:
-            if fill:
-                self.set_fill_color(240, 248, 255)
-            else:
-                self.set_fill_color(255, 255, 255)
-
-            self.cell(80, 7, item.description[:40], border=1, fill=True)
-            self.cell(15, 7, str(item.quantity), border=1, fill=True, align="C")
-            self.cell(35, 7, f"€{item.unit_price_eur:,.2f}", border=1, fill=True, align="R")
-            self.cell(35, 7, f"₺{item.unit_price_try:,.2f}", border=1, fill=True, align="R")
-            self.cell(25, 7, f"₺{item.line_total_try:,.2f}", border=1, fill=True, align="R")
+    def add_items_table(self, items, category_labels):
+        self.set_font(self.default_font, "B", 9)
+        self.set_text_color(*self.AQUA_DARK)
+        self.cell(0, 7, "FATURA KALEMLERİ", ln=True)
+        self._table_header()
+        widths = (68, 31, 12, 27, 18, 30)
+        for index, item in enumerate(items):
+            if self.get_y() > 255:
+                self.add_page()
+                self._table_header()
+            category_key = item.treatment.category if item.treatment else item.item_type.value
+            category = category_labels.get(category_key, category_key)
+            self.set_fill_color(*(self.SURFACE if index % 2 == 0 else (255, 255, 255)))
+            self.set_text_color(*self.INK)
+            self.set_font(self.default_font, "", 7.2)
+            values = (
+                item.description[:45], category[:20], str(item.quantity),
+                f"{item.unit_price_eur:,.2f}", f"%{item.vat_rate:,.1f}", f"{item.line_total_try + item.vat_amount_try:,.2f}",
+            )
+            for width, value in zip(widths, values):
+                align = "R" if width in (27, 18, 30) else ("C" if width == 12 else "L")
+                self.cell(width, 8, value, border="B", fill=True, align=align)
             self.ln()
-            fill = not fill
 
-    def add_totals(self, total_eur, total_try, exchange_rate):
-        self.ln(5)
-        self.set_font(self.default_font, "", 10)
-        self.set_text_color(80, 80, 80)
+    def add_totals(self, invoice):
+        if self.get_y() > 225:
+            self.add_page()
+        subtotal_eur = sum(item.line_total_eur for item in invoice.items)
+        vat_eur = sum(item.vat_amount_eur for item in invoice.items)
+        self.ln(4)
+        x_label, x_value = 126, 163
+        rows = (
+            ("Ara toplam", f"€{subtotal_eur:,.2f}", False),
+            ("KDV toplamı", f"€{vat_eur:,.2f}", False),
+            ("Toplam EUR", f"€{invoice.total_eur:,.2f}", True),
+        )
+        for label, value, bold in rows:
+            self.set_xy(x_label, self.get_y())
+            self.set_font(self.default_font, "B" if bold else "", 8)
+            self.set_text_color(*self.MUTED if not bold else self.INK)
+            self.cell(37, 7, label, align="R")
+            self.set_text_color(*self.INK)
+            self.cell(35, 7, value, align="R")
+            self.ln()
 
-        self.cell(130, 7, "Kur (1 EUR =)", align="R")
-        self.cell(50, 7, f"₺{exchange_rate:,.4f}", align="R")
-        self.ln()
-
-        self.set_font(self.default_font, "B", 11)
-        self.set_text_color(0, 102, 153)
-        self.cell(130, 8, "Toplam (EUR):", align="R")
-        self.cell(50, 8, f"€{total_eur:,.2f}", align="R")
-        self.ln()
-
-        self.set_font(self.default_font, "B", 13)
-        self.set_text_color(0, 0, 0)
-        self.cell(130, 10, "TOPLAM (TRY):", align="R")
-        self.cell(50, 10, f"₺{total_try:,.2f}", align="R")
+        self.set_x(126)
+        self.set_fill_color(*self.AQUA_DARK)
+        self.set_text_color(255, 255, 255)
+        self.set_font(self.default_font, "B", 10)
+        self.cell(37, 11, "TOPLAM TRY", fill=True, align="R")
+        self.cell(35, 11, f"₺{invoice.total_try:,.2f}", fill=True, align="R")
         self.ln()
 
     def add_notes(self, notes):
-        if notes:
-            self.ln(5)
-            self.set_font(self.default_font, "B", 10)
-            self.set_text_color(0, 102, 153)
-            self.cell(0, 7, "Notlar:", ln=True)
-            self.set_font(self.default_font, "", 9)
-            self.set_text_color(80, 80, 80)
-            self.multi_cell(0, 5, notes)
+        if not notes:
+            return
+        if self.get_y() > 242:
+            self.add_page()
+        self.ln(6)
+        self.set_font(self.default_font, "B", 7)
+        self.set_text_color(*self.AQUA_DARK)
+        self.cell(0, 5, "NOTLAR", ln=True)
+        self.set_font(self.default_font, "", 7.5)
+        self.set_text_color(*self.MUTED)
+        self.set_fill_color(*self.SURFACE)
+        self.multi_cell(0, 5, notes, fill=True, padding=3)
 
 
 def get_customer_info(invoice):
-    """Get customer info from either party (preferred) or legacy patient."""
-    if invoice.party:
-        return {
-            "name": invoice.party.display_name,
-            "phone": invoice.party.phone,
-            "email": invoice.party.email,
-            "address": invoice.party.address,
-        }
-    elif invoice.patient:
-        return {
-            "name": invoice.patient.full_name,
-            "phone": invoice.patient.phone,
-            "email": invoice.patient.email,
-            "address": invoice.patient.address,
-        }
-    return {"name": "Bilinmeyen Müşteri", "phone": None, "email": None, "address": None}
+    customer = invoice.party or invoice.patient
+    if not customer:
+        return {"name": "Bilinmeyen müşteri"}
+    return {
+        "name": getattr(customer, "display_name", None) or getattr(customer, "full_name", "Bilinmeyen müşteri"),
+        "phone": customer.phone,
+        "email": customer.email,
+        "address": customer.address,
+        "tax_id": getattr(customer, "tax_id", None),
+    }
 
 
 def generate_invoice_pdf(invoice) -> bytes:
     from app.extensions import db
-    from app.models.models import Settings
+    from app.models.models import ExchangeRate, INVOICE_CATEGORY_LABELS, Settings
 
     def get_setting(key, default=""):
-        val = db.session.execute(
+        value = db.session.execute(
             db.select(Settings.value).where(Settings.key == key)
         ).scalar_one_or_none()
-        return val or default
+        return value or default
 
-    clinic_name_val = get_setting("clinic_name", "Makro Ortodonti")
-    clinic_address_val = get_setting("clinic_address")
-    clinic_phone_val = get_setting("clinic_phone")
-    clinic_email_val = get_setting("clinic_email")
-    clinic_logo_path_val = get_setting("clinic_logo_path")
-
-    # Locate actual logo path
-    logo_path = None
-    if clinic_logo_path_val:
-        if os.path.isabs(clinic_logo_path_val):
-            if os.path.exists(clinic_logo_path_val):
-                logo_path = clinic_logo_path_val
-        else:
-            app_dir = os.path.dirname(os.path.dirname(__file__))
-            p = os.path.join(app_dir, clinic_logo_path_val)
-            if os.path.exists(p):
-                logo_path = p
-    
-    if not logo_path:
-        app_dir = os.path.dirname(os.path.dirname(__file__))
-        p = os.path.join(app_dir, "app", "static", "images", "logo.png")
-        if os.path.exists(p):
-            logo_path = p
-        else:
-            p = os.path.join(app_dir, "static", "images", "logo.png")
-            if os.path.exists(p):
-                logo_path = p
+    rate_record = db.session.execute(
+        db.select(ExchangeRate)
+        .where(ExchangeRate.rate_date <= invoice.invoice_date)
+        .order_by(ExchangeRate.rate_date.desc())
+        .limit(1)
+    ).scalar_one_or_none()
 
     pdf = InvoicePDF(
-        clinic_name=clinic_name_val,
-        clinic_address=clinic_address_val,
-        clinic_phone=clinic_phone_val,
-        clinic_email=clinic_email_val,
-        logo_path=logo_path,
+        clinic_name=get_setting("clinic_name", "Makro Ortodonti"),
+        clinic_address=get_setting("clinic_address"),
+        clinic_phone=get_setting("clinic_phone"),
+        clinic_email=get_setting("clinic_email"),
+        clinic_tax_id=get_setting("tax_id"),
+        footer_text=get_setting("invoice_footer_text"),
     )
     pdf.alias_nb_pages()
     pdf.add_page()
-
-    pdf.add_invoice_info(
-        invoice.invoice_number,
-        invoice.invoice_date,
-        invoice.due_date,
-        invoice.status,
-    )
-    
-    customer = get_customer_info(invoice)
-    pdf.add_customer_info(customer)
-    pdf.add_items_table(invoice.items, invoice.exchange_rate)
-    pdf.add_totals(invoice.total_eur, invoice.total_try, invoice.exchange_rate)
+    pdf.add_summary(invoice, get_customer_info(invoice), rate_record.rate_date if rate_record else None)
+    pdf.add_items_table(invoice.items, INVOICE_CATEGORY_LABELS)
+    pdf.add_totals(invoice)
     pdf.add_notes(invoice.notes)
 
     output = pdf.output()
-    if isinstance(output, bytearray):
-        return bytes(output)
-    if isinstance(output, bytes):
-        return output
-    return str(output).encode("latin-1", errors="ignore")
+    return bytes(output) if isinstance(output, (bytes, bytearray)) else str(output).encode("latin-1", errors="ignore")

@@ -1,167 +1,258 @@
+from collections import defaultdict
+from datetime import date, timedelta
+
 from flask import Blueprint, render_template, request
 from flask_login import login_required
-from datetime import date, timedelta
-from sqlalchemy import func
 
 from app.extensions import db
-from app.models.models import Invoice, Patient, PatientTreatment, Treatment, TreatmentCategory, ExchangeRate, Party, PartyType, InvoiceItem
+from app.models.models import (
+    ExchangeRate,
+    INVOICE_CATEGORY_LABELS,
+    Invoice,
+    InvoiceItemType,
+    Party,
+    PartyType,
+    Payment,
+    invoice_item_category_key,
+)
+from app.services.validation_service import parse_date
+
 
 reports_bp = Blueprint("reports", __name__)
+
+
+STATUS_LABELS = {
+    Invoice.STATUS_PENDING: "Bekliyor",
+    Invoice.STATUS_PAID: "Ödendi",
+    Invoice.STATUS_OVERDUE: "Gecikmiş",
+    Invoice.STATUS_CANCELLED: "İptal",
+}
+PATIENT_STATUS_LABELS = {
+    "active": "Aktif tedavi",
+    "completed": "Tamamlandı",
+    "planned": "Planlandı",
+    "on_hold": "Beklemede",
+    "inactive": "Pasif",
+}
+
+
+def _resolve_period(today: date) -> tuple[date, date, str]:
+    period = request.args.get("period", "this_month")
+    explicit_start = parse_date(request.args.get("start_date", ""))
+    explicit_end = parse_date(request.args.get("end_date", ""))
+
+    if period == "custom" and (explicit_start or explicit_end):
+        start = explicit_start or today.replace(month=1, day=1)
+        end = explicit_end or today
+        period = "custom"
+    elif period == "last_30":
+        start, end = today - timedelta(days=29), today
+    elif period == "this_year":
+        start, end = today.replace(month=1, day=1), today
+    elif period == "last_year":
+        start = today.replace(year=today.year - 1, month=1, day=1)
+        end = today.replace(year=today.year - 1, month=12, day=31)
+    else:
+        period = "this_month"
+        start, end = today.replace(day=1), today
+
+    if start > end:
+        start, end = end, start
+    return start, end, period
+
+
+def _trend_rows(start: date, end: date, invoices: list[Invoice], payments: list[Payment]) -> list[dict]:
+    day_span = (end - start).days + 1
+    use_months = day_span > 100
+    values: dict[tuple[int, int] | date, dict[str, float]] = defaultdict(
+        lambda: {"issued": 0.0, "collected": 0.0}
+    )
+
+    def key_for(value: date):
+        if use_months:
+            return value.year, value.month
+        return value - timedelta(days=value.weekday())
+
+    for invoice in invoices:
+        values[key_for(invoice.invoice_date)]["issued"] += invoice.total_eur
+    for payment in payments:
+        values[key_for(payment.payment_date)]["collected"] += payment.amount_eur
+
+    rows = []
+    for key in sorted(values):
+        if use_months:
+            label = f"{key[1]:02d}.{key[0]}"
+        else:
+            label = key.strftime("%d.%m")
+        rows.append({"label": label, **values[key]})
+
+    return rows[-12:]
 
 
 @reports_bp.route("/")
 @login_required
 def index():
     today = date.today()
-    month_start = today.replace(day=1)
-    year_start = today.replace(month=1, day=1)
+    start_date, end_date, selected_period = _resolve_period(today)
 
-    # Monthly revenue
-    monthly_revenue = db.session.execute(
-        db.select(
-            func.sum(Invoice.total_eur).label("total_eur"),
-            func.sum(Invoice.total_try).label("total_try"),
-        ).where(
-            Invoice.invoice_date >= month_start,
+    invoices = db.session.execute(
+        db.select(Invoice)
+        .where(
+            Invoice.invoice_date.between(start_date, end_date),
             Invoice.is_deleted == False,
-            Invoice.status == Invoice.STATUS_PAID,
+            Invoice.status != Invoice.STATUS_CANCELLED,
         )
-    ).one()
+        .order_by(Invoice.invoice_date)
+    ).scalars().all()
 
-    # Yearly revenue
-    yearly_revenue = db.session.execute(
-        db.select(
-            func.sum(Invoice.total_eur).label("total_eur"),
-            func.sum(Invoice.total_try).label("total_try"),
-        ).where(
-            Invoice.invoice_date >= year_start,
+    payments = db.session.execute(
+        db.select(Payment)
+        .join(Invoice, Payment.invoice_id == Invoice.id)
+        .where(
+            Payment.payment_date.between(start_date, end_date),
             Invoice.is_deleted == False,
-            Invoice.status == Invoice.STATUS_PAID,
+            Invoice.status != Invoice.STATUS_CANCELLED,
         )
-    ).one()
+        .order_by(Payment.payment_date)
+    ).scalars().all()
 
-    # Pending amounts
-    pending_amounts = db.session.execute(
-        db.select(
-            func.sum(Invoice.total_eur).label("total_eur"),
-            func.sum(Invoice.total_try).label("total_try"),
-            func.count(Invoice.id).label("count"),
-        ).where(
-            Invoice.status == Invoice.STATUS_PENDING,
-            Invoice.is_deleted == False,
-        )
-    ).one()
+    issued_eur = sum(invoice.total_eur for invoice in invoices)
+    issued_try = sum(invoice.total_try for invoice in invoices)
+    collected_eur = sum(payment.amount_eur for payment in payments)
+    collected_try = sum(payment.amount_try for payment in payments)
 
-    # Treatment statistics (counts from InvoiceItem + PatientTreatment)
-    inv_counts = db.session.execute(
-        db.select(
-            InvoiceItem.treatment_id,
-            func.sum(InvoiceItem.quantity).label("qty")
-        )
-        .where(InvoiceItem.item_type == "treatment", InvoiceItem.treatment_id.isnot(None))
-        .group_by(InvoiceItem.treatment_id)
-    ).all()
+    outstanding_eur = 0.0
+    outstanding_try = 0.0
+    overdue_eur = 0.0
+    aging = {
+        "not_due": {"label": "Vadesi gelmedi", "count": 0, "amount": 0.0},
+        "days_0_30": {"label": "0-30 gün", "count": 0, "amount": 0.0},
+        "days_31_60": {"label": "31-60 gün", "count": 0, "amount": 0.0},
+        "days_61_plus": {"label": "61+ gün", "count": 0, "amount": 0.0},
+    }
+    for invoice in invoices:
+        paid_eur = sum(payment.amount_eur for payment in invoice.payments)
+        paid_try = sum(payment.amount_try for payment in invoice.payments)
+        remaining_eur = max(invoice.total_eur - paid_eur, 0.0)
+        remaining_try = max(invoice.total_try - paid_try, 0.0)
+        if remaining_eur <= 0.01:
+            continue
+        outstanding_eur += remaining_eur
+        outstanding_try += remaining_try
+        due_reference = invoice.due_date or invoice.invoice_date
+        age_days = (today - due_reference).days
+        if age_days < 0:
+            bucket = "not_due"
+        elif age_days <= 30:
+            bucket = "days_0_30"
+        elif age_days <= 60:
+            bucket = "days_31_60"
+        else:
+            bucket = "days_61_plus"
+        aging[bucket]["count"] += 1
+        aging[bucket]["amount"] += remaining_eur
+        if age_days > 0:
+            overdue_eur += remaining_eur
 
-    pt_counts = db.session.execute(
-        db.select(
-            PatientTreatment.treatment_id,
-            func.count(PatientTreatment.id).label("qty")
-        )
-        .where(PatientTreatment.treatment_id.isnot(None))
-        .group_by(PatientTreatment.treatment_id)
-    ).all()
+    treatment_totals: dict[int, dict] = {}
+    category_totals: dict[str, dict] = defaultdict(lambda: {"count": 0, "amount_eur": 0.0})
+    for invoice in invoices:
+        for item in invoice.items:
+            item_type = item.item_type.value if isinstance(item.item_type, InvoiceItemType) else str(item.item_type)
+            category_key = invoice_item_category_key(item)
+            quantity = int(item.quantity or 0)
+            amount_eur = item.line_total_eur + item.vat_amount_eur
+            category_totals[category_key]["count"] += quantity
+            category_totals[category_key]["amount_eur"] += amount_eur
+            if item_type == InvoiceItemType.TREATMENT.value and item.treatment:
+                row = treatment_totals.setdefault(item.treatment.id, {
+                    "name": item.treatment.name,
+                    "category": item.treatment.category,
+                    "count": 0,
+                    "amount_eur": 0.0,
+                })
+                row["count"] += quantity
+                row["amount_eur"] += amount_eur
 
-    totals_by_id = {}
-    for tid, qty in inv_counts:
-        if tid:
-            totals_by_id[tid] = totals_by_id.get(tid, 0) + int(qty or 0)
-    for tid, qty in pt_counts:
-        if tid:
-            totals_by_id[tid] = totals_by_id.get(tid, 0) + int(qty or 0)
-
-    treatments_list = []
-    if totals_by_id:
-        treatments_in_db = db.session.execute(
-            db.select(Treatment).where(Treatment.id.in_(totals_by_id.keys()))
-        ).scalars().all()
-        
-        for t in treatments_in_db:
-            treatments_list.append({
-                "id": t.id,
-                "name": t.name,
-                "category": t.category,
-                "count": totals_by_id.get(t.id, 0)
-            })
-        
-        treatments_list.sort(key=lambda x: x["count"], reverse=True)
-    else:
-        all_treatments = db.session.execute(
-            db.select(Treatment).order_by(Treatment.name).limit(10)
-        ).scalars().all()
-        treatments_list = [{
-            "id": t.id,
-            "name": t.name,
-            "category": t.category,
-            "count": 0
-        } for t in all_treatments]
-
-    treatment_stats = treatments_list[:10]
-
-    # Category statistics
-    category_counts = {}
-    for item in treatments_list:
-        cat = item["category"] or "other"
-        category_counts[cat] = category_counts.get(cat, 0) + item["count"]
-
+    treatment_stats = sorted(
+        treatment_totals.values(), key=lambda row: (row["count"], row["amount_eur"]), reverse=True
+    )[:8]
     category_stats = [
-        {"category": cat, "count": count}
-        for cat, count in sorted(category_counts.items(), key=lambda x: x[1], reverse=True)
+        {"category": key, **value}
+        for key, value in sorted(
+            category_totals.items(), key=lambda pair: pair[1]["amount_eur"], reverse=True
+        )
     ]
 
-    category_labels = {
-        "orthodontic": "Ortodonti",
-        "prosthetic": "Protetik",
-        "surgical": "Cerrahi",
-        "preventive": "Koruyucu",
-        "restorative": "Restoratif",
-        "periodontic": "Periodontoloji (Diş Eti)",
-        "endodontic": "Endodonti (Kanal Tedavisi)",
-        "implant": "İmplant",
-        "cosmetic": "Kozmetik",
-        "other": "Diğer",
-    }
+    status_counts = defaultdict(int)
+    for invoice in invoices:
+        status_counts[invoice.status] += 1
+    invoice_statuses = [
+        {"status": status, "label": STATUS_LABELS[status], "count": status_counts.get(status, 0)}
+        for status in (Invoice.STATUS_PAID, Invoice.STATUS_PENDING, Invoice.STATUS_OVERDUE)
+    ]
 
-    # Patient count by status
-    patient_stats = db.session.execute(
-        db.select(
-            Party.treatment_status,
-            func.count(Party.id).label("count"),
-        )
+    patient_status_rows = db.session.execute(
+        db.select(Party.treatment_status, db.func.count(Party.id).label("count"))
         .where(Party.party_type == PartyType.PATIENT, Party.is_active == True)
         .group_by(Party.treatment_status)
     ).all()
+    patient_stats = [
+        {
+            "status": row.treatment_status or "active",
+            "label": PATIENT_STATUS_LABELS.get(row.treatment_status or "active", row.treatment_status or "active"),
+            "count": row.count,
+        }
+        for row in patient_status_rows
+    ]
 
-    # Exchange rate history
     exchange_rates = db.session.execute(
         db.select(ExchangeRate)
+        .where(ExchangeRate.rate_date <= end_date)
         .order_by(ExchangeRate.rate_date.desc())
-        .limit(30)
+        .limit(12)
     ).scalars().all()
+    current_rate = exchange_rates[0] if exchange_rates else None
+    previous_rate = exchange_rates[1] if len(exchange_rates) > 1 else None
+    rate_delta = (
+        current_rate.eur_to_try - previous_rate.eur_to_try
+        if current_rate and previous_rate else None
+    )
 
-    max_category_count = max((s["count"] for s in category_stats), default=1) or 1
+    trend_rows = _trend_rows(start_date, end_date, invoices, payments)
+    max_trend_value = max(
+        (max(row["issued"], row["collected"]) for row in trend_rows), default=1.0
+    ) or 1.0
+    max_category_amount = max((row["amount_eur"] for row in category_stats), default=1.0) or 1.0
+    max_aging_amount = max((row["amount"] for row in aging.values()), default=1.0) or 1.0
 
     return render_template(
         "reports/index.html",
-        monthly_revenue=monthly_revenue,
-        yearly_revenue=yearly_revenue,
-        pending_amounts=pending_amounts,
+        today=today,
+        start_date=start_date,
+        end_date=end_date,
+        selected_period=selected_period,
+        issued_eur=issued_eur,
+        issued_try=issued_try,
+        collected_eur=collected_eur,
+        collected_try=collected_try,
+        outstanding_eur=outstanding_eur,
+        outstanding_try=outstanding_try,
+        overdue_eur=overdue_eur,
+        collection_ratio=(collected_eur / issued_eur * 100) if issued_eur else 0,
+        invoice_count=len(invoices),
+        payment_count=len(payments),
         treatment_stats=treatment_stats,
         category_stats=category_stats,
-        category_labels=category_labels,
-        max_category_count=max_category_count,
+        category_labels=INVOICE_CATEGORY_LABELS,
+        invoice_statuses=invoice_statuses,
         patient_stats=patient_stats,
+        aging_rows=list(aging.values()),
         exchange_rates=exchange_rates,
-        today=today,
-        month_start=month_start,
-        year_start=year_start,
+        current_rate=current_rate,
+        rate_delta=rate_delta,
+        trend_rows=trend_rows,
+        max_trend_value=max_trend_value,
+        max_category_amount=max_category_amount,
+        max_aging_amount=max_aging_amount,
     )

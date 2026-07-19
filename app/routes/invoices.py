@@ -5,7 +5,10 @@ import io
 import json
 
 from app.extensions import db
-from app.models.models import Invoice, InvoiceItem, Party, PartyType, PatientTreatment, Treatment, ExchangeRate, InvoiceItemType
+from app.models.models import (
+    ExchangeRate, INVOICE_CATEGORY_LABELS, Invoice, InvoiceItem, InvoiceItemType,
+    Party, PartyType, PatientTreatment, Treatment,
+)
 from app.models.invoice_service import InvoiceService
 from app.authz import roles_required
 
@@ -16,6 +19,7 @@ invoices_bp = Blueprint("invoices", __name__)
 @login_required
 def list_invoices():
     status = request.args.get("status", "")
+    category = request.args.get("category", "")
     search = request.args.get("search", "").strip()
 
     query = db.select(Invoice).where(Invoice.is_deleted == False)
@@ -32,11 +36,15 @@ def list_invoices():
 
     query = query.order_by(Invoice.invoice_date.desc())
     invoices = db.session.execute(query).scalars().all()
+    if category:
+        invoices = [invoice for invoice in invoices if category in invoice.category_keys]
 
     return render_template(
         "invoices/list.html",
         invoices=invoices,
         selected_status=status,
+        selected_category=category,
+        category_labels=INVOICE_CATEGORY_LABELS,
         search=search,
     )
 
@@ -147,7 +155,10 @@ def add_invoice():
     ).scalars().all()
 
     current_rate = db.session.execute(
-        db.select(ExchangeRate).order_by(ExchangeRate.rate_date.desc()).limit(1)
+        db.select(ExchangeRate)
+        .where(ExchangeRate.rate_date <= date.today())
+        .order_by(ExchangeRate.rate_date.desc())
+        .limit(1)
     ).scalar_one_or_none()
 
     # Prepare treatments for JSON serialization
@@ -157,6 +168,8 @@ def add_invoice():
             "name": t.name,
             "description": t.description or t.name,
             "price_eur": t.price_eur,
+            "category": t.category,
+            "category_label": INVOICE_CATEGORY_LABELS.get(t.category, t.category),
         }
         for t in treatments
     ]
@@ -167,6 +180,7 @@ def add_invoice():
         patient_treatments=patient_treatments,
         treatments=treatments_json,
         current_rate=current_rate,
+        category_labels=INVOICE_CATEGORY_LABELS,
         today=date.today(),
         selected_party_id=request.args.get("party_id", type=int),
     )
@@ -176,7 +190,18 @@ def add_invoice():
 @login_required
 def detail_invoice(invoice_id):
     invoice = db.get_or_404(Invoice, invoice_id)
-    return render_template("invoices/detail.html", invoice=invoice)
+    rate_record = db.session.execute(
+        db.select(ExchangeRate)
+        .where(ExchangeRate.rate_date <= invoice.invoice_date)
+        .order_by(ExchangeRate.rate_date.desc())
+        .limit(1)
+    ).scalar_one_or_none()
+    return render_template(
+        "invoices/detail.html",
+        invoice=invoice,
+        rate_record=rate_record,
+        category_labels=INVOICE_CATEGORY_LABELS,
+    )
 
 
 @invoices_bp.route("/<int:invoice_id>/pdf")
@@ -289,3 +314,30 @@ def get_party_info(party_id):
             "party_type": party.party_type.value,
         })
     return jsonify({"error": "Not found"}), 404
+
+
+@invoices_bp.route("/api/exchange-rate")
+@login_required
+def get_exchange_rate_for_date():
+    """Return the rate that will be fixed on an invoice for the requested date."""
+    from app.services.validation_service import parse_date
+
+    target_date = parse_date(request.args.get("date", ""))
+    if not target_date:
+        return jsonify({"error": "Geçersiz tarih"}), 400
+
+    rate = db.session.execute(
+        db.select(ExchangeRate)
+        .where(ExchangeRate.rate_date <= target_date)
+        .order_by(ExchangeRate.rate_date.desc())
+        .limit(1)
+    ).scalar_one_or_none()
+    if not rate:
+        return jsonify({"error": "Bu tarih için kur bulunamadı"}), 404
+
+    return jsonify({
+        "rate": rate.eur_to_try,
+        "rate_date": rate.rate_date.isoformat(),
+        "display_date": rate.rate_date.strftime("%d.%m.%Y"),
+        "source": rate.source,
+    })

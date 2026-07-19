@@ -132,6 +132,83 @@ def test_invoice_pdf_download_works(client, app):
     assert response.mimetype == "application/pdf"
 
 
+def test_invoice_category_and_date_rate_api(client, app):
+    login(client, "admin", "admin-pass")
+
+    rate_response = client.get(f"/invoices/api/exchange-rate?date={date.today().isoformat()}")
+    assert rate_response.status_code == 200
+    assert rate_response.get_json()["rate"] == 40.0
+
+    with app.app_context():
+        party = db.session.execute(
+            db.select(Party).where(Party.party_type == PartyType.PATIENT).limit(1)
+        ).scalar_one()
+        treatment = db.session.execute(
+            db.select(Treatment).where(Treatment.category == "other").limit(1)
+        ).scalar_one()
+
+    response = client.post("/invoices/add", data={
+        "party_id": party.id,
+        "invoice_date": date.today().isoformat(),
+        "items_json": json.dumps([{
+            "item_type": "treatment",
+            "treatment_id": treatment.id,
+            "description": treatment.name,
+            "quantity": 1,
+            "unit_price_eur": treatment.price_eur,
+        }]),
+    })
+    assert response.status_code == 302
+
+    list_response = client.get("/invoices/?category=other")
+    assert list_response.status_code == 200
+    assert "Diğer tedavi" in list_response.get_data(as_text=True)
+
+
+def test_reports_use_payments_for_collections_without_double_counting(client, app):
+    login(client, "admin", "admin-pass")
+
+    with app.app_context():
+        party = db.session.execute(
+            db.select(Party).where(Party.party_type == PartyType.PATIENT).limit(1)
+        ).scalar_one()
+        treatment = db.session.execute(
+            db.select(Treatment).where(Treatment.name == "Consultation")
+        ).scalar_one()
+
+    client.post("/invoices/add", data={
+        "party_id": party.id,
+        "invoice_date": date.today().isoformat(),
+        "items_json": json.dumps([{
+            "item_type": "treatment",
+            "treatment_id": treatment.id,
+            "description": treatment.name,
+            "quantity": 1,
+            "unit_price_eur": 50.0,
+        }]),
+    })
+
+    report = client.get("/reports/").get_data(as_text=True)
+    assert "Gerçek tahsilat" in report
+    assert "€0.00" in report
+    assert "Consultation" in report
+
+    with app.app_context():
+        invoice = db.session.execute(db.select(Invoice)).scalar_one()
+        db.session.add(Payment(
+            invoice_id=invoice.id,
+            payment_date=date.today(),
+            amount_eur=20.0,
+            amount_try=800.0,
+            exchange_rate=40.0,
+            method=PaymentMethod.CASH,
+        ))
+        db.session.commit()
+
+    report_after_payment = client.get("/reports/").get_data(as_text=True)
+    assert "€20.00" in report_after_payment
+
+
 # ==================== YENI TESTLER ====================
 
 def test_party_crud_patient(client, app):

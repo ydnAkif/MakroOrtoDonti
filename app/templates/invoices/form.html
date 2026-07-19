@@ -18,21 +18,19 @@
       </div>
       <div class="card-body">
         {% if current_rate %}
-        <div class="alert alert-info mb-3">
-          <i class="bi bi-currency-exchange"></i>
-          Güncel Kur:
-          <strong
-            >1 EUR = ₺{{ "{:,.4f}".format(current_rate.eur_to_try) }}</strong
-          >
-          <small class="text-muted ms-2"
-            >({{ current_rate.rate_date.strftime('%d.%m.%Y') }})</small
-          >
+        <div class="rate-strip mb-4" id="invoice-rate-banner">
+          <span class="rate-strip-icon"><i class="bi bi-currency-exchange"></i></span>
+          <div>
+            <span class="d-block small text-muted">Fatura tarihindeki sabit kur</span>
+            <strong id="invoice-rate-value">1 EUR = ₺{{ "{:,.4f}".format(current_rate.eur_to_try) }}</strong>
+            <small class="text-muted ms-2" id="invoice-rate-date">{{ current_rate.rate_date.strftime('%d.%m.%Y') }} tarihli kur</small>
+          </div>
         </div>
         {% else %}
-        <div class="alert alert-warning mb-3">
-          <i class="bi bi-exclamation-triangle"></i>
-          Döviz kuru tanımlanmamış! Lütfen önce
-          <a href="{{ url_for('settings.index') }}">Ayarlar</a>'dan kur ekleyin.
+        <div class="rate-strip rate-strip-error mb-4" id="invoice-rate-banner">
+          <span class="rate-strip-icon"><i class="bi bi-exclamation-triangle"></i></span>
+          <div><strong id="invoice-rate-value">Döviz kuru tanımlanmamış</strong>
+          <small class="d-block text-muted" id="invoice-rate-date"><a href="{{ url_for('settings.index') }}">Ayarlar</a> bölümünden kur ekleyin.</small></div>
         </div>
         {% endif %}
 
@@ -74,6 +72,12 @@
             <div class="col-md-3">
               <label class="form-label">Son Ödeme</label>
               <input type="date" name="due_date" id="due-date" class="form-control" />
+            </div>
+            <div class="col-12">
+              <div class="invoice-category-summary" aria-live="polite">
+                <span><i class="bi bi-tags"></i><strong>Fatura kategorisi</strong></span>
+                <span id="invoice-category-preview" class="text-muted">Kalem eklendiğinde otomatik belirlenir</span>
+              </div>
             </div>
           </div>
 
@@ -259,8 +263,9 @@
 {% endblock %} {% block scripts %}
 <script>
 let itemCounter = 0;
-const currentRate = {{ current_rate.eur_to_try if current_rate else 0 }};
+let currentRate = {{ current_rate.eur_to_try if current_rate else 0 }};
 const treatments = {{ treatments|tojson|safe if treatments else [] }};
+const categoryLabels = {{ category_labels|tojson|safe }};
 
 function formatNumber(num) {
     return new Intl.NumberFormat('tr-TR', {minimumFractionDigits: 2, maximumFractionDigits: 2}).format(num);
@@ -312,6 +317,24 @@ function recalculateTotals() {
     document.getElementById('total-vat-eur').textContent = formatCurrencyEUR(totalVat);
     document.getElementById('grand-total-eur').textContent = formatCurrencyEUR(grandTotal);
     document.getElementById('grand-total-try').textContent = formatCurrencyTRY(grandTotal * currentRate);
+    updateCategoryPreview();
+}
+
+function updateCategoryPreview() {
+    const keys = new Set();
+    document.querySelectorAll('#invoice-items-body tr[data-item]').forEach(row => {
+        const item = JSON.parse(row.dataset.item);
+        keys.add(item.category || item.item_type || 'other');
+    });
+    const target = document.getElementById('invoice-category-preview');
+    if (!keys.size) {
+        target.className = 'text-muted';
+        target.textContent = 'Kalem eklendiğinde otomatik belirlenir';
+        return;
+    }
+    const labels = Array.from(keys).map(key => categoryLabels[key] || key);
+    target.className = 'invoice-category-tags';
+    target.innerHTML = labels.map(label => `<span class="invoice-category-badge"><i class="bi bi-tag"></i>${label}</span>`).join('');
 }
 
 function addItemToTable(item) {
@@ -449,7 +472,12 @@ document.getElementById('item-form').addEventListener('submit', function(e) {
         }
         item.treatment_id = parseInt(treatment_id);
         const treatment = treatments.find(t => t.id == treatment_id);
-        if (treatment) item.treatment_name = treatment.name;
+        if (treatment) {
+            item.treatment_name = treatment.name;
+            item.category = treatment.category;
+        }
+    } else {
+        item.category = type;
     }
     
     if (index) {
@@ -515,5 +543,25 @@ document.getElementById('invoice-form').addEventListener('submit', function(e) {
 if (currentRate > 0) {
     console.log('Current EUR/TRY rate:', currentRate);
 }
+
+document.getElementById('invoice-date').addEventListener('change', async function() {
+    const banner = document.getElementById('invoice-rate-banner');
+    try {
+        const response = await fetch(`{{ url_for('invoices.get_exchange_rate_for_date') }}?date=${encodeURIComponent(this.value)}`);
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Kur alınamadı');
+        currentRate = Number(data.rate);
+        document.getElementById('invoice-rate-value').textContent = `1 EUR = ₺${currentRate.toLocaleString('tr-TR', {minimumFractionDigits: 4, maximumFractionDigits: 4})}`;
+        document.getElementById('invoice-rate-date').textContent = `${data.display_date} tarihli kur`;
+        banner.classList.remove('rate-strip-error');
+        recalculateTotals();
+    } catch (error) {
+        currentRate = 0;
+        document.getElementById('invoice-rate-value').textContent = error.message;
+        document.getElementById('invoice-rate-date').textContent = 'Ayarlar bölümünden bu tarih için kur ekleyin';
+        banner.classList.add('rate-strip-error');
+        recalculateTotals();
+    }
+});
 </script>
 {% endblock %}

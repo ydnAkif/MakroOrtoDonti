@@ -66,6 +66,33 @@ class InvoiceItemType(PyEnum):
     CUSTOM = "custom"
 
 
+INVOICE_CATEGORY_LABELS = {
+    TreatmentCategory.ORTHODONTIC: "Ortodonti",
+    TreatmentCategory.PROSTHETIC: "Protetik",
+    TreatmentCategory.SURGICAL: "Cerrahi",
+    TreatmentCategory.PREVENTIVE: "Koruyucu",
+    TreatmentCategory.RESTORATIVE: "Restoratif",
+    TreatmentCategory.PERIODONTIC: "Periodontoloji",
+    TreatmentCategory.ENDODONTIC: "Endodonti",
+    TreatmentCategory.IMPLANT: "İmplant",
+    TreatmentCategory.COSMETIC: "Kozmetik",
+    TreatmentCategory.OTHER: "Diğer tedavi",
+    InvoiceItemType.PRODUCT.value: "Ürün",
+    InvoiceItemType.SERVICE.value: "Hizmet",
+    InvoiceItemType.LAB.value: "Laboratuvar",
+    InvoiceItemType.CUSTOM.value: "Özel kalem",
+    "mixed": "Karma",
+}
+
+
+def invoice_item_category_key(item: "InvoiceItem") -> str:
+    """Return the business-facing category for an invoice line."""
+    item_type = item.item_type.value if isinstance(item.item_type, InvoiceItemType) else str(item.item_type)
+    if item_type == InvoiceItemType.TREATMENT.value and item.treatment:
+        return item.treatment.category or TreatmentCategory.OTHER
+    return item_type if item_type in INVOICE_CATEGORY_LABELS else TreatmentCategory.OTHER
+
+
 class Party(Base, TimestampMixin):
     """Unified entity for all parties: patients, dentist customers, company customers."""
     __tablename__ = "parties"
@@ -274,6 +301,21 @@ class Invoice(Base, TimestampMixin):
     def recalculate_totals(self) -> None:
         self.total_eur = sum(item.line_total_eur + item.vat_amount_eur for item in self.items)
         self.total_try = sum(item.line_total_try + item.vat_amount_try for item in self.items)
+
+    @property
+    def category_keys(self) -> list[str]:
+        return sorted({invoice_item_category_key(item) for item in self.items})
+
+    @property
+    def category_key(self) -> str:
+        keys = self.category_keys
+        if not keys:
+            return TreatmentCategory.OTHER
+        return keys[0] if len(keys) == 1 else "mixed"
+
+    @property
+    def category_label(self) -> str:
+        return INVOICE_CATEGORY_LABELS.get(self.category_key, self.category_key)
 
     def __repr__(self) -> str:
         return f"<Invoice {self.invoice_number} €{self.total_eur:.2f}>"
