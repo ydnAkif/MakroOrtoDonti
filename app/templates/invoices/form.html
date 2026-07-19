@@ -14,7 +14,7 @@
   <div class="col-md-10">
     <div class="card border-0 shadow-sm">
       <div class="card-header bg-white">
-        <h5 class="mb-0"><i class="bi bi-receipt"></i> Yeni Fatura Oluştur</h5>
+        <h5 class="mb-0"><i class="bi bi-receipt" aria-hidden="true"></i> Yeni Fatura Oluştur</h5>
       </div>
       <div class="card-body">
         {% if current_rate %}
@@ -330,57 +330,121 @@ function updateCategoryPreview() {
         target.textContent = 'Kalem eklendiğinde otomatik belirlenir';
         return;
     }
-    const labels = Array.from(keys).map(key => categoryLabels[key] || key);
+    // Build badges with DOM API so labels are rendered as text, not HTML.
     target.className = 'invoice-category-tags';
-    target.innerHTML = labels.map(label => `<span class="invoice-category-badge"><i class="bi bi-tag"></i>${label}</span>`).join('');
+    target.textContent = '';
+    Array.from(keys).forEach(key => {
+        const span = document.createElement('span');
+        span.className = 'invoice-category-badge';
+        const icon = document.createElement('i');
+        icon.className = 'bi bi-tag';
+        icon.setAttribute('aria-hidden', 'true');
+        span.appendChild(icon);
+        span.appendChild(document.createTextNode(categoryLabels[key] || key));
+        target.appendChild(span);
+    });
 }
 
 function addItemToTable(item) {
     const tbody = document.getElementById('invoice-items-body');
     const index = itemCounter++;
     item.index = index;
-    
+
     const calc = calculateLineTotal(item);
-    
-    const typeLabels = {
-        'treatment': '<span class="badge bg-primary">Tedavi</span>',
-        'product': '<span class="badge bg-success">Ürün</span>',
-        'service': '<span class="badge bg-info">Hizmet</span>',
-        'lab': '<span class="badge bg-warning text-dark">Lab</span>',
-        'custom': '<span class="badge bg-secondary">Özel</span>'
-    };
-    
-    const discountDisplay = item.discount_type ? 
-        (item.discount_type === 'percent' ? '%' + item.discount_value : '€' + formatNumber(item.discount_value)) : '-';
-    
+
+    // Safe DOM construction – no innerHTML with user-supplied values to prevent XSS.
     const tr = document.createElement('tr');
     tr.dataset.item = JSON.stringify(item);
     tr.dataset.itemIndex = index;
-    tr.innerHTML = `
-        <td>${typeLabels[item.item_type] || item.item_type}</td>
-        <td>
-            <strong>${item.description}</strong>
-            ${item.treatment_name ? '<br><small class="text-muted">' + item.treatment_name + '</small>' : ''}
-        </td>
-        <td class="text-center">${item.quantity}</td>
-        <td class="text-end">€${formatNumber(item.unit_price_eur)}</td>
-        <td class="text-end">%${formatNumber(item.vat_rate)}</td>
-        <td class="text-end">${discountDisplay}</td>
-        <td class="text-end fw-bold line-total-eur">${formatCurrencyEUR(calc.total)}</td>
-        <td>
-            <button type="button" class="btn btn-sm btn-outline-danger delete-item" data-index="${index}" aria-label="Fatura kalemini sil">
-                <i class="bi bi-trash"></i>
-            </button>
-        </td>
-    `;
+
+    // Type badge cell (static map – no user data)
+    const typeBadgeMap = {
+        'treatment': ['bg-primary', 'Tedavi'],
+        'product':   ['bg-success', 'Ürün'],
+        'service':   ['bg-info',    'Hizmet'],
+        'lab':       ['bg-warning text-dark', 'Lab'],
+        'custom':    ['bg-secondary', 'Özel'],
+    };
+    const tdType = document.createElement('td');
+    const badgeInfo = typeBadgeMap[item.item_type];
+    if (badgeInfo) {
+        const badge = document.createElement('span');
+        badge.className = 'badge ' + badgeInfo[0];
+        badge.textContent = badgeInfo[1];
+        tdType.appendChild(badge);
+    } else {
+        tdType.textContent = item.item_type;
+    }
+    tr.appendChild(tdType);
+
+    // Description cell – textContent prevents XSS
+    const tdDesc = document.createElement('td');
+    const strong = document.createElement('strong');
+    strong.textContent = item.description;
+    tdDesc.appendChild(strong);
+    if (item.treatment_name) {
+        tdDesc.appendChild(document.createElement('br'));
+        const small = document.createElement('small');
+        small.className = 'text-muted';
+        small.textContent = item.treatment_name;
+        tdDesc.appendChild(small);
+    }
+    tr.appendChild(tdDesc);
+
+    // Numeric cells
+    const tdQty = document.createElement('td');
+    tdQty.className = 'text-center';
+    tdQty.textContent = item.quantity;
+    tr.appendChild(tdQty);
+
+    const tdPrice = document.createElement('td');
+    tdPrice.className = 'text-end';
+    tdPrice.textContent = '€' + formatNumber(item.unit_price_eur);
+    tr.appendChild(tdPrice);
+
+    const tdVat = document.createElement('td');
+    tdVat.className = 'text-end';
+    tdVat.textContent = '%' + formatNumber(item.vat_rate);
+    tr.appendChild(tdVat);
+
+    const tdDiscount = document.createElement('td');
+    tdDiscount.className = 'text-end';
+    if (item.discount_type) {
+        tdDiscount.textContent = item.discount_type === 'percent'
+            ? '%' + item.discount_value
+            : '€' + formatNumber(item.discount_value);
+    } else {
+        tdDiscount.textContent = '-';
+    }
+    tr.appendChild(tdDiscount);
+
+    const tdTotal = document.createElement('td');
+    tdTotal.className = 'text-end fw-bold line-total-eur';
+    tdTotal.textContent = formatCurrencyEUR(calc.total);
+    tr.appendChild(tdTotal);
+
+    // Delete button cell
+    const tdAction = document.createElement('td');
+    const delBtn = document.createElement('button');
+    delBtn.type = 'button';
+    delBtn.className = 'btn btn-sm btn-outline-danger delete-item';
+    delBtn.dataset.index = index;
+    delBtn.setAttribute('aria-label', 'Fatura kalemini sil');
+    const trashIcon = document.createElement('i');
+    trashIcon.className = 'bi bi-trash';
+    trashIcon.setAttribute('aria-hidden', 'true');
+    delBtn.appendChild(trashIcon);
+    tdAction.appendChild(delBtn);
+    tr.appendChild(tdAction);
+
     tbody.appendChild(tr);
-    
+
     // Add delete handler
-    tr.querySelector('.delete-item').addEventListener('click', function() {
+    delBtn.addEventListener('click', function() {
         tr.remove();
         recalculateTotals();
     });
-    
+
     recalculateTotals();
 }
 

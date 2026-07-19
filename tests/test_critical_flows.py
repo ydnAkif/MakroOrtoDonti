@@ -704,20 +704,24 @@ def test_smtp_password_encryption_decryption(app):
     """SMTP şifreleme ve geri açma birim testi."""
     with app.app_context():
         from app.services.security_service import encrypt_value, decrypt_value
-        
+
         test_pass = "mypass123!@#"
         encrypted = encrypt_value(test_pass)
         assert encrypted != test_pass
         assert len(encrypted) > 0
-        
+        # Fernet tokens start with "gAAAAA"
+        assert encrypted.startswith("gAAAAA")
+
         decrypted = decrypt_value(encrypted)
         assert decrypted == test_pass
-        
-        # Test fallback to plaintext
-        plaintext_fallback = "legacy_plaintext"
-        assert decrypt_value(plaintext_fallback) == plaintext_fallback
-        
-        # Test empty input
+
+        # Legacy plaintext (non-Fernet token) must raise ValueError instead of
+        # silently returning the raw value, which was the insecure old behaviour.
+        import pytest as _pytest
+        with _pytest.raises(ValueError, match="Failed to decrypt"):
+            decrypt_value("legacy_plaintext")
+
+        # Empty input still returns empty string
         assert encrypt_value("") == ""
         assert decrypt_value("") == ""
 

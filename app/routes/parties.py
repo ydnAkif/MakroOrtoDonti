@@ -18,7 +18,12 @@ def list_parties():
     query = db.select(Party).where(Party.is_active == True)
 
     if party_type:
-        query = query.where(Party.party_type == PartyType(party_type))
+        from app.services.validation_service import parse_enum
+        parsed_type = parse_enum(PartyType, party_type)
+        if parsed_type is None:
+            flash("Geçersiz kişi tipi.", "warning")
+            return redirect(url_for("parties.list_parties"))
+        query = query.where(Party.party_type == parsed_type)
     
     if search:
         search_pattern = f"%{search}%"

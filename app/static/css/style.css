@@ -456,6 +456,20 @@ textarea.form-control { min-height: 92px; }
 .table a:not(.btn) { color: var(--ink-950); font-weight: 700; text-decoration: none; }
 .table a:not(.btn):hover { color: var(--aqua-700); }
 .table-responsive { border-radius: 0 0 var(--radius-md) var(--radius-md); }
+/* Mobile tables: hint that the table is horizontally scrollable */
+@media (max-width: 575.98px) {
+    .table-responsive::after {
+        content: '';
+        position: absolute;
+        top: 0; right: 0; bottom: 0;
+        width: 2rem;
+        background: linear-gradient(to right, transparent, rgba(255,255,255,.6));
+        pointer-events: none;
+    }
+    .table-responsive { position: relative; }
+    /* Hide lower-priority columns at small sizes */
+    .table .d-sm-none { display: none !important; }
+}
 .list-group-item { border-color: var(--line); background: transparent; color: var(--ink-800); }
 .list-group-item-action:hover { background: rgba(57,191,179,.05); color: var(--ink-950); }
 

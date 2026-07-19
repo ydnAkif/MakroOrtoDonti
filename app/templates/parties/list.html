@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}{{ selected_type|title }}lar - {{ clinic_name }}{% endblock %}
+{% block title %}{% if selected_type == 'patient' %}Hastalar{% elif selected_type == 'dentist_customer' %}Diş Hekimi Müşterileri{% elif selected_type == 'company_customer' %}Kurumsal Müşteriler{% else %}Kişiler{% endif %} - {{ clinic_name }}{% endblock %}
 
 {% block content %}
 <header class="page-header">
@@ -11,27 +11,29 @@
     </a>
 </header>
 
-<!-- Type Tabs -->
-<ul class="nav nav-tabs mb-4" role="tablist">
-    <li class="nav-item" role="presentation">
-        <a class="nav-link {% if selected_type == 'patient' %}active{% endif %}" 
-           href="{{ url_for('parties.list_parties', type='patient') }}">
-            <i class="bi bi-person"></i> Hastalar
-        </a>
-    </li>
-    <li class="nav-item" role="presentation">
-        <a class="nav-link {% if selected_type == 'dentist_customer' %}active{% endif %}" 
-           href="{{ url_for('parties.list_parties', type='dentist_customer') }}">
-            <i class="bi bi-heart-pulse"></i> Diş Hekimleri
-        </a>
-    </li>
-    <li class="nav-item" role="presentation">
-        <a class="nav-link {% if selected_type == 'company_customer' %}active{% endif %}" 
-           href="{{ url_for('parties.list_parties', type='company_customer') }}">
-            <i class="bi bi-building"></i> Kurumsal
-        </a>
-    </li>
-</ul>
+<!-- Type Tabs — these are navigation links, not ARIA tabs -->
+<nav class="nav nav-tabs mb-4" aria-label="Kişi türü filtresi">
+    <a class="nav-link {% if selected_type == 'patient' %}active{% endif %}"
+       href="{{ url_for('parties.list_parties', type='patient') }}"
+       {% if selected_type == 'patient' %}aria-current="page"{% endif %}>
+        <i class="bi bi-person" aria-hidden="true"></i> Hastalar
+    </a>
+    <a class="nav-link {% if selected_type == 'dentist_customer' %}active{% endif %}"
+       href="{{ url_for('parties.list_parties', type='dentist_customer') }}"
+       {% if selected_type == 'dentist_customer' %}aria-current="page"{% endif %}>
+        <i class="bi bi-heart-pulse" aria-hidden="true"></i> Diş Hekimleri
+    </a>
+    <a class="nav-link {% if selected_type == 'company_customer' %}active{% endif %}"
+       href="{{ url_for('parties.list_parties', type='company_customer') }}"
+       {% if selected_type == 'company_customer' %}aria-current="page"{% endif %}>
+        <i class="bi bi-building" aria-hidden="true"></i> Kurumsal
+    </a>
+    <a class="nav-link {% if not selected_type %}active{% endif %}"
+       href="{{ url_for('parties.list_parties') }}"
+       {% if not selected_type %}aria-current="page"{% endif %}>
+        <i class="bi bi-people" aria-hidden="true"></i> Tümü
+    </a>
+</nav>
 
 <!-- Search -->
 <div class="card border-0 shadow-sm mb-4">

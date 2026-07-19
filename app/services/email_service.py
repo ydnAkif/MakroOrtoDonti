@@ -1,3 +1,4 @@
+import logging
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -6,6 +7,8 @@ from flask import current_app
 
 from app.extensions import db
 from app.models.models import Settings
+
+logger = logging.getLogger(__name__)
 
 
 def get_smtp_config() -> dict:
@@ -19,11 +22,19 @@ def get_smtp_config() -> dict:
         val = db.session.execute(
             db.select(Settings.value).where(Settings.key == key)
         ).scalar_one_or_none()
-        
+
         if key == "smtp_password" and val:
             from app.services.security_service import decrypt_value
-            val = decrypt_value(val)
-            
+            try:
+                val = decrypt_value(val)
+            except ValueError:
+                logger.warning(
+                    "SMTP password could not be decrypted. The stored value may be "
+                    "a legacy plaintext entry or the SECRET_KEY has changed. "
+                    "Please re-save the SMTP password in Settings."
+                )
+                val = ""
+
         config[key] = val or default
     return config
 

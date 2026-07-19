@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from datetime import date
 from typing import Optional, List, Dict, Any
 
@@ -11,6 +12,58 @@ from .models import (
     ExchangeRate, Invoice, InvoiceItem, InvoiceItemType,
     PatientTreatment, Settings, Treatment, Party
 )
+
+logger = logging.getLogger(__name__)
+
+
+def _validate_item(item_data: Dict[str, Any]) -> None:
+    """Raise ValueError for any item that violates financial invariants."""
+    description = str(item_data.get("description", "")).strip()
+    if not description:
+        raise ValueError("Kalem açıklaması boş olamaz.")
+
+    quantity = item_data.get("quantity", 1)
+    try:
+        quantity = int(quantity)
+    except (TypeError, ValueError):
+        raise ValueError("Miktar tam sayı olmalıdır.")
+    if quantity <= 0:
+        raise ValueError(f"Miktar sıfırdan büyük olmalıdır (girilen: {quantity}).")
+
+    unit_price = item_data.get("unit_price_eur")
+    try:
+        unit_price = float(unit_price)
+    except (TypeError, ValueError):
+        raise ValueError("Birim fiyat sayısal olmalıdır.")
+    if unit_price < 0:
+        raise ValueError(f"Birim fiyat negatif olamaz (girilen: {unit_price}).")
+
+    vat_rate = item_data.get("vat_rate", 0.0)
+    try:
+        vat_rate = float(vat_rate)
+    except (TypeError, ValueError):
+        raise ValueError("KDV oranı sayısal olmalıdır.")
+    if not (0.0 <= vat_rate <= 100.0):
+        raise ValueError(f"KDV oranı 0 ile 100 arasında olmalıdır (girilen: {vat_rate}).")
+
+    discount_type = item_data.get("discount_type")
+    discount_value = item_data.get("discount_value", 0.0)
+    if discount_type:
+        try:
+            discount_value = float(discount_value)
+        except (TypeError, ValueError):
+            raise ValueError("İskonto değeri sayısal olmalıdır.")
+        if discount_value < 0:
+            raise ValueError(f"İskonto değeri negatif olamaz (girilen: {discount_value}).")
+        if discount_type == "percent" and discount_value > 100.0:
+            raise ValueError(f"Yüzde iskonto 100'ü aşamaz (girilen: {discount_value}).")
+        if discount_type == "amount":
+            line_total = unit_price * quantity
+            if discount_value > line_total:
+                raise ValueError(
+                    f"Tutar iskontosu ({discount_value:.2f} €) satır tutarını "
+                    f"({line_total:.2f} €) aşamaz."
+                )
 
 
 class InvoiceService:
@@ -82,6 +135,18 @@ class InvoiceService:
             - discount_type: str (percent/amount, optional)
             - discount_value: float (default 0)
         """
+        if not items:
+            raise ValueError("Fatura en az bir kalem içermelidir.")
+
+        # Validate party exists
+        party = session.get(Party, party_id)
+        if not party:
+            raise ValueError(f"Müşteri bulunamadı (id={party_id}).")
+
+        # Validate all items before touching the database
+        for item_data in items:
+            _validate_item(item_data)
+
         invoice_date = invoice_date or date.today()
         rate = InvoiceService.get_exchange_rate(session, invoice_date)
         invoice_number = InvoiceService.generate_invoice_number(session)
