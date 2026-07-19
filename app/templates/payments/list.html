@@ -1,57 +1,20 @@
 {% extends "base.html" %}
-{% block title %}Ödemeler - {{ clinic_name }}{% endblock %}
+{% block title %}Ödemeler ve Tahsilatlar - {{ clinic_name }}{% endblock %}
 
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h4 class="mb-0"><i class="bi bi-cash-stack"></i> Ödemeler</h4>
+    <h4 class="mb-0"><i class="bi bi-cash-stack"></i> Ödemeler ve Tahsilatlar</h4>
     <a href="{{ url_for('payments.add_payment') }}" class="btn btn-primary">
-        <i class="bi bi-plus-circle"></i> Yeni Ödeme
+        <i class="bi bi-plus-circle"></i> Yeni Ödeme Kaydet
     </a>
 </div>
 
-<!-- Filters -->
-<div class="card border-0 shadow-sm mb-4">
-    <div class="card-body">
-        <form method="GET" action="{{ url_for('payments.list_payments') }}" class="row g-3">
-            <div class="col-md-3">
-                <label class="form-label">Ödeme Yöntemi</label>
-                <select name="method" class="form-select" onchange="this.form.submit()">
-                    <option value="">Tümü</option>
-                    {% for m in ['cash', 'card', 'transfer', 'check', 'other'] %}
-                    <option value="{{ m }}" {% if selected_method == m %}selected{% endif %}>{{ m|title }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="col-md-3">
-                <label class="form-label">Başlangıç Tarihi</label>
-                <input type="date" class="form-control" name="start_date" value="{{ start_date }}">
-            </div>
-            <div class="col-md-3">
-                <label class="form-label">Bitiş Tarihi</label>
-                <input type="date" class="form-control" name="end_date" value="{{ end_date }}">
-            </div>
-            <div class="col-md-2">
-                <label class="form-label">Ara</label>
-                <input type="text" class="form-control js-table-filter" data-target="tbody tr" name="search" value="{{ search }}" placeholder="Fatura no, müşteri...">
-            </div>
-            <div class="col-md-1 d-flex align-items-end">
-                <button type="submit" class="btn btn-primary w-100">Ara</button>
-            </div>
-            {% if search or start_date or end_date or selected_method %}
-            <div class="col-md-1 d-flex align-items-end">
-                <a href="{{ url_for('payments.list_payments') }}" class="btn btn-outline-secondary w-100">Temizle</a>
-            </div>
-            {% endif %}
-        </form>
-    </div>
-</div>
-
-<!-- Summary -->
+<!-- Summary Metrics -->
 <div class="row g-3 mb-4">
     <div class="col-md-6">
         <div class="card border-0 shadow-sm h-100 border-start border-success border-4">
             <div class="card-body">
-                <h6 class="text-muted mb-1">Toplam Tahsilat (EUR)</h6>
+                <h6 class="text-muted mb-1">Toplam Tahsilat Geçmişi (EUR)</h6>
                 <h3 class="text-success mb-0">€{{ "{:,.2f}".format(total_eur) }}</h3>
             </div>
         </div>
@@ -59,133 +22,191 @@
     <div class="col-md-6">
         <div class="card border-0 shadow-sm h-100 border-start border-info border-4">
             <div class="card-body">
-                <h6 class="text-muted mb-1">Toplam Tahsilat (TRY)</h6>
+                <h6 class="text-muted mb-1">Toplam Tahsilat Geçmişi (TRY)</h6>
                 <h3 class="text-primary mb-0">₺{{ "{:,.2f}".format(total_try) }}</h3>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Bekleyen Tahsilatlar / Ödeme Bekleyen Faturalar -->
-<div class="card border-0 shadow-sm mb-4 border-start border-warning border-4">
-    <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
-        <h6 class="mb-0 text-warning fw-bold"><i class="bi bi-clock-history"></i> Ödeme Bekleyen Faturalar (Bekleyen Tahsilatlar)</h6>
-        <span class="badge bg-warning text-dark">{{ pending_invoices|length }} Fatura</span>
-    </div>
-    <div class="card-body {% if pending_invoices %}p-0{% endif %}">
-        {% if pending_invoices %}
-        <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0">
-                <thead class="table-light">
-                    <tr>
-                        <th>Fatura No</th>
-                        <th>Müşteri</th>
-                        <th>Tarih</th>
-                        <th>Fatura Tutarı</th>
-                        <th>Kalan Borç</th>
-                        <th>Durum</th>
-                        <th class="text-end">İşlem</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for inv in pending_invoices %}
-                    {% set paid_amount = inv.payments|sum(attribute='amount_eur') %}
-                    {% set balance = inv.total_eur - paid_amount %}
-                    <tr>
-                        <td>
-                            <a href="{{ url_for('invoices.detail_invoice', invoice_id=inv.id) }}" class="fw-bold">
-                                {{ inv.invoice_number }}
-                            </a>
-                        </td>
-                        <td>{{ inv.party.display_name if inv.party else inv.patient.full_name }}</td>
-                        <td>{{ inv.invoice_date.strftime('%d.%m.%Y') }}</td>
-                        <td>€{{ "{:,.2f}".format(inv.total_eur) }}</td>
-                        <td class="text-danger fw-bold">€{{ "{:,.2f}".format(balance) }}</td>
-                        <td>
-                            <span class="badge bg-{% if inv.status == 'overdue' %}danger{% else %}warning text-dark{% endif %}">
-                                {% if inv.status == 'overdue' %}Gecikmiş{% else %}Bekliyor{% endif %}
-                            </span>
-                        </td>
-                        <td class="text-end">
-                            <a href="{{ url_for('payments.add_payment', invoice_id=inv.id) }}" class="btn btn-sm btn-primary">
-                                <i class="bi bi-plus-circle"></i> Ödeme Al
-                            </a>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-        {% else %}
-        <div class="text-center py-4 text-muted">
-            <i class="bi bi-check-circle text-success fs-3 d-block mb-2"></i>
-            Ödeme bekleyen fatura bulunmamaktadır. Tüm tahsilatlar tamam!
-        </div>
-        {% endif %}
-    </div>
-</div>
+<!-- Section Tabs -->
+<ul class="nav nav-tabs mb-4" id="paymentsTab" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active fw-bold py-2 px-3" id="pending-tab" data-bs-toggle="tab" data-bs-target="#pending-pane" type="button" role="tab">
+            <i class="bi bi-clock-history text-warning me-1"></i> Ödeme Bekleyen Faturalar
+            <span class="badge bg-warning text-dark ms-1">{{ pending_invoices|length }}</span>
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link fw-bold py-2 px-3" id="history-tab" data-bs-toggle="tab" data-bs-target="#history-pane" type="button" role="tab">
+            <i class="bi bi-cash-stack text-primary me-1"></i> Tahsilat Geçmişi
+            <span class="badge bg-primary ms-1">{{ payments|length }}</span>
+        </button>
+    </li>
+</ul>
 
-<!-- Payment List -->
-<div class="card border-0 shadow-sm">
-    <div class="card-header bg-white py-3">
-        <h6 class="mb-0 text-primary fw-bold"><i class="bi bi-cash-stack"></i> Tahsilat Geçmişi (Ödeme Kayıtları)</h6>
+<div class="tab-content" id="paymentsTabContent">
+    <!-- Pending Invoices Tab Pane -->
+    <div class="tab-pane fade show active" id="pending-pane" role="tabpanel">
+        <div class="card border-0 shadow-sm border-start border-warning border-4">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
+                <h6 class="mb-0 text-warning fw-bold"><i class="bi bi-exclamation-circle"></i> Açık / Ödeme Bekleyen Faturalar</h6>
+                <span class="text-muted small">Ödeme almak istediğiniz faturanın yanındaki 'Ödeme Al' butonuna tıklayabilirsiniz.</span>
+            </div>
+            <div class="card-body {% if pending_invoices %}p-0{% endif %}">
+                {% if pending_invoices %}
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Fatura No</th>
+                                <th>Müşteri / Hasta</th>
+                                <th>Tarih</th>
+                                <th>Fatura Tutarı</th>
+                                <th>Kalan Borç</th>
+                                <th>Durum</th>
+                                <th class="text-end">İşlem</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for inv in pending_invoices %}
+                            {% set paid_amount = inv.payments|sum(attribute='amount_eur') %}
+                            {% set balance = inv.total_eur - paid_amount %}
+                            <tr>
+                                <td>
+                                    <a href="{{ url_for('invoices.detail_invoice', invoice_id=inv.id) }}" class="fw-bold">
+                                        {{ inv.invoice_number }}
+                                    </a>
+                                </td>
+                                <td>{{ inv.party.display_name if inv.party else inv.patient.full_name }}</td>
+                                <td>{{ inv.invoice_date.strftime('%d.%m.%Y') }}</td>
+                                <td>€{{ "{:,.2f}".format(inv.total_eur) }}</td>
+                                <td class="text-danger fw-bold">€{{ "{:,.2f}".format(balance) }}</td>
+                                <td>
+                                    <span class="badge bg-{% if inv.status == 'overdue' %}danger{% else %}warning text-dark{% endif %}">
+                                        {% if inv.status == 'overdue' %}Gecikmiş{% else %}Bekliyor{% endif %}
+                                    </span>
+                                </td>
+                                <td class="text-end">
+                                    <a href="{{ url_for('payments.add_payment', invoice_id=inv.id) }}" class="btn btn-sm btn-primary">
+                                        <i class="bi bi-plus-circle"></i> Ödeme Al
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-5 text-muted">
+                    <i class="bi bi-check-circle text-success fs-2 d-block mb-2"></i>
+                    Ödeme bekleyen açık fatura bulunmamaktadır. Tüm tahsilatlar tamam!
+                </div>
+                {% endif %}
+            </div>
+        </div>
     </div>
-    <div class="card-body p-0">
-        <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0">
-                <thead class="table-light">
-                    <tr>
-                        <th>Tarih</th>
-                        <th>Fatura</th>
-                        <th>Müşteri</th>
-                        <th>Tutar (EUR)</th>
-                        <th>Tutar (TRY)</th>
-                        <th>Yöntem</th>
-                        <th>Referans</th>
-                        <th>Kur</th>
-                        <th class="text-end">İşlem</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for p in payments %}
-                    <tr>
-                        <td>{{ p.payment_date.strftime('%d.%m.%Y') }}</td>
-                        <td>
-                            <a href="{{ url_for('invoices.detail_invoice', invoice_id=p.invoice_id) }}" class="fw-bold">
-                                {{ p.invoice.invoice_number }}
-                            </a>
-                        </td>
-                        <td>{{ p.invoice.party.display_name if p.invoice.party else p.invoice.patient.full_name }}</td>
-                        <td class="fw-bold">€{{ "{:,.2f}".format(p.amount_eur) }}</td>
-                        <td class="fw-bold">₺{{ "{:,.2f}".format(p.amount_try) }}</td>
-                        <td>
-                            <span class="badge bg-{% if p.method == 'cash' %}success{% elif p.method == 'card' %}primary{% elif p.method == 'transfer' %}info{% elif p.method == 'check' %}warning text-dark{% else %}secondary{% endif %}">
-                                {{ p.method|title }}
-                            </span>
-                        </td>
-                        <td>{{ p.reference or '-' }}</td>
-                        <td>₺{{ "{:,.4f}".format(p.exchange_rate) }}</td>
-                        <td class="text-end">
-                            <form method="POST" action="{{ url_for('payments.delete_payment', payment_id=p.id) }}" class="d-inline" onsubmit="return confirm('Bu ödemeyi silmek istediğinize emin misiniz?');">
-                                <button type="submit" class="btn btn-sm btn-outline-danger">
-                                    <i class="bi bi-trash"></i>
-                                </button>
-                            </form>
-                        </td>
-                    </tr>
-                    {% else %}
-                    <tr>
-                        <td colspan="9" class="text-center text-muted py-4">
-                            {% if search or date_from or date_to or selected_status %}
-                                Kriterlere uyan ödeme bulunamadı.
+
+    <!-- Payment History Tab Pane -->
+    <div class="tab-pane fade" id="history-pane" role="tabpanel">
+        <!-- Filters -->
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-body">
+                <form method="GET" action="{{ url_for('payments.list_payments') }}" class="row g-3">
+                    <div class="col-md-3">
+                        <label class="form-label">Ödeme Yöntemi</label>
+                        <select name="method" class="form-select" onchange="this.form.submit()">
+                            <option value="">Tüm Yöntemler</option>
+                            {% for m in ['cash', 'card', 'transfer', 'check', 'other'] %}
+                            <option value="{{ m }}" {% if selected_method == m %}selected{% endif %}>{{ method_labels.get(m, m|title) }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Başlangıç Tarihi</label>
+                        <input type="date" class="form-control" name="start_date" value="{{ start_date }}">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Bitiş Tarihi</label>
+                        <input type="date" class="form-control" name="end_date" value="{{ end_date }}">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Ara</label>
+                        <input type="text" class="form-control js-table-filter" data-target="#history-pane tbody tr" name="search" value="{{ search }}" placeholder="Fatura no, müşteri...">
+                    </div>
+                    <div class="col-md-1 d-flex align-items-end">
+                        <button type="submit" class="btn btn-primary w-100">Ara</button>
+                    </div>
+                    {% if search or start_date or end_date or selected_method %}
+                    <div class="col-md-1 d-flex align-items-end">
+                        <a href="{{ url_for('payments.list_payments') }}" class="btn btn-outline-secondary w-100">Temizle</a>
+                    </div>
+                    {% endif %}
+                </form>
+            </div>
+        </div>
+
+        <div class="card border-0 shadow-sm">
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Tarih</th>
+                                <th>Fatura</th>
+                                <th>Müşteri</th>
+                                <th>Tutar (EUR)</th>
+                                <th>Tutar (TRY)</th>
+                                <th>Yöntem</th>
+                                <th>Referans</th>
+                                <th>Kur</th>
+                                <th class="text-end">İşlem</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for p in payments %}
+                            {% set method_val = p.method.value if p.method.value is defined else (p.method|string) %}
+                            {% set method_clean = method_val.replace('PaymentMethod.', '').replace('Paymentmethod.', '').lower() %}
+                            <tr>
+                                <td>{{ p.payment_date.strftime('%d.%m.%Y') }}</td>
+                                <td>
+                                    <a href="{{ url_for('invoices.detail_invoice', invoice_id=p.invoice_id) }}" class="fw-bold">
+                                        {{ p.invoice.invoice_number }}
+                                    </a>
+                                </td>
+                                <td>{{ p.invoice.party.display_name if p.invoice.party else p.invoice.patient.full_name }}</td>
+                                <td class="fw-bold">€{{ "{:,.2f}".format(p.amount_eur) }}</td>
+                                <td class="fw-bold">₺{{ "{:,.2f}".format(p.amount_try) }}</td>
+                                <td>
+                                    <span class="badge bg-{% if method_clean == 'cash' %}success{% elif method_clean == 'card' %}primary{% elif method_clean == 'transfer' %}info{% elif method_clean == 'check' %}warning text-dark{% else %}secondary{% endif %}">
+                                        {{ method_labels.get(method_clean, method_clean|title) }}
+                                    </span>
+                                </td>
+                                <td>{{ p.reference or '-' }}</td>
+                                <td>₺{{ "{:,.4f}".format(p.exchange_rate) }}</td>
+                                <td class="text-end">
+                                    <form method="POST" action="{{ url_for('payments.delete_payment', payment_id=p.id) }}" class="d-inline" onsubmit="return confirm('Bu ödemeyi silmek istediğinize emin misiniz?');">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Ödemeyi Sil">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
                             {% else %}
-                                Henüz ödeme kaydı yok.
-                            {% endif %}
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+                            <tr>
+                                <td colspan="9" class="text-center text-muted py-4">
+                                    {% if search or start_date or end_date or selected_method %}
+                                        Kriterlere uyan ödeme kaydı bulunamadı.
+                                    {% else %}
+                                        Henüz kaydedilmiş ödeme bulunmamaktadır.
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
     </div>
 </div>

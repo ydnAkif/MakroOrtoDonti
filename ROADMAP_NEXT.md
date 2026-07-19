@@ -171,29 +171,12 @@ Finans bilgi mimarisi: ✅
 - ✅ Faz E: performans/test kapsam genisletme (65 test, tumunu geciyor)
 - ✅ Faz F: Tedavi yonetimi + sevk sistemi + UX duzeltmeleri
 - ✅ Faz G: TODO.md bug fixleri (13/15 duzeltildi, 2 bekliyor)
-- 🟡 Faz H: Production hardening + Party-Patient gecis tamamlama (devam ediyor)
+- 🟢 Faz I: Profesyonel UI/UX Revizyonu ve Finans Mimarisi (Tamamlandı)
 
-## Faz H (Yeni) - Production Hardening
+## Faz I - Profesyonel UI/UX & Finans Mimarisi
 
-Hedef: Uygulamayi guvenlik, operasyon ve veri butunlugu acisindan production seviyesine yaklastirmak.
-
-1. Kimlik ve gizli bilgi guvenligi
-
-- `.env` policy sertlestirme (`FLASK_DEBUG=false`, guclu `SECRET_KEY`, default admin sifre kaldirma)
-- SMTP sifresini plaintext saklamayi birak
-
-2. Veri modeli tutarliligi
-
-- Party-first akisa tam gecis
-- Patient route ve template baglantilarinda id tutarliligi
-
-3. Dayaniklilik
-
-- Validation katmani ile malformed input'larda 400 + acik hata mesaji
-- Kur cekme mekanizmasini request disi background job'a tasima
-
-4. Test genisletme
-
-- CSRF enabled test seti
-- Invalid payload/regression testleri
-- Auth brute-force smoke testleri
+- ✅ Fatura Tedavi Ekleme modali akış yenilemesi ("Tedavi Seç" en üste, otomatik açıklama & EUR fiyat doldurma)
+- ✅ Typeahead arama sonuç limiti (12 -> 100) kaldırılarak tüm tedavi kataloğunun kesintisiz listelenmesi
+- ✅ Tahsilatlar ekranına Sekmeli (Tabbed) mimari (Bekleyen Faturalar vs Tahsilat Geçmişi)
+- ✅ Ödeme Yöntemi Enum çıktısının (`Paymentmethod.cash`) Türkçe etiketlere (`Nakit`, `Kredi Kartı`, `Havale / EFT`) çevrilmesi
+- ✅ Veritabanı açılışında eksik kalan geçmiş ödemelerin otomatik oluşturulması (Self-healing)

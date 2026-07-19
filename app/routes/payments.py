@@ -55,6 +55,14 @@ def list_payments():
     total_eur = sum(p.amount_eur for p in payments)
     total_try = sum(p.amount_try for p in payments)
 
+    method_labels = {
+        "cash": "Nakit",
+        "card": "Kredi / Banka Kartı",
+        "transfer": "Havale / EFT",
+        "check": "Çek",
+        "other": "Diğer",
+    }
+
     return render_template(
         "payments/list.html",
         payments=payments,
@@ -62,6 +70,7 @@ def list_payments():
         total_eur=total_eur,
         total_try=total_try,
         selected_method=method,
+        method_labels=method_labels,
         search=search,
         start_date=start_date,
         end_date=end_date,

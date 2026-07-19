@@ -66,7 +66,7 @@ document.addEventListener('DOMContentLoaded', function() {
             var nq = normalizeText(query);
             var matches = options.filter(function(opt) {
                 return !nq || normalizeText(opt.textContent).indexOf(nq) !== -1;
-            }).slice(0, 12);
+            }).slice(0, 100);
 
             list.innerHTML = '';
             if (!matches.length) {

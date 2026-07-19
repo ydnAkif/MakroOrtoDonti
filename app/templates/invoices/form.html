@@ -204,9 +204,20 @@
           <input type="hidden" name="item_index" id="item-index">
           <input type="hidden" name="item_type" id="item-type">
           
+          <div id="treatment-field" class="mb-3 d-none">
+            <label class="form-label">Tedavi Seç <span class="text-danger">*</span></label>
+            <select class="form-select js-searchable-select" name="treatment_id" id="item-treatment-id" 
+                    data-search-placeholder="Katalogdan tedavi ara veya seçin...">
+              <option value="">Tedavi seçiniz...</option>
+              {% for t in treatments %}
+              <option value="{{ t.id }}" data-price="{{ t.price_eur }}">{{ t.name }} (€{{ "{:,.2f}".format(t.price_eur) }})</option>
+              {% endfor %}
+            </select>
+          </div>
+
           <div class="mb-3">
             <label class="form-label">Açıklama <span class="text-danger">*</span></label>
-            <input type="text" class="form-control" name="description" id="item-description" required>
+            <input type="text" class="form-control" name="description" id="item-description" required placeholder="Kalem açıklaması...">
           </div>
           
           <div class="row g-3">
@@ -216,7 +227,7 @@
             </div>
             <div class="col-md-3">
               <label class="form-label">Birim Fiyat (EUR) <span class="text-danger">*</span></label>
-              <input type="number" step="0.01" class="form-control" name="unit_price_eur" id="item-unit-price-eur" required>
+              <input type="number" step="0.01" class="form-control" name="unit_price_eur" id="item-unit-price-eur" required placeholder="0.00">
             </div>
             <div class="col-md-3">
               <label class="form-label">KDV %</label>
@@ -234,17 +245,6 @@
               <label class="form-label">İskonto Değeri</label>
               <input type="number" step="0.01" class="form-control" name="discount_value" id="item-discount-value" value="0" min="0">
             </div>
-          </div>
-          
-          <div id="treatment-field" class="mb-3 d-none">
-            <label class="form-label">Tedavi Seç <span class="text-danger">*</span></label>
-            <select class="form-select js-searchable-select" name="treatment_id" id="item-treatment-id" 
-                    data-search-placeholder="Tedavi ara...">
-              <option value="">Tedavi seçiniz...</option>
-              {% for t in treatments %}
-              <option value="{{ t.id }}" data-price="{{ t.price_eur }}">{{ t.name }} (€{{ "{:,.2f}".format(t.price_eur) }})</option>
-              {% endfor %}
-            </select>
           </div>
         </div>
         <div class="modal-footer">
@@ -372,6 +372,13 @@ function openItemModal(type) {
     document.getElementById('item-discount-type').value = '';
     document.getElementById('item-discount-value').value = 0;
     document.getElementById('treatment-field').classList.add('d-none');
+    
+    const tSelect = document.getElementById('item-treatment-id');
+    if (tSelect) {
+        tSelect.value = '';
+        const tInput = tSelect.parentNode ? tSelect.parentNode.querySelector('input[type="text"]') : null;
+        if (tInput) tInput.value = '';
+    }
     
     const titles = {
         'treatment': 'Tedavi Ekle',
