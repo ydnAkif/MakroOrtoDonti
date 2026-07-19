@@ -330,9 +330,18 @@ function updateCategoryPreview() {
         target.textContent = 'Kalem eklendiğinde otomatik belirlenir';
         return;
     }
-    const labels = Array.from(keys).map(key => categoryLabels[key] || key);
     target.className = 'invoice-category-tags';
-    target.innerHTML = labels.map(label => `<span class="invoice-category-badge"><i class="bi bi-tag"></i>${label}</span>`).join('');
+    target.textContent = '';
+    Array.from(keys).forEach(key => {
+        const badge = document.createElement('span');
+        badge.className = 'invoice-category-badge';
+        const icon = document.createElement('i');
+        icon.className = 'bi bi-tag';
+        icon.setAttribute('aria-hidden', 'true');
+        badge.appendChild(icon);
+        badge.appendChild(document.createTextNode(categoryLabels[key] || key));
+        target.appendChild(badge);
+    });
 }
 
 function addItemToTable(item) {
@@ -343,40 +352,75 @@ function addItemToTable(item) {
     const calc = calculateLineTotal(item);
     
     const typeLabels = {
-        'treatment': '<span class="badge bg-primary">Tedavi</span>',
-        'product': '<span class="badge bg-success">Ürün</span>',
-        'service': '<span class="badge bg-info">Hizmet</span>',
-        'lab': '<span class="badge bg-warning text-dark">Lab</span>',
-        'custom': '<span class="badge bg-secondary">Özel</span>'
+        'treatment': ['bg-primary', 'Tedavi'],
+        'product': ['bg-success', 'Ürün'],
+        'service': ['bg-info', 'Hizmet'],
+        'lab': ['bg-warning text-dark', 'Lab'],
+        'custom': ['bg-secondary', 'Özel']
     };
-    
-    const discountDisplay = item.discount_type ? 
-        (item.discount_type === 'percent' ? '%' + item.discount_value : '€' + formatNumber(item.discount_value)) : '-';
-    
+
     const tr = document.createElement('tr');
     tr.dataset.item = JSON.stringify(item);
     tr.dataset.itemIndex = index;
-    tr.innerHTML = `
-        <td>${typeLabels[item.item_type] || item.item_type}</td>
-        <td>
-            <strong>${item.description}</strong>
-            ${item.treatment_name ? '<br><small class="text-muted">' + item.treatment_name + '</small>' : ''}
-        </td>
-        <td class="text-center">${item.quantity}</td>
-        <td class="text-end">€${formatNumber(item.unit_price_eur)}</td>
-        <td class="text-end">%${formatNumber(item.vat_rate)}</td>
-        <td class="text-end">${discountDisplay}</td>
-        <td class="text-end fw-bold line-total-eur">${formatCurrencyEUR(calc.total)}</td>
-        <td>
-            <button type="button" class="btn btn-sm btn-outline-danger delete-item" data-index="${index}" aria-label="Fatura kalemini sil">
-                <i class="bi bi-trash"></i>
-            </button>
-        </td>
-    `;
+
+    const typeCell = document.createElement('td');
+    const typeInfo = typeLabels[item.item_type];
+    if (typeInfo) {
+        const badge = document.createElement('span');
+        badge.className = `badge ${typeInfo[0]}`;
+        badge.textContent = typeInfo[1];
+        typeCell.appendChild(badge);
+    } else {
+        typeCell.textContent = item.item_type;
+    }
+    tr.appendChild(typeCell);
+
+    const descriptionCell = document.createElement('td');
+    const description = document.createElement('strong');
+    description.textContent = item.description;
+    descriptionCell.appendChild(description);
+    if (item.treatment_name) {
+        descriptionCell.appendChild(document.createElement('br'));
+        const treatmentName = document.createElement('small');
+        treatmentName.className = 'text-muted';
+        treatmentName.textContent = item.treatment_name;
+        descriptionCell.appendChild(treatmentName);
+    }
+    tr.appendChild(descriptionCell);
+
+    const appendTextCell = (text, className = '') => {
+        const cell = document.createElement('td');
+        cell.className = className;
+        cell.textContent = text;
+        tr.appendChild(cell);
+        return cell;
+    };
+    appendTextCell(String(item.quantity), 'text-center');
+    appendTextCell('€' + formatNumber(item.unit_price_eur), 'text-end');
+    appendTextCell('%' + formatNumber(item.vat_rate), 'text-end');
+    const discountDisplay = item.discount_type
+        ? (item.discount_type === 'percent'
+            ? '%' + item.discount_value
+            : '€' + formatNumber(item.discount_value))
+        : '-';
+    appendTextCell(discountDisplay, 'text-end');
+    appendTextCell(formatCurrencyEUR(calc.total), 'text-end fw-bold line-total-eur');
+
+    const actionCell = document.createElement('td');
+    const deleteButton = document.createElement('button');
+    deleteButton.type = 'button';
+    deleteButton.className = 'btn btn-sm btn-outline-danger delete-item';
+    deleteButton.dataset.index = index;
+    deleteButton.setAttribute('aria-label', 'Fatura kalemini sil');
+    const trashIcon = document.createElement('i');
+    trashIcon.className = 'bi bi-trash';
+    trashIcon.setAttribute('aria-hidden', 'true');
+    deleteButton.appendChild(trashIcon);
+    actionCell.appendChild(deleteButton);
+    tr.appendChild(actionCell);
     tbody.appendChild(tr);
-    
-    // Add delete handler
-    tr.querySelector('.delete-item').addEventListener('click', function() {
+
+    deleteButton.addEventListener('click', function() {
         tr.remove();
         recalculateTotals();
     });

@@ -3,12 +3,14 @@ from datetime import date, timedelta
 
 from flask import Blueprint, render_template, request
 from flask_login import login_required
+from sqlalchemy.orm import selectinload
 
 from app.extensions import db
 from app.models.models import (
     ExchangeRate,
     INVOICE_CATEGORY_LABELS,
     Invoice,
+    InvoiceItem,
     InvoiceItemType,
     Party,
     PartyType,
@@ -97,6 +99,7 @@ def index():
 
     invoices = db.session.execute(
         db.select(Invoice)
+        .options(selectinload(Invoice.items).selectinload(InvoiceItem.treatment))
         .where(
             Invoice.invoice_date.between(start_date, end_date),
             Invoice.is_deleted == False,
@@ -116,6 +119,19 @@ def index():
         .order_by(Payment.payment_date)
     ).scalars().all()
 
+    # Receivables are a point-in-time balance at the report end date. Include
+    # invoices from before the selected period and ignore later payments.
+    receivable_invoices = db.session.execute(
+        db.select(Invoice)
+        .options(selectinload(Invoice.payments))
+        .where(
+            Invoice.invoice_date <= end_date,
+            Invoice.is_deleted == False,
+            Invoice.status != Invoice.STATUS_CANCELLED,
+        )
+        .order_by(Invoice.invoice_date)
+    ).scalars().all()
+
     issued_eur = sum(invoice.total_eur for invoice in invoices)
     issued_try = sum(invoice.total_try for invoice in invoices)
     collected_eur = sum(payment.amount_eur for payment in payments)
@@ -130,17 +146,26 @@ def index():
         "days_31_60": {"label": "31-60 gün", "count": 0, "amount": 0.0},
         "days_61_plus": {"label": "61+ gün", "count": 0, "amount": 0.0},
     }
-    for invoice in invoices:
-        paid_eur = sum(payment.amount_eur for payment in invoice.payments)
-        paid_try = sum(payment.amount_try for payment in invoice.payments)
+    receivable_count = 0
+    for invoice in receivable_invoices:
+        paid_eur = sum(
+            payment.amount_eur
+            for payment in invoice.payments
+            if payment.payment_date <= end_date
+        )
         remaining_eur = max(invoice.total_eur - paid_eur, 0.0)
-        remaining_try = max(invoice.total_try - paid_try, 0.0)
         if remaining_eur <= 0.01:
             continue
+        receivable_count += 1
+
+        # Preserve the invoice's fixed exchange-rate basis for book-value TRY.
+        # Payment-date TRY values cannot be subtracted without mixing rates.
+        remaining_ratio = remaining_eur / invoice.total_eur if invoice.total_eur else 0.0
+        remaining_try = max(invoice.total_try * remaining_ratio, 0.0)
         outstanding_eur += remaining_eur
         outstanding_try += remaining_try
         due_reference = invoice.due_date or invoice.invoice_date
-        age_days = (today - due_reference).days
+        age_days = (end_date - due_reference).days
         if age_days < 0:
             bucket = "not_due"
         elif age_days <= 30:
@@ -238,6 +263,7 @@ def index():
         collected_try=collected_try,
         outstanding_eur=outstanding_eur,
         outstanding_try=outstanding_try,
+        receivable_count=receivable_count,
         overdue_eur=overdue_eur,
         collection_ratio=(collected_eur / issued_eur * 100) if issued_eur else 0,
         invoice_count=len(invoices),

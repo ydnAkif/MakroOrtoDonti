@@ -25,7 +25,9 @@ def login():
     if request.method == "POST":
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "")
-        ip_address = request.headers.get("X-Forwarded-For", request.remote_addr or "127.0.0.1").split(",")[0].strip()
+        # ProxyFix normalizes remote_addr only when TRUST_PROXY is explicitly enabled.
+        # Reading X-Forwarded-For directly would let clients spoof the lockout key.
+        ip_address = request.remote_addr or "127.0.0.1"
 
         from datetime import datetime, timezone, timedelta
         from app.models.models import LoginAttempt

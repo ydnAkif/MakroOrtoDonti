@@ -108,6 +108,10 @@ def app():
 
     yield app
 
+    with app.app_context():
+        db.session.remove()
+        db.engine.dispose()
+
 
 @pytest.fixture()
 def client(app):

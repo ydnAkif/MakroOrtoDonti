@@ -1,174 +1,220 @@
 #!/usr/bin/env python3
-"""
-Backup and restore utilities for the Makro Ortodonti SQLite database.
+"""Consistent backup, verification, listing, and restore for the SQLite DB."""
 
-Usage
------
-Back up the database (creates a timestamped copy in data/backups/):
-    python backup.py backup
-
-Verify the integrity of the most-recent backup:
-    python backup.py verify
-
-List available backups:
-    python backup.py list
-
-Restore from a specific backup file:
-    python backup.py restore data/backups/makroortodonti_2025-01-01T12-00-00.db
-
-All commands honour the DATABASE_URL environment variable; if it is not set the
-default path data/makroortodonti.db is used.
-"""
+from __future__ import annotations
 
 import argparse
 import os
-import shutil
 import sqlite3
 import sys
+import tempfile
+from contextlib import closing
 from datetime import datetime
 from pathlib import Path
+from urllib.parse import unquote
+
+
+PROJECT_ROOT = Path(__file__).resolve().parent
+BACKUP_PATTERN = "makroortodonti_*.db"
 
 
 def _db_path() -> Path:
-    db_url = os.environ.get("DATABASE_URL", "")
-    if db_url.startswith("sqlite:///"):
-        return Path(db_url[len("sqlite:///"):])
-    # Default relative to this script
-    return Path(__file__).parent / "data" / "makroortodonti.db"
+    db_url = os.environ.get("DATABASE_URL", "").strip()
+    if not db_url:
+        return PROJECT_ROOT / "data" / "makroortodonti.db"
+    if db_url == "sqlite:///:memory:":
+        raise ValueError("Bellek içi SQLite veritabanı yedeklenemez.")
+    if not db_url.startswith("sqlite:///"):
+        raise ValueError("Bu araç yalnızca SQLite DATABASE_URL değerlerini destekler.")
+
+    raw_path = unquote(db_url[len("sqlite:///") :].split("?", 1)[0])
+    path = Path(raw_path)
+    return path if path.is_absolute() else (Path.cwd() / path).resolve()
 
 
 def _backup_dir() -> Path:
     return _db_path().parent / "backups"
 
 
-def cmd_backup(args) -> int:  # noqa: ANN001
-    db_path = _db_path()
-    if not db_path.exists():
+def _integrity_result(path: Path) -> str:
+    with closing(sqlite3.connect(str(path))) as conn:
+        row = conn.execute("PRAGMA integrity_check").fetchone()
+    return str(row[0]) if row else "no result"
+
+
+def _online_backup(source: Path, destination: Path) -> None:
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    with closing(sqlite3.connect(str(source))) as source_conn:
+        with closing(sqlite3.connect(str(destination))) as destination_conn:
+            source_conn.backup(destination_conn)
+
+
+def _positive_int(value: str) -> int:
+    parsed = int(value)
+    if parsed < 1:
+        raise argparse.ArgumentTypeError("değer 1 veya daha büyük olmalıdır")
+    return parsed
+
+
+def cmd_backup(args: argparse.Namespace) -> int:
+    try:
+        db_path = _db_path()
+    except ValueError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 2
+    if not db_path.is_file():
         print(f"ERROR: Database not found at {db_path}", file=sys.stderr)
         return 1
 
     backup_dir = _backup_dir()
-    backup_dir.mkdir(parents=True, exist_ok=True)
-
-    timestamp = datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
-    dest = backup_dir / f"makroortodonti_{timestamp}.db"
-
-    # Use SQLite online backup API for a consistent copy
-    src_conn = sqlite3.connect(str(db_path))
-    dst_conn = sqlite3.connect(str(dest))
+    timestamp = datetime.now().strftime("%Y-%m-%dT%H-%M-%S-%f")
+    destination = backup_dir / f"makroortodonti_{timestamp}.db"
     try:
-        src_conn.backup(dst_conn)
-    finally:
-        dst_conn.close()
-        src_conn.close()
-
-    # Verify the backup immediately
-    try:
-        conn = sqlite3.connect(str(dest))
-        result = conn.execute("PRAGMA integrity_check").fetchone()
-        conn.close()
-        if result[0] != "ok":
-            print(f"ERROR: Integrity check failed: {result[0]}", file=sys.stderr)
-            dest.unlink(missing_ok=True)
-            return 1
+        _online_backup(db_path, destination)
+        result = _integrity_result(destination)
+        if result != "ok":
+            raise sqlite3.DatabaseError(f"integrity_check: {result}")
     except Exception as exc:
-        print(f"ERROR: Could not verify backup: {exc}", file=sys.stderr)
+        destination.unlink(missing_ok=True)
+        print(f"ERROR: Backup failed: {exc}", file=sys.stderr)
         return 1
 
-    print(f"Backup created: {dest} ({dest.stat().st_size:,} bytes)")
-
-    # Keep only the most-recent N backups
-    keep = getattr(args, "keep", 30)
-    backups = sorted(backup_dir.glob("makroortodonti_*.db"))
-    for old in backups[:-keep]:
+    print(f"Backup created: {destination} ({destination.stat().st_size:,} bytes)")
+    backups = sorted(backup_dir.glob(BACKUP_PATTERN))
+    for old in backups[: -args.keep]:
         old.unlink()
         print(f"Removed old backup: {old.name}")
-
     return 0
 
 
-def cmd_verify(args) -> int:  # noqa: ANN001
-    backup_dir = _backup_dir()
-    backups = sorted(backup_dir.glob("makroortodonti_*.db"))
-    if not backups:
-        print("No backups found.", file=sys.stderr)
+def cmd_verify(args: argparse.Namespace) -> int:
+    try:
+        if args.file:
+            target = Path(args.file).expanduser().resolve()
+        else:
+            backups = sorted(_backup_dir().glob(BACKUP_PATTERN))
+            if not backups:
+                print("No backups found.", file=sys.stderr)
+                return 1
+            target = backups[-1]
+        if not target.is_file():
+            print(f"ERROR: Backup file not found: {target}", file=sys.stderr)
+            return 1
+        result = _integrity_result(target)
+    except (ValueError, sqlite3.Error, OSError) as exc:
+        print(f"ERROR: Verification failed: {exc}", file=sys.stderr)
         return 1
 
-    target = backups[-1]
     print(f"Verifying: {target}")
-    conn = sqlite3.connect(str(target))
-    result = conn.execute("PRAGMA integrity_check").fetchone()
-    conn.close()
-    if result[0] == "ok":
+    if result == "ok":
         print("Integrity check PASSED.")
         return 0
-    else:
-        print(f"Integrity check FAILED: {result[0]}", file=sys.stderr)
-        return 1
+    print(f"Integrity check FAILED: {result}", file=sys.stderr)
+    return 1
 
 
-def cmd_list(args) -> int:  # noqa: ANN001
-    backup_dir = _backup_dir()
-    backups = sorted(backup_dir.glob("makroortodonti_*.db"))
+def cmd_list(_args: argparse.Namespace) -> int:
+    try:
+        backups = sorted(_backup_dir().glob(BACKUP_PATTERN))
+    except ValueError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 2
     if not backups:
         print("No backups found.")
         return 0
-    for b in backups:
-        size_kb = b.stat().st_size / 1024
-        print(f"  {b.name}  ({size_kb:.1f} KB)")
+    for backup in backups:
+        print(f"  {backup.name}  ({backup.stat().st_size / 1024:.1f} KB)")
     return 0
 
 
-def cmd_restore(args) -> int:  # noqa: ANN001
-    src = Path(args.file)
-    if not src.exists():
-        print(f"ERROR: Backup file not found: {src}", file=sys.stderr)
-        return 1
-
-    # Verify source first
-    conn = sqlite3.connect(str(src))
-    result = conn.execute("PRAGMA integrity_check").fetchone()
-    conn.close()
-    if result[0] != "ok":
-        print(f"ERROR: Source backup failed integrity check: {result[0]}", file=sys.stderr)
-        return 1
-
-    db_path = _db_path()
-
-    # Create a safety backup of the current DB before overwriting
-    if db_path.exists():
-        safety = db_path.with_suffix(
-            f".pre-restore-{datetime.now().strftime('%Y%m%dT%H%M%S')}.db"
+def cmd_restore(args: argparse.Namespace) -> int:
+    if not args.yes:
+        print(
+            "ERROR: Restore uygulamayı kapatıp --yes onayıyla çalıştırılmalıdır.",
+            file=sys.stderr,
         )
-        shutil.copy2(db_path, safety)
+        return 2
+
+    source = Path(args.file).expanduser().resolve()
+    if not source.is_file():
+        print(f"ERROR: Backup file not found: {source}", file=sys.stderr)
+        return 1
+    try:
+        if _integrity_result(source) != "ok":
+            print("ERROR: Source backup failed integrity check.", file=sys.stderr)
+            return 1
+        db_path = _db_path()
+    except (ValueError, sqlite3.Error, OSError) as exc:
+        print(f"ERROR: Restore preflight failed: {exc}", file=sys.stderr)
+        return 1
+
+    if source == db_path.resolve():
+        print("ERROR: Backup source and active database are the same file.", file=sys.stderr)
+        return 1
+
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    original_mode = db_path.stat().st_mode if db_path.exists() else None
+
+    if db_path.exists():
+        safety = db_path.parent / (
+            f"{db_path.stem}.pre-restore-"
+            f"{datetime.now().strftime('%Y%m%dT%H%M%S%f')}.db"
+        )
+        try:
+            _online_backup(db_path, safety)
+            if _integrity_result(safety) != "ok":
+                raise sqlite3.DatabaseError("safety backup integrity check failed")
+        except Exception as exc:
+            safety.unlink(missing_ok=True)
+            print(f"ERROR: Safety backup failed; restore aborted: {exc}", file=sys.stderr)
+            return 1
         print(f"Current database saved to: {safety}")
 
-    # Restore
-    src_conn = sqlite3.connect(str(src))
-    dst_conn = sqlite3.connect(str(db_path))
+    temp_fd, temp_name = tempfile.mkstemp(
+        prefix=f".{db_path.name}.restore-", suffix=".db", dir=db_path.parent
+    )
+    os.close(temp_fd)
+    temporary = Path(temp_name)
     try:
-        src_conn.backup(dst_conn)
-    finally:
-        dst_conn.close()
-        src_conn.close()
+        _online_backup(source, temporary)
+        if _integrity_result(temporary) != "ok":
+            raise sqlite3.DatabaseError("restored database integrity check failed")
+        if original_mode is not None:
+            os.chmod(temporary, original_mode)
+        os.replace(temporary, db_path)
+    except Exception as exc:
+        temporary.unlink(missing_ok=True)
+        print(f"ERROR: Restore failed: {exc}", file=sys.stderr)
+        return 1
 
-    print(f"Database restored from: {src}")
+    print(f"Database restored atomically from: {source}")
     return 0
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="Makro Ortodonti database backup tool")
+    subparsers = parser.add_subparsers(dest="command")
+
+    backup_parser = subparsers.add_parser("backup", help="Create a verified backup")
+    backup_parser.add_argument(
+        "--keep", type=_positive_int, default=30, help="Backups to retain (default: 30)"
+    )
+
+    verify_parser = subparsers.add_parser("verify", help="Verify a backup")
+    verify_parser.add_argument("file", nargs="?", help="Default: most recent backup")
+
+    subparsers.add_parser("list", help="List available backups")
+
+    restore_parser = subparsers.add_parser("restore", help="Restore a verified backup")
+    restore_parser.add_argument("file", help="Path to the backup file")
+    restore_parser.add_argument(
+        "--yes", action="store_true", help="Confirm the destructive restore operation"
+    )
+    return parser
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Makro Ortodonti database backup tool")
-    sub = parser.add_subparsers(dest="command")
-
-    p_backup = sub.add_parser("backup", help="Create a timestamped backup")
-    p_backup.add_argument("--keep", type=int, default=30, help="Number of backups to retain")
-
-    sub.add_parser("verify", help="Verify the most-recent backup")
-    sub.add_parser("list", help="List available backups")
-
-    p_restore = sub.add_parser("restore", help="Restore database from a backup file")
-    p_restore.add_argument("file", help="Path to the backup file")
-
+    parser = build_parser()
     args = parser.parse_args()
     dispatch = {
         "backup": cmd_backup,
@@ -176,12 +222,10 @@ def main() -> None:
         "list": cmd_list,
         "restore": cmd_restore,
     }
-
     if args.command not in dispatch:
         parser.print_help()
-        sys.exit(0)
-
-    sys.exit(dispatch[args.command](args))
+        raise SystemExit(0)
+    raise SystemExit(dispatch[args.command](args))
 
 
 if __name__ == "__main__":

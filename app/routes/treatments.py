@@ -1,12 +1,36 @@
 from flask import Blueprint, render_template, redirect, url_for, flash, request, jsonify
 from flask_login import login_required
 import io
+from math import isfinite
 
 from app.extensions import db
 from app.models.models import Treatment, TreatmentCategory
 from app.authz import roles_required
 
 treatments_bp = Blueprint("treatments", __name__)
+
+
+def _treatment_form_values():
+    """Validate and normalize the treatment fields shared by add/edit."""
+    name = request.form.get("name", "").strip()
+    description = request.form.get("description", "").strip() or None
+    category = request.form.get("category", "")
+    raw_price = request.form.get("price_eur", "").strip().replace(",", ".")
+
+    if not name or len(name) > 200:
+        raise ValueError("Tedavi adı 1–200 karakter olmalıdır.")
+    if description and len(description) > 2000:
+        raise ValueError("Tedavi açıklaması 2000 karakteri aşamaz.")
+    if category not in TreatmentCategory.ALL:
+        raise ValueError("Geçersiz tedavi kategorisi.")
+    try:
+        price_eur = float(raw_price)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("Tedavi fiyatı sayısal olmalıdır.") from exc
+    if not isfinite(price_eur) or price_eur < 0:
+        raise ValueError("Tedavi fiyatı negatif veya sonsuz olamaz.")
+
+    return name, description, category, round(price_eur, 2)
 
 
 @treatments_bp.route("/")
@@ -54,11 +78,16 @@ def list_treatments():
 @roles_required("admin")
 def add_treatment():
     if request.method == "POST":
+        try:
+            name, description, category, price_eur = _treatment_form_values()
+        except ValueError as exc:
+            flash(str(exc), "danger")
+            return redirect(url_for("treatments.add_treatment"))
         treatment = Treatment(
-            name=request.form["name"].strip(),
-            description=request.form.get("description", "").strip() or None,
-            category=request.form["category"],
-            price_eur=float(request.form["price_eur"]),
+            name=name,
+            description=description,
+            category=category,
+            price_eur=price_eur,
         )
         db.session.add(treatment)
         db.session.commit()
@@ -87,10 +116,15 @@ def edit_treatment(treatment_id):
     treatment = db.get_or_404(Treatment, treatment_id)
 
     if request.method == "POST":
-        treatment.name = request.form["name"].strip()
-        treatment.description = request.form.get("description", "").strip() or None
-        treatment.category = request.form["category"]
-        treatment.price_eur = float(request.form["price_eur"])
+        try:
+            name, description, category, price_eur = _treatment_form_values()
+        except ValueError as exc:
+            flash(str(exc), "danger")
+            return redirect(url_for("treatments.edit_treatment", treatment_id=treatment.id))
+        treatment.name = name
+        treatment.description = description
+        treatment.category = category
+        treatment.price_eur = price_eur
         db.session.commit()
         flash(f"{treatment.name} güncellendi.", "success")
         return redirect(url_for("treatments.list_treatments"))
