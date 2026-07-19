@@ -169,7 +169,7 @@ Durum: {status_tr.get(invoice.status, invoice.status)}
 Faturanız ekte gönderilmiştir.
 
 Saygılarımızla,
-Makro Orto Denti"""
+Makro Ortodonti"""
 
         return cls.send_message(phone, message)
 

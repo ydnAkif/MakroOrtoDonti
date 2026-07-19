@@ -54,13 +54,20 @@ def create_app(config_class=Config) -> Flask:
         from .models.models import Settings
         from .services.exchange_service import get_rate_health
 
-        clinic_name = "Makro Orto Denti"
+        clinic_name = "Makro Ortodonti"
         try:
             with db.session.begin():
                 row = db.session.execute(
                     db.select(Settings.value).where(Settings.key == "clinic_name")
                 ).scalar_one_or_none()
-                if row:
+                if row == "Makro Orto Denti":
+                    db.session.execute(
+                        db.update(Settings)
+                        .where(Settings.key == "clinic_name")
+                        .values(value="Makro Ortodonti")
+                    )
+                    clinic_name = "Makro Ortodonti"
+                elif row:
                     clinic_name = row
         except Exception:
             pass

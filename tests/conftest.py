@@ -29,7 +29,7 @@ def app():
         Base.metadata.create_all(bind=db.engine)
 
         default_settings = {
-            "clinic_name": "Makro Orto Denti",
+            "clinic_name": "Makro Ortodonti",
             "invoice_prefix": "MKR",
             "invoice_next_number": "1",
             "smtp_server": "smtp.gmail.com",

@@ -343,7 +343,7 @@ class Settings(Base, TimestampMixin):
     __table_args__ = ()
 
     DEFAULTS = {
-        "clinic_name": "Makro Orto Denti",
+        "clinic_name": "Makro Ortodonti",
         "clinic_address": "",
         "clinic_phone": "",
         "clinic_email": "",

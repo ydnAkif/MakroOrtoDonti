@@ -10,7 +10,7 @@ FONT_PATH_BOLD = os.path.join(FONT_DIR, "DejaVuSans-Bold.ttf")
 
 
 class InvoicePDF(FPDF):
-    def __init__(self, clinic_name="Makro Orto Denti", clinic_address="", clinic_phone="", clinic_email=""):
+    def __init__(self, clinic_name="Makro Ortodonti", clinic_address="", clinic_phone="", clinic_email=""):
         super().__init__()
         self.clinic_name = clinic_name
         self.clinic_address = clinic_address
@@ -239,7 +239,7 @@ def generate_invoice_pdf(invoice) -> bytes:
         ).scalar_one_or_none()
         return val or default
 
-    clinic_name_val = get_setting("clinic_name", "Makro Orto Denti")
+    clinic_name_val = get_setting("clinic_name", "Makro Ortodonti")
     clinic_address_val = get_setting("clinic_address")
     clinic_phone_val = get_setting("clinic_phone")
     clinic_email_val = get_setting("clinic_email")

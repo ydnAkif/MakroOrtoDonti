@@ -65,7 +65,7 @@ Toplam Tutar: ₺{invoice.total_try:,.2f} (€{invoice.total_eur:,.2f})
 Ödeme durumunuzla ilgili sorularınız için bizimle iletişime geçebilirsiniz.
 
 Saygılarımızla,
-Makro Orto Denti"""
+Makro Ortodonti"""
 
         msg.attach(MIMEText(body, "plain", "utf-8"))
 
