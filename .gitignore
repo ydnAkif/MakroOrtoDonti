@@ -5,5 +5,12 @@ __pycache__/
 venv/
 .venv/
 data/*.db
+app/data/*.db
+instance/
 *.pyc
 .DS_Store
+.pytest_cache/
+.texpadtmp/
+.coverage
+htmlcov/
+*.log
