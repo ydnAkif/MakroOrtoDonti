@@ -78,7 +78,7 @@
                             {% endif %}
                         </td>
                         <td>
-                            <span class="badge bg-{% if p.party_type.value == 'patient' %}primary{% elif p.party_type.value == 'dentist_customer' %}success{% else %}info{% endif %}">
+                            <span class="badge table-pill table-pill--party bg-{% if p.party_type.value == 'patient' %}primary{% elif p.party_type.value == 'dentist_customer' %}success{% else %}info{% endif %}">
                                 {% if p.party_type.value == 'patient' %}Hasta
                                 {% elif p.party_type.value == 'dentist_customer' %}Diş Hekimi
                                 {% else %}Kurumsal{% endif %}

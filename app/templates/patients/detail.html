@@ -245,13 +245,13 @@ clinic_name }}{% endblock %} {% block content %}
                 </td>
                 <td>
                   {% if inv.status == 'pending' %}
-                  <span class="badge bg-warning">Bekliyor</span>
+                  <span class="badge bg-warning table-pill table-pill--status">Bekliyor</span>
                   {% elif inv.status == 'paid' %}
-                  <span class="badge bg-success">Ödendi</span>
+                  <span class="badge bg-success table-pill table-pill--status">Ödendi</span>
                   {% elif inv.status == 'overdue' %}
-                  <span class="badge bg-danger">Gecikmiş</span>
+                  <span class="badge bg-danger table-pill table-pill--status">Gecikmiş</span>
                   {% else %}
-                  <span class="badge bg-secondary">İptal</span>
+                  <span class="badge bg-secondary table-pill table-pill--status">İptal</span>
                   {% endif %}
                 </td>
                 <td>

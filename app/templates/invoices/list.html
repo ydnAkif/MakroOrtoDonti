@@ -67,19 +67,19 @@
                     <tr>
                         <td><a href="{{ url_for('invoices.detail_invoice', invoice_id=invoice.id) }}" class="fw-bold">{{ invoice.invoice_number }}</a></td>
                         <td>{{ invoice.party.display_name if invoice.party else (invoice.patient.full_name if invoice.patient else '-') }}</td>
-                        <td><span class="invoice-category-badge"><i class="bi bi-tag"></i>{{ invoice.category_label }}</span></td>
+                        <td><span class="invoice-category-badge table-pill table-pill--category"><i class="bi bi-tag"></i>{{ invoice.category_label }}</span></td>
                         <td>{{ invoice.invoice_date.strftime('%d.%m.%Y') }}</td>
                         <td>€{{ "{:,.2f}".format(invoice.total_eur) }}</td>
                         <td>₺{{ "{:,.2f}".format(invoice.total_try) }}</td>
                         <td>
                             {% if invoice.status == 'pending' %}
-                                <span class="badge bg-warning">Bekliyor</span>
+                                <span class="badge bg-warning table-pill table-pill--status">Bekliyor</span>
                             {% elif invoice.status == 'paid' %}
-                                <span class="badge bg-success">Ödendi</span>
+                                <span class="badge bg-success table-pill table-pill--status">Ödendi</span>
                             {% elif invoice.status == 'overdue' %}
-                                <span class="badge bg-danger">Gecikmiş</span>
+                                <span class="badge bg-danger table-pill table-pill--status">Gecikmiş</span>
                             {% else %}
-                                <span class="badge bg-secondary">İptal</span>
+                                <span class="badge bg-secondary table-pill table-pill--status">İptal</span>
                             {% endif %}
                         </td>
                         <td class="text-end">

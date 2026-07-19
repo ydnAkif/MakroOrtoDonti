@@ -475,6 +475,16 @@ textarea.form-control { min-height: 92px; }
 [id] { scroll-margin-top: calc(var(--topbar-height) + 1.25rem); }
 
 .badge { padding: .42rem .58rem; border-radius: 999px; font-size: .68rem; font-weight: 750; letter-spacing: .01em; }
+.table-pill {
+    display: inline-flex;
+    min-height: 28px;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+}
+.table-pill--status { min-width: 6.25rem; }
+.table-pill--party { min-width: 7.25rem; }
+.table-pill--category { min-width: 8rem; }
 .bg-warning { background-color: var(--amber-500) !important; }
 .bg-success { background-color: var(--success-500) !important; }
 .bg-danger { background-color: var(--danger-500) !important; }

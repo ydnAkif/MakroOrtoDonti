@@ -57,7 +57,7 @@
                                 <td><a href="{{ url_for('invoices.detail_invoice', invoice_id=inv.id) }}">{{ inv.invoice_number }}</a></td>
                                 <td>{{ inv.party.display_name if inv.party else (inv.patient.full_name if inv.patient else '-') }}</td>
                                 <td><strong>€{{ "{:,.2f}".format(inv.total_eur) }}</strong><br><small class="text-muted">₺{{ "{:,.2f}".format(inv.total_try) }}</small></td>
-                                <td>{% if inv.status == 'pending' %}<span class="badge bg-warning">Bekliyor</span>{% elif inv.status == 'paid' %}<span class="badge bg-success">Ödendi</span>{% elif inv.status == 'overdue' %}<span class="badge bg-danger">Gecikmiş</span>{% else %}<span class="badge bg-secondary">İptal</span>{% endif %}</td>
+                                <td>{% if inv.status == 'pending' %}<span class="badge bg-warning table-pill table-pill--status">Bekliyor</span>{% elif inv.status == 'paid' %}<span class="badge bg-success table-pill table-pill--status">Ödendi</span>{% elif inv.status == 'overdue' %}<span class="badge bg-danger table-pill table-pill--status">Gecikmiş</span>{% else %}<span class="badge bg-secondary table-pill table-pill--status">İptal</span>{% endif %}</td>
                             </tr>
                         {% else %}
                             <tr><td colspan="4" class="empty-state text-muted"><i class="bi bi-receipt"></i>Henüz fatura bulunmuyor.<br><a href="{{ url_for('invoices.add_invoice') }}">İlk faturayı oluşturun</a></td></tr>
