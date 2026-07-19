@@ -2,28 +2,26 @@
 {% block title %}Ödemeler ve Tahsilatlar - {{ clinic_name }}{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h4 class="mb-0"><i class="bi bi-cash-stack"></i> Ödemeler ve Tahsilatlar</h4>
+<header class="page-header">
+    <div><span class="page-eyebrow">Nakit akışı</span><h1>Ödemeler ve tahsilatlar</h1><p class="page-description">Açık faturaları önceliklendirin ve tüm tahsilat hareketlerini izleyin.</p></div>
     <a href="{{ url_for('payments.add_payment') }}" class="btn btn-primary">
-        <i class="bi bi-plus-circle"></i> Yeni Ödeme Kaydet
+        <i class="bi bi-plus-lg"></i> Yeni tahsilat
     </a>
-</div>
+</header>
 
 <!-- Summary Metrics -->
 <div class="row g-3 mb-4">
     <div class="col-md-6">
-        <div class="card border-0 shadow-sm h-100 border-start border-success border-4">
+        <div class="card metric-card h-100" style="--metric-color: var(--success-500); --metric-tint: rgba(45,155,115,.13);">
             <div class="card-body">
-                <h6 class="text-muted mb-1">Toplam Tahsilat Geçmişi (EUR)</h6>
-                <h3 class="text-success mb-0">€{{ "{:,.2f}".format(total_eur) }}</h3>
+                <span class="metric-icon"><i class="bi bi-currency-euro"></i></span><div class="metric-label">Toplam tahsilat · EUR</div><p class="metric-value">€{{ "{:,.2f}".format(total_eur) }}</p>
             </div>
         </div>
     </div>
     <div class="col-md-6">
-        <div class="card border-0 shadow-sm h-100 border-start border-info border-4">
+        <div class="card metric-card h-100" style="--metric-color: var(--sky-500); --metric-tint: rgba(53,175,208,.13);">
             <div class="card-body">
-                <h6 class="text-muted mb-1">Toplam Tahsilat Geçmişi (TRY)</h6>
-                <h3 class="text-primary mb-0">₺{{ "{:,.2f}".format(total_try) }}</h3>
+                <span class="metric-icon"><i class="bi bi-cash-stack"></i></span><div class="metric-label">Toplam tahsilat · TRY</div><p class="metric-value">₺{{ "{:,.2f}".format(total_try) }}</p>
             </div>
         </div>
     </div>
@@ -186,7 +184,7 @@
                                 <td>₺{{ "{:,.4f}".format(p.exchange_rate) }}</td>
                                 <td class="text-end">
                                     <form method="POST" action="{{ url_for('payments.delete_payment', payment_id=p.id) }}" class="d-inline" onsubmit="return confirm('Bu ödemeyi silmek istediğinize emin misiniz?');">
-                                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Ödemeyi Sil">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Ödemeyi Sil" aria-label="Tahsilat kaydını sil">
                                             <i class="bi bi-trash"></i>
                                         </button>
                                     </form>

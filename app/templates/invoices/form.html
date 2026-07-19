@@ -197,7 +197,7 @@
     <div class="modal-content">
       <div class="modal-header">
         <h5 class="modal-title" id="modal-title">Kalem Ekle</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Pencereyi kapat"></button>
       </div>
       <form id="item-form">
         <div class="modal-body">
@@ -347,7 +347,7 @@ function addItemToTable(item) {
         <td class="text-end">${discountDisplay}</td>
         <td class="text-end fw-bold line-total-eur">${formatCurrencyEUR(calc.total)}</td>
         <td>
-            <button type="button" class="btn btn-sm btn-outline-danger delete-item" data-index="${index}">
+            <button type="button" class="btn btn-sm btn-outline-danger delete-item" data-index="${index}" aria-label="Fatura kalemini sil">
                 <i class="bi bi-trash"></i>
             </button>
         </td>

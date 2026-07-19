@@ -2,10 +2,7 @@
 {% block title %}Raporlar - {{ clinic_name }}{% endblock %}
 
 {% block content %}
-<div class="mb-4">
-    <h4 class="mb-0"><i class="bi bi-bar-chart"></i> Raporlar</h4>
-    <small class="text-muted">Tarih: {{ today.strftime('%d.%m.%Y') }}</small>
-</div>
+<header class="page-header"><div><span class="page-eyebrow">{{ today.strftime('%d.%m.%Y') }}</span><h1>Raporlar</h1><p class="page-description">Gelir performansını, tedavi dağılımını ve hasta durumlarını karşılaştırın.</p></div></header>
 
 <!-- Revenue Cards -->
 <div class="row g-3 mb-4">

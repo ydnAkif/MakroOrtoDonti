@@ -2,17 +2,17 @@
 {% block title %}Tedaviler - {{ clinic_name }}{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h4 class="mb-0"><i class="bi bi-heart-pulse"></i> Tedavi Kataloğu</h4>
+<header class="page-header">
+    <div><span class="page-eyebrow">Klinik katalog</span><h1>Tedavi kataloğu</h1><p class="page-description">Tedavi tanımlarını, kategorileri ve EUR fiyatlarını güncel tutun.</p></div>
     <div class="d-flex gap-2">
         <a href="{{ url_for('treatments.import_treatments') }}" class="btn btn-outline-success">
-            <i class="bi bi-upload"></i> XLS İçe Aktar
+            <i class="bi bi-upload"></i> XLS içe aktar
         </a>
         <a href="{{ url_for('treatments.add_treatment') }}" class="btn btn-primary">
-            <i class="bi bi-plus-circle"></i> Yeni Tedavi
+            <i class="bi bi-plus-lg"></i> Yeni tedavi
         </a>
     </div>
-</div>
+</header>
 
 <!-- Filters -->
 <div class="card border-0 shadow-sm mb-4">
@@ -70,14 +70,14 @@
                             <input type="number" step="0.01" min="0" class="form-control form-control-sm text-end editable-input" data-field="price_eur" value="{{ treatment.price_eur }}" style="width:100px">
                         </td>
                         <td class="text-end">
-                            <button class="btn btn-sm btn-success save-row d-none" title="Kaydet">
+                            <button class="btn btn-sm btn-success save-row d-none" title="Kaydet" aria-label="Satırdaki değişiklikleri kaydet">
                                 <i class="bi bi-check-lg"></i>
                             </button>
                             <a href="{{ url_for('treatments.edit_treatment', treatment_id=treatment.id) }}" class="btn btn-sm btn-outline-primary" title="Tam Form">
                                 <i class="bi bi-pencil"></i>
                             </a>
                             <form method="POST" action="{{ url_for('treatments.delete_treatment', treatment_id=treatment.id) }}" class="d-inline" onsubmit="return confirm('Bu tedaviyi silmek istediğinize emin misiniz?')">
-                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Sil">
+                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Sil" aria-label="{{ treatment.name }} tedavisini sil">
                                     <i class="bi bi-trash"></i>
                                 </button>
                             </form>

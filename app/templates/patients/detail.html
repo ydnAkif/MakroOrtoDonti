@@ -22,7 +22,7 @@ clinic_name }}{% endblock %} {% block content %}
         <div>
           <a
             href="{{ url_for('patients.edit_patient', patient_id=patient.id) }}"
-            class="btn btn-sm btn-outline-primary"
+            class="btn btn-sm btn-outline-primary" aria-label="Hasta kaydını düzenle"
           >
             <i class="bi bi-pencil"></i>
           </a>
@@ -34,7 +34,7 @@ clinic_name }}{% endblock %} {% block content %}
               return confirm('Bu hastayı silmek istediğinize emin misiniz?');
             "
           >
-            <button type="submit" class="btn btn-sm btn-outline-danger">
+            <button type="submit" class="btn btn-sm btn-outline-danger" aria-label="Hasta kaydını sil">
               <i class="bi bi-trash"></i>
             </button>
           </form>

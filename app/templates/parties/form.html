@@ -49,22 +49,6 @@
                                 <input type="text" class="form-control" id="last_name" name="last_name" value="{{ party.last_name if party else '' }}" {% if party %}required{% endif %}>
                             </div>
                             <div class="col-md-6">
-                                <label for="phone" class="form-label">Telefon</label>
-                                <input type="tel" class="form-control" id="phone" name="phone" value="{{ party.phone if party else '' }}" placeholder="+90 5XX XXX XX XX">
-                            </div>
-                            <div class="col-md-6">
-                                <label for="email" class="form-label">E-posta</label>
-                                <input type="email" class="form-control" id="email" name="email" value="{{ party.email if party else '' }}">
-                            </div>
-                            <div class="col-12">
-                                <label for="address" class="form-label">Adres</label>
-                                <textarea class="form-control" id="address" name="address" rows="2">{{ party.address if party else '' }}</textarea>
-                            </div>
-                            <div class="col-md-6">
-                                <label for="tax_id" class="form-label">TC Kimlik / Vergi No</label>
-                                <input type="text" class="form-control" id="tax_id" name="tax_id" value="{{ party.tax_id if party else '' }}">
-                            </div>
-                            <div class="col-md-6">
                                 <label for="treatment_status" class="form-label">Tedavi Durumu</label>
                                 <select class="form-select" id="treatment_status" name="treatment_status">
                                     <option value="active" {% if party and party.treatment_status == 'active' %}selected{% endif %}>Aktif</option>
@@ -92,28 +76,40 @@
                                 <input type="text" class="form-control" id="name" name="name" value="{{ party.name if party else '' }}" required>
                             </div>
                             <div class="col-md-6">
-                                <label for="phone" class="form-label">Telefon</label>
-                                <input type="tel" class="form-control" id="phone" name="phone" value="{{ party.phone if party else '' }}" placeholder="+90 5XX XXX XX XX">
-                            </div>
-                            <div class="col-md-6">
-                                <label for="email" class="form-label">E-posta</label>
-                                <input type="email" class="form-control" id="email" name="email" value="{{ party.email if party else '' }}">
-                            </div>
-                            <div class="col-12">
-                                <label for="address" class="form-label">Adres</label>
-                                <textarea class="form-control" id="address" name="address" rows="2">{{ party.address if party else '' }}</textarea>
-                            </div>
-                            <div class="col-md-6">
-                                <label for="tax_id" class="form-label">Vergi No / TC Kimlik <span class="text-danger">*</span></label>
-                                <input type="text" class="form-control" id="tax_id" name="tax_id" value="{{ party.tax_id if party else '' }}" required>
-                            </div>
-                            <div class="col-md-6">
                                 <label for="contact_person" class="form-label">İlgili Kişi</label>
                                 <input type="text" class="form-control" id="contact_person" name="contact_person" value="{{ party.contact_person if party else '' }}">
                             </div>
                             <div class="col-md-6">
                                 <label for="contact_phone" class="form-label">İlgili Kişi Telefon</label>
                                 <input type="tel" class="form-control" id="contact_phone" name="contact_phone" value="{{ party.contact_phone if party else '' }}">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-section">
+                        <div class="form-section-heading"><span class="form-section-icon"><i class="bi bi-person-lines-fill"></i></span><div><h6>İletişim ve kayıt bilgileri</h6><p>Bu alanlar tüm kişi türleri için ortaktır.</p></div></div>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label for="phone" class="form-label">Telefon</label>
+                                <input type="tel" class="form-control" id="phone" name="phone" value="{{ party.phone if party else '' }}" placeholder="+90 5XX XXX XX XX" autocomplete="tel">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="email" class="form-label">E-posta</label>
+                                <input type="email" class="form-control" id="email" name="email" value="{{ party.email if party else '' }}" autocomplete="email">
+                            </div>
+                            <div class="col-12">
+                                <label for="address" class="form-label">Adres</label>
+                                <textarea class="form-control" id="address" name="address" rows="2" autocomplete="street-address">{{ party.address if party else '' }}</textarea>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="tax_id" class="form-label">TC kimlik / vergi no</label>
+                                <input type="text" class="form-control" id="tax_id" name="tax_id" value="{{ party.tax_id if party else '' }}" inputmode="numeric">
+                            </div>
+                            <div class="col-md-6 d-flex align-items-end">
+                                <div class="form-check form-switch mb-2">
+                                    <input class="form-check-input" type="checkbox" role="switch" id="is_active" name="is_active" {% if not party or party.is_active %}checked{% endif %}>
+                                    <label class="form-check-label" for="is_active">Aktif kayıt</label>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -165,8 +161,10 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
-    partyTypeSelect.addEventListener('change', toggleFields);
-    toggleFields();
+    if (partyTypeSelect) {
+        partyTypeSelect.addEventListener('change', toggleFields);
+        toggleFields();
+    }
 });
 </script>
 {% endblock %}

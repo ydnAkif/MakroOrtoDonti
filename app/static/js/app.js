@@ -129,9 +129,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
         var rows = document.querySelectorAll(targetSelector);
         input.addEventListener('input', function() {
-            var q = input.value.trim().toLowerCase();
+            var q = normalizeText(input.value.trim());
             rows.forEach(function(row) {
-                var text = (row.textContent || '').toLowerCase();
+                var text = normalizeText(row.textContent || '');
                 row.style.display = !q || text.indexOf(q) !== -1 ? '' : 'none';
             });
         });
@@ -146,9 +146,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
         var items = document.querySelectorAll(targetSelector);
         input.addEventListener('input', function() {
-            var q = input.value.trim().toLowerCase();
+            var q = normalizeText(input.value.trim());
             items.forEach(function(item) {
-                var text = (item.textContent || '').toLowerCase();
+                var text = normalizeText(item.textContent || '');
                 item.style.display = !q || text.indexOf(q) !== -1 ? '' : 'none';
             });
         });

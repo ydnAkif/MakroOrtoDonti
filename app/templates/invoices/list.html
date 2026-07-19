@@ -2,12 +2,12 @@
 {% block title %}Faturalar - {{ clinic_name }}{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h4 class="mb-0"><i class="bi bi-receipt"></i> Faturalar</h4>
+<header class="page-header">
+    <div><span class="page-eyebrow">Finans</span><h1>Faturalar</h1><p class="page-description">Kesilen faturaları, ödeme durumlarını ve açık bakiyeleri izleyin.</p></div>
     <a href="{{ url_for('invoices.add_invoice') }}" class="btn btn-primary">
-        <i class="bi bi-plus-circle"></i> Yeni Fatura
+        <i class="bi bi-plus-lg"></i> Yeni fatura
     </a>
-</div>
+</header>
 
 <!-- Filters -->
 <div class="card border-0 shadow-sm mb-4">
@@ -72,7 +72,7 @@
                             {% endif %}
                         </td>
                         <td class="text-end">
-                            <a href="{{ url_for('invoices.detail_invoice', invoice_id=invoice.id) }}" class="btn btn-sm btn-outline-primary">
+                            <a href="{{ url_for('invoices.detail_invoice', invoice_id=invoice.id) }}" class="btn btn-sm btn-outline-primary" aria-label="{{ invoice.invoice_number }} faturasını görüntüle">
                                 <i class="bi bi-eye"></i>
                             </a>
                         </td>
