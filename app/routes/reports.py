@@ -148,6 +148,8 @@ def index():
         .limit(30)
     ).scalars().all()
 
+    max_category_count = max((s["count"] for s in category_stats), default=1) or 1
+
     return render_template(
         "reports/index.html",
         monthly_revenue=monthly_revenue,
@@ -156,6 +158,7 @@ def index():
         treatment_stats=treatment_stats,
         category_stats=category_stats,
         category_labels=category_labels,
+        max_category_count=max_category_count,
         patient_stats=patient_stats,
         exchange_rates=exchange_rates,
         today=today,

@@ -89,7 +89,8 @@
                         <span class="fw-bold">{{ stat.count }}</span>
                     </div>
                     <div class="progress" style="height: 8px;">
-                        <div class="progress-bar bg-primary" style="width: {{ (stat.count / (category_stats[0].count if category_stats else 1) * 100)|int }}%"></div>
+                        {% set pct = (stat.count / max_category_count * 100)|int if max_category_count > 0 else 0 %}
+                        <div class="progress-bar bg-primary" style="width: {{ pct }}%"></div>
                     </div>
                 </div>
                 {% else %}
