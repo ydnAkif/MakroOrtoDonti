@@ -28,7 +28,7 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        var placeholder = select.dataset.searchPlaceholder || 'Yazdıka ara...';
+        var placeholder = select.dataset.searchPlaceholder || 'Yazarak ara...';
         var options = Array.from(select.options).filter(function(opt) {
             return opt.value;
         });
@@ -169,9 +169,11 @@ document.addEventListener('DOMContentLoaded', function() {
         function updateIcon(theme) {
             if (themeToggleIcon) {
                 if (theme === 'dark') {
-                    themeToggleIcon.className = 'bi bi-sun-fill';
+                    themeToggleIcon.className = 'bi bi-sun';
+                    themeToggle.setAttribute('aria-label', 'Açık temaya geç');
                 } else {
-                    themeToggleIcon.className = 'bi bi-moon-fill';
+                    themeToggleIcon.className = 'bi bi-moon-stars';
+                    themeToggle.setAttribute('aria-label', 'Koyu temaya geç');
                 }
             }
         }

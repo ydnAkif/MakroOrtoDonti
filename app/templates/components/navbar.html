@@ -1,54 +1,53 @@
-<nav class="navbar navbar-expand-lg fixed-top shadow-sm bg-body-tertiary">
+<nav class="navbar fixed-top" aria-label="Üst menü">
     <div class="container-fluid">
-        <!-- Sidebar toggle for mobile -->
-        <button class="btn btn-outline-secondary me-2 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#sidebar" aria-controls="sidebar">
-            <i class="bi bi-list fs-4"></i>
+        {% if current_user.is_authenticated %}
+        <button class="mobile-menu-trigger me-2 d-lg-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#mobileSidebar" aria-controls="mobileSidebar" aria-label="Menüyü aç">
+            <i class="bi bi-list fs-5" aria-hidden="true"></i>
         </button>
+        {% endif %}
 
-        <a class="navbar-brand fw-bold d-flex align-items-center text-body" href="{{ url_for('dashboard.index') }}">
-            <img src="{{ url_for('static', filename='images/logo.png') }}" alt="Logo" height="32" class="me-2 rounded">
-            {{ clinic_name }}
+        <a class="navbar-brand d-flex align-items-center" href="{{ url_for('dashboard.index') }}" aria-label="{{ clinic_name }} ana sayfa">
+            <span class="brand-mark" aria-hidden="true"></span>
+            <span class="brand-copy"><span>{{ clinic_name }}</span><small>Klinik operasyonları</small></span>
         </a>
+        {% if current_user.is_authenticated %}
+        <span class="topbar-context">Güvenli çalışma alanı</span>
+        {% endif %}
 
-        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-            <span class="navbar-toggler-icon"></span>
-        </button>
-
-        <div class="collapse navbar-collapse" id="navbarNav">
-            <ul class="navbar-nav ms-auto align-items-center">
-                <!-- Theme Toggle Button -->
-                <li class="nav-item me-2">
-                    <button class="btn" id="theme-toggle" type="button" title="Koyu/Açık Tema">
-                        <i class="bi bi-moon-fill" id="theme-toggle-icon"></i>
+        <ul class="navbar-nav ms-auto flex-row align-items-center gap-2">
+                <li class="nav-item">
+                    <button id="theme-toggle" type="button" title="Temayı değiştir" aria-label="Koyu temaya geç">
+                        <i class="bi bi-moon-stars" id="theme-toggle-icon" aria-hidden="true"></i>
                     </button>
                 </li>
                 {% if current_user.is_authenticated %}
                 <li class="nav-item dropdown">
-                    <a class="nav-link dropdown-toggle text-body" href="#" data-bs-toggle="dropdown">
-                        <i class="bi bi-person-circle"></i> {{ current_user.full_name }}
+                    <a class="nav-link dropdown-toggle user-menu" href="#" data-bs-toggle="dropdown" aria-expanded="false">
+                        <span class="user-avatar" aria-hidden="true">{{ current_user.full_name[:2]|upper }}</span>
+                        <span class="user-name">{{ current_user.full_name }}</span>
                     </a>
-                    <ul class="dropdown-menu dropdown-menu-end shadow-sm">
-                        <li><a class="dropdown-item" href="{{ url_for('settings.index') }}"><i class="bi bi-gear"></i> Ayarlar</a></li>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li><a class="dropdown-item" href="{{ url_for('settings.index') }}"><i class="bi bi-sliders me-2"></i>Ayarlar</a></li>
                         <li><hr class="dropdown-divider"></li>
-                        <li><form method="POST" action="{{ url_for('auth.logout') }}" class="d-inline"><button type="submit" class="dropdown-item text-danger"><i class="bi bi-box-arrow-right"></i> Çıkış</button></form></li>
+                        <li><form method="POST" action="{{ url_for('auth.logout') }}"><button type="submit" class="dropdown-item text-danger"><i class="bi bi-box-arrow-right me-2"></i>Çıkış yap</button></form></li>
                     </ul>
                 </li>
                 {% endif %}
-            </ul>
-        </div>
+        </ul>
     </div>
 </nav>
 
-<!-- Offcanvas sidebar for mobile -->
-<div class="offcanvas offcanvas-start d-md-none" tabindex="-1" id="sidebar" aria-labelledby="sidebarLabel">
-    <div class="offcanvas-header bg-body-tertiary border-bottom">
-        <h5 class="offcanvas-title" id="sidebarLabel">
-            <img src="{{ url_for('static', filename='images/logo.png') }}" alt="Logo" height="28" class="me-2 rounded">
-            <span class="text-body fw-bold">{{ clinic_name }}</span>
+{% if current_user.is_authenticated %}
+<div class="offcanvas offcanvas-start d-lg-none" tabindex="-1" id="mobileSidebar" aria-labelledby="mobileSidebarLabel">
+    <div class="offcanvas-header">
+        <h5 class="offcanvas-title d-flex align-items-center gap-2" id="mobileSidebarLabel">
+            <span class="brand-mark" aria-hidden="true"></span>
+            <span>{{ clinic_name }}</span>
         </h5>
-        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Menüyü kapat"></button>
     </div>
-    <div class="offcanvas-body p-0">
+    <div class="offcanvas-body">
         {% include 'components/sidebar.html' %}
     </div>
 </div>
+{% endif %}
