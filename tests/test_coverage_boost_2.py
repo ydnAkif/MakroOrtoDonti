@@ -1097,11 +1097,16 @@ class TestInit:
             assert resp.status_code == 200
 
     def test_refresh_exchange_rate_cli(self, app):
-        with app.app_context():
-            from app import create_app
+        with patch(
+            "app.services.exchange_service.fetch_and_store_rate",
+            return_value=Decimal("42.1234"),
+        ) as fetch_rate:
             runner = app.test_cli_runner()
             result = runner.invoke(args=["refresh-exchange-rate"])
-            assert result.exit_code == 0
+
+        assert result.exit_code == 0
+        assert "EUR/TRY rate stored: 42.1234" in result.output
+        fetch_rate.assert_called_once_with()
 
     def test_purge_audit_logs_cli(self, app):
         with app.app_context():

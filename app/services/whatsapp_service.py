@@ -4,7 +4,7 @@ import os
 import json
 import asyncio
 import threading
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from app.extensions import db
@@ -60,7 +60,7 @@ class WhatsAppService:
                     client.pair_phone_code(phone_number)
                     session.phone_number = phone_number
                     session.status = WhatsAppSession.STATUS_CONNECTED
-                    session.connected_at = datetime.utcnow()
+                    session.connected_at = datetime.now(timezone.utc).replace(tzinfo=None)
                     db.session.commit()
                     cls._connected = True
                     return {"success": True, "message": "WhatsApp bağlandı (pair code)."}
@@ -85,7 +85,7 @@ class WhatsAppService:
 
             if session:
                 session.status = WhatsAppSession.STATUS_DISCONNECTED
-                session.disconnected_at = datetime.utcnow()
+                session.disconnected_at = datetime.now(timezone.utc).replace(tzinfo=None)
                 db.session.commit()
 
             cls._connected = False

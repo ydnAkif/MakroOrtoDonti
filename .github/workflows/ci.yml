@@ -29,4 +29,4 @@ jobs:
       - name: Compile Python sources
         run: python -m compileall -q app backup.py run.py run_production.py
       - name: Run tests with branch coverage
-        run: pytest --cov=app --cov-report=term-missing --cov-report=xml --cov-fail-under=70
+        run: pytest --cov=app --cov-report=term-missing --cov-report=xml --cov-fail-under=90

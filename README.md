@@ -144,7 +144,7 @@ Yerel backup dizini tek başına felaket kurtarma çözümü değildir. Yedekler
 
 ```bash
 pytest
-pytest --cov=app --cov-report=term-missing --cov-fail-under=70
+pytest --cov=app --cov-report=term-missing --cov-fail-under=90
 pytest tests/e2e --browser chromium
 python -m compileall -q app backup.py run.py run_production.py
 python -m pip check

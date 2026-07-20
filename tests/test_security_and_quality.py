@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 import pytest
 from datetime import date
+from unittest.mock import patch
 
 import bcrypt
 
@@ -339,3 +340,45 @@ def test_parties_list_all_types_render(client):
         url = f"/parties/?type={ptype}" if ptype else "/parties/"
         resp = client.get(url)
         assert resp.status_code == 200, f"Failed for type={ptype!r}"
+
+
+def test_roles_required_redirects_anonymous_user(app):
+    from app.authz import roles_required
+
+    protected = roles_required("admin")(lambda: "allowed")
+    with app.test_request_context("/protected"):
+        response = protected()
+
+    assert response.status_code == 302
+    assert response.location.endswith("/login")
+
+
+def test_roles_required_rejects_wrong_role(app):
+    from app.authz import roles_required
+
+    user = type("User", (), {"is_authenticated": True, "role": "staff"})()
+    protected = roles_required("admin")(lambda: "allowed")
+    with app.test_request_context("/protected"), patch("app.authz.current_user", user):
+        response = protected()
+
+    assert response.status_code == 302
+    assert response.location.endswith("/")
+
+
+def test_roles_required_allows_matching_role(app):
+    from app.authz import roles_required
+
+    user = type("User", (), {"is_authenticated": True, "role": "admin"})()
+    protected = roles_required("admin")(lambda: "allowed")
+    with app.test_request_context("/protected"), patch("app.authz.current_user", user):
+        assert protected() == "allowed"
+
+
+def test_force_hsts_and_request_id_headers(app):
+    app.config["FORCE_HSTS"] = True
+    client = app.test_client()
+
+    response = client.get("/health", headers={"X-Request-ID": "review-request"})
+
+    assert response.headers["X-Request-ID"] == "review-request"
+    assert response.headers["Strict-Transport-Security"] == "max-age=31536000; includeSubDomains"
