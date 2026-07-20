@@ -6,6 +6,7 @@ import threading
 
 import bcrypt
 import pytest
+from sqlalchemy.pool import NullPool
 from werkzeug.serving import make_server
 
 from app import create_app
@@ -25,8 +26,12 @@ class TestConfig:
 
 
 @pytest.fixture()
-def app():
-    app = create_app(TestConfig)
+def app(tmp_path):
+    class IsolatedTestConfig(TestConfig):
+        SQLALCHEMY_DATABASE_URI = f"sqlite:///{tmp_path / 'test.db'}"
+        SQLALCHEMY_ENGINE_OPTIONS = {"poolclass": NullPool}
+
+    app = create_app(IsolatedTestConfig)
 
     with app.app_context():
         Base.metadata.create_all(bind=db.engine)
