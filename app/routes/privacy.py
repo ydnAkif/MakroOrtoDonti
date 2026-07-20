@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from flask import Blueprint, Response, abort, render_template, request
 from flask_login import login_required
 
-from app.authz import roles_required
+from app.authz import permissions_required
 from app.extensions import db
 from app.models.models import AuditLog, Invoice, Party, PatientTreatment
 
@@ -16,7 +16,7 @@ privacy_bp = Blueprint("privacy", __name__)
 
 @privacy_bp.get("/audit")
 @login_required
-@roles_required("admin")
+@permissions_required("privacy.audit")
 def audit_index():
     page = max(request.args.get("page", 1, type=int), 1)
     pagination = db.paginate(
@@ -28,7 +28,7 @@ def audit_index():
 
 @privacy_bp.get("/parties/<int:party_id>/export")
 @login_required
-@roles_required("admin")
+@permissions_required("privacy.export")
 def export_party(party_id: int):
     party = db.get_or_404(Party, party_id)
     invoices = db.session.execute(db.select(Invoice).where(Invoice.party_id == party.id)).scalars().all()
@@ -58,7 +58,7 @@ def export_party(party_id: int):
 
 @privacy_bp.post("/parties/<int:party_id>/anonymize")
 @login_required
-@roles_required("admin")
+@permissions_required("privacy.anonymize")
 def anonymize_party(party_id: int):
     party = db.get_or_404(Party, party_id)
     if any(not invoice.is_deleted for invoice in party.invoices):

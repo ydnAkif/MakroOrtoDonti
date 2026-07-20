@@ -4,13 +4,14 @@ from datetime import date
 
 from app.extensions import db
 from app.models.models import Party, PartyType, Treatment, Invoice, PatientTreatment, ExchangeRate
-from app.authz import roles_required
+from app.authz import permissions_required
 
 parties_bp = Blueprint("parties", __name__)
 
 
 @parties_bp.route("/")
 @login_required
+@permissions_required("clinical.view")
 def list_parties():
     search = request.args.get("search", "").strip()
     party_type = request.args.get("type", "")
@@ -61,6 +62,7 @@ def list_parties():
 
 @parties_bp.route("/add", methods=["GET", "POST"])
 @login_required
+@permissions_required("clinical.edit")
 def add_party():
     if request.method == "POST":
         from app.services.validation_service import parse_date, parse_enum
@@ -104,6 +106,7 @@ def add_party():
 
 @parties_bp.route("/<int:party_id>")
 @login_required
+@permissions_required("clinical.view")
 def detail_party(party_id):
     party = db.get_or_404(Party, party_id)
 
@@ -132,6 +135,7 @@ def detail_party(party_id):
 
 @parties_bp.route("/<int:party_id>/edit", methods=["GET", "POST"])
 @login_required
+@permissions_required("clinical.edit")
 def edit_party(party_id):
     party = db.get_or_404(Party, party_id)
 
@@ -175,7 +179,7 @@ def edit_party(party_id):
 
 @parties_bp.route("/<int:party_id>/delete", methods=["POST"])
 @login_required
-@roles_required("admin")
+@permissions_required("clinical.delete")
 def delete_party(party_id):
     party = db.get_or_404(Party, party_id)
     party.is_active = False

@@ -44,7 +44,10 @@ Uygulama varsayılan olarak `http://127.0.0.1:5000` adresinde açılır. `init_d
 | --- | --- | --- |
 | `SECRET_KEY` | Oturum imzalama anahtarı; production için zorunlu | Development anahtarı |
 | `ENCRYPTION_KEY` | SMTP gibi hassas ayarlar için ayrı şifreleme anahtarı; production için zorunlu | Development anahtarı |
+| `BACKUP_ENCRYPTION_KEYS` | Güncel anahtar önce olacak şekilde virgülle ayrılmış yedek şifreleme/rotasyon anahtarları | Boş |
 | `DATABASE_URL` | SQLAlchemy SQLite bağlantısı | `sqlite:///.../data/makroortodonti.db` |
+| `DATABASE_ENCRYPTION_AT_REST` | Sunucu disk/volume şifrelemesinin etkin olduğunu doğrulayan production beyanı | `false` |
+| `REMOTE_BACKUP_URL` | Şifreli yedeklerin farklı fiziksel hedefi | Boş |
 | `DEFAULT_ADMIN_PASSWORD` | İlk admin için isteğe bağlı parola | Güvenli rastgele parola |
 | `FLASK_DEBUG` | Development debug modu | `false` |
 | `SESSION_COOKIE_SECURE` | Cookie'yi yalnızca HTTPS üzerinden gönderir | `false` |
@@ -67,8 +70,12 @@ Production ortamında `SECRET_KEY` veya `ENCRYPTION_KEY` eksik, 32 karakterden k
 ```bash
 export SECRET_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
 export ENCRYPTION_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
+export BACKUP_ENCRYPTION_KEYS="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
 export SESSION_COOKIE_SECURE=true
 export FORCE_HSTS=true
+export DATABASE_ENCRYPTION_AT_REST=true
+export REMOTE_BACKUP_URL=s3://example-private-bucket/makro
+python deployment_check.py
 flask --app run:app db upgrade
 python run_production.py
 ```
@@ -116,6 +123,13 @@ flask --app run:app purge-expired-audit-logs
 - Anonimleştirme, açık finansal kayıt varsa `409` ile reddedilir.
 - `AUDIT_RETENTION_DAYS` yalnızca kurumun onaylı saklama politikasına göre ayarlanmalıdır.
 
+## Yetki matrisi
+
+Route yetkileri merkezi ve adlandırılmıştır: `clinical.view/edit/delete`,
+`billing.view/edit/delete`, `reports.view`, `messaging.use`, `settings.manage` ve
+`privacy.audit/export/anonymize`. `staff` günlük klinik ve finans işlemlerini yapabilir;
+silme, ayar ve KVKK işlemleri yalnız `admin` yetkisindedir.
+
 ## Veritabanı yedekleme
 
 Tutarlı bir online SQLite yedeği oluşturmak ve son 30 kopyayı saklamak için:
@@ -125,6 +139,11 @@ python backup.py backup
 python backup.py list
 python backup.py verify
 ```
+
+`BACKUP_ENCRYPTION_KEYS` tanımlıysa yedek yalnızca `.db.enc` olarak yazılır. Anahtar
+rotasyonunda yeni anahtarı listenin başına, eski anahtarı ikinci sıraya koyun; eski
+yedekler doğrulandıktan ve yeni anahtarla yeni yedek üretildikten sonra eski anahtarı
+secret store'dan kaldırın. Aktif SQLite dosyası için şifreli disk/volume zorunludur.
 
 Farklı saklama adedi:
 
@@ -140,13 +159,28 @@ python backup.py restore data/backups/makroortodonti_YYYY-MM-DDTHH-MM-SS-ffffff.
 
 Yerel backup dizini tek başına felaket kurtarma çözümü değildir. Yedekler erişim kontrollü, şifreli ve farklı bir fiziksel konuma düzenli olarak kopyalanmalıdır.
 
+## Production migration ve restore tatbikatı
+
+Production verisinin dosya kopyasını doğrudan geliştirici ortamına taşımayın. Erişim
+kontrollü makinede anonimleştirilmiş, hash manifestli ve ikinci dosyaya restore edilmiş
+tatbikat artefaktı oluşturun:
+
+```bash
+python production_drill.py /secure/path/production-copy.db --output-dir /secure/drill-output
+DATABASE_URL=sqlite:////secure/drill-output/<restored-copy>.db flask --app run:app db upgrade
+python backup.py verify /secure/drill-output/<restored-copy>.db
+```
+
+Tatbikat aracı kaynak dosyayı değiştirmez; kişi ve iletişim PII alanlarını temizler,
+SQLite integrity/foreign-key kontrollerini ve ayrı hedefe restore simülasyonunu yapar.
+
 ## Test ve kalite kontrolleri
 
 ```bash
 pytest
 pytest --cov=app --cov-report=term-missing --cov-fail-under=90
 pytest tests/e2e --browser chromium
-python -m compileall -q app backup.py run.py run_production.py
+python -m compileall -q app backup.py deployment_check.py production_drill.py run.py run_production.py
 python -m pip check
 ```
 

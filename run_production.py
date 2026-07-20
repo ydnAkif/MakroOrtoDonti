@@ -8,6 +8,11 @@ Usage:
 Environment variables:
     SECRET_KEY           Strong session-signing key (required)
     ENCRYPTION_KEY       Separate key for encrypted settings (required)
+    BACKUP_ENCRYPTION_KEYS Current and previous backup encryption keys (required)
+    DATABASE_ENCRYPTION_AT_REST Must be true after encrypted volume verification
+    REMOTE_BACKUP_URL    Off-host encrypted backup destination (required)
+    SESSION_COOKIE_SECURE Must be true
+    FORCE_HSTS           Must be true
     PORT                 TCP port to listen on (default: 8000)
     WORKERS              Gunicorn worker processes (default: 2*CPU+1)
     BIND                 Full bind address, overrides PORT (default: 0.0.0.0:<PORT>)
@@ -26,21 +31,14 @@ import os
 import sys
 
 
-from app.config import is_insecure_secret
+from deployment_check import validate_environment
 
 
 def main() -> None:
-    invalid_keys = [
-        key
-        for key in ("SECRET_KEY", "ENCRYPTION_KEY")
-        if is_insecure_secret(os.environ.get(key, ""))
-    ]
-    if invalid_keys:
-        print(
-            "ERROR: Production için ayrı, güçlü ve kalıcı anahtarlar gerekli: "
-            + ", ".join(invalid_keys),
-            file=sys.stderr,
-        )
+    preflight_errors = validate_environment(dict(os.environ))
+    if preflight_errors:
+        for error in preflight_errors:
+            print(f"ERROR: {error}", file=sys.stderr)
         sys.exit(1)
 
     try:

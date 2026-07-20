@@ -10,7 +10,7 @@ from app.models.models import (
     Party, PartyType, PatientTreatment, Treatment,
 )
 from app.models.invoice_service import InvoiceService
-from app.authz import roles_required
+from app.authz import permissions_required
 from sqlalchemy import String, case, cast
 
 invoices_bp = Blueprint("invoices", __name__)
@@ -18,6 +18,7 @@ invoices_bp = Blueprint("invoices", __name__)
 
 @invoices_bp.route("/")
 @login_required
+@permissions_required("billing.view")
 def list_invoices():
     status = request.args.get("status", "")
     category = request.args.get("category", "")
@@ -70,6 +71,7 @@ def list_invoices():
 
 @invoices_bp.route("/add", methods=["GET", "POST"])
 @login_required
+@permissions_required("billing.edit")
 def add_invoice():
     if request.method == "POST":
         # Support both new format (party_id + items_json) and legacy format (patient_id + treatment_ids)
@@ -207,6 +209,7 @@ def add_invoice():
 
 @invoices_bp.route("/<int:invoice_id>")
 @login_required
+@permissions_required("billing.view")
 def detail_invoice(invoice_id):
     invoice = db.get_or_404(Invoice, invoice_id)
     rate_record = db.session.execute(
@@ -225,6 +228,7 @@ def detail_invoice(invoice_id):
 
 @invoices_bp.route("/<int:invoice_id>/pdf")
 @login_required
+@permissions_required("billing.view")
 def download_pdf(invoice_id):
     invoice = db.get_or_404(Invoice, invoice_id)
 
@@ -241,6 +245,7 @@ def download_pdf(invoice_id):
 
 @invoices_bp.route("/<int:invoice_id>/status", methods=["POST"])
 @login_required
+@permissions_required("billing.edit")
 def update_status(invoice_id):
     invoice = db.get_or_404(Invoice, invoice_id)
     new_status = request.form.get("status", "")
@@ -280,6 +285,7 @@ def update_status(invoice_id):
 
 @invoices_bp.route("/<int:invoice_id>/send-email", methods=["POST"])
 @login_required
+@permissions_required("billing.edit")
 def send_email(invoice_id):
     invoice = db.get_or_404(Invoice, invoice_id)
 
@@ -296,7 +302,7 @@ def send_email(invoice_id):
 
 @invoices_bp.route("/<int:invoice_id>/delete", methods=["POST"])
 @login_required
-@roles_required("admin")
+@permissions_required("billing.delete")
 def delete_invoice(invoice_id):
     invoice = db.get_or_404(Invoice, invoice_id)
     invoice.is_deleted = True
@@ -307,6 +313,7 @@ def delete_invoice(invoice_id):
 
 @invoices_bp.route("/api/treatment-price/<int:treatment_id>")
 @login_required
+@permissions_required("billing.edit")
 def get_treatment_price(treatment_id):
     pt = db.session.get(PatientTreatment, treatment_id)
     if pt:
@@ -319,6 +326,7 @@ def get_treatment_price(treatment_id):
 
 @invoices_bp.route("/api/party/<int:party_id>")
 @login_required
+@permissions_required("billing.edit")
 def get_party_info(party_id):
     """Get party info for invoice form."""
     party = db.session.get(Party, party_id)
@@ -337,6 +345,7 @@ def get_party_info(party_id):
 
 @invoices_bp.route("/api/exchange-rate")
 @login_required
+@permissions_required("billing.edit")
 def get_exchange_rate_for_date():
     """Return the rate that will be fixed on an invoice for the requested date."""
     from app.services.validation_service import parse_date

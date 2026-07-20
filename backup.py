@@ -4,18 +4,67 @@
 from __future__ import annotations
 
 import argparse
+import base64
+import hashlib
 import os
 import sqlite3
 import sys
 import tempfile
-from contextlib import closing
+from contextlib import closing, contextmanager
 from datetime import datetime
 from pathlib import Path
 from urllib.parse import unquote
 
+from cryptography.fernet import Fernet, InvalidToken
+
 
 PROJECT_ROOT = Path(__file__).resolve().parent
-BACKUP_PATTERN = "makroortodonti_*.db"
+BACKUP_PATTERN = "makroortodonti_*.db*"
+
+
+def _backup_keys() -> list[Fernet]:
+    """Return current then previous backup keys, supporting safe rotation."""
+    raw_keys = os.environ.get("BACKUP_ENCRYPTION_KEYS", "").split(",")
+    keys = [key.strip() for key in raw_keys if key.strip()]
+    return [
+        Fernet(base64.urlsafe_b64encode(hashlib.sha256(key.encode()).digest()))
+        for key in keys
+    ]
+
+
+def _encrypt_backup(path: Path) -> Path:
+    keys = _backup_keys()
+    if not keys:
+        return path
+    encrypted = path.with_suffix(path.suffix + ".enc")
+    encrypted.write_bytes(keys[0].encrypt(path.read_bytes()))
+    path.unlink()
+    return encrypted
+
+
+@contextmanager
+def _readable_backup(path: Path):
+    if path.suffix != ".enc":
+        yield path
+        return
+    payload = path.read_bytes()
+    plaintext = None
+    for key in _backup_keys():
+        try:
+            plaintext = key.decrypt(payload)
+            break
+        except InvalidToken:
+            continue
+    if plaintext is None:
+        raise ValueError("Şifreli yedek mevcut BACKUP_ENCRYPTION_KEYS ile açılamadı.")
+    fd, name = tempfile.mkstemp(prefix="makro-backup-decrypt-", suffix=".db")
+    os.close(fd)
+    temporary = Path(name)
+    try:
+        temporary.write_bytes(plaintext)
+        yield temporary
+    finally:
+        temporary.unlink(missing_ok=True)
 
 
 def _db_path() -> Path:
@@ -74,6 +123,7 @@ def cmd_backup(args: argparse.Namespace) -> int:
         result = _integrity_result(destination)
         if result != "ok":
             raise sqlite3.DatabaseError(f"integrity_check: {result}")
+        destination = _encrypt_backup(destination)
     except Exception as exc:
         destination.unlink(missing_ok=True)
         print(f"ERROR: Backup failed: {exc}", file=sys.stderr)
@@ -100,7 +150,8 @@ def cmd_verify(args: argparse.Namespace) -> int:
         if not target.is_file():
             print(f"ERROR: Backup file not found: {target}", file=sys.stderr)
             return 1
-        result = _integrity_result(target)
+        with _readable_backup(target) as readable:
+            result = _integrity_result(readable)
     except (ValueError, sqlite3.Error, OSError) as exc:
         print(f"ERROR: Verification failed: {exc}", file=sys.stderr)
         return 1
@@ -140,9 +191,6 @@ def cmd_restore(args: argparse.Namespace) -> int:
         print(f"ERROR: Backup file not found: {source}", file=sys.stderr)
         return 1
     try:
-        if _integrity_result(source) != "ok":
-            print("ERROR: Source backup failed integrity check.", file=sys.stderr)
-            return 1
         db_path = _db_path()
     except (ValueError, sqlite3.Error, OSError) as exc:
         print(f"ERROR: Restore preflight failed: {exc}", file=sys.stderr)
@@ -176,7 +224,10 @@ def cmd_restore(args: argparse.Namespace) -> int:
     os.close(temp_fd)
     temporary = Path(temp_name)
     try:
-        _online_backup(source, temporary)
+        with _readable_backup(source) as readable:
+            if _integrity_result(readable) != "ok":
+                raise sqlite3.DatabaseError("source backup failed integrity check")
+            _online_backup(readable, temporary)
         if _integrity_result(temporary) != "ok":
             raise sqlite3.DatabaseError("restored database integrity check failed")
         if original_mode is not None:

@@ -4,14 +4,14 @@ from datetime import date
 
 from app.extensions import db
 from app.models.models import Settings, ExchangeRate
-from app.authz import roles_required
+from app.authz import permissions_required
 
 settings_bp = Blueprint("settings", __name__)
 
 
 @settings_bp.route("/")
 @login_required
-@roles_required("admin")
+@permissions_required("settings.manage")
 def index():
     settings = db.session.execute(db.select(Settings)).scalars().all()
     settings_dict = {s.key: s.value for s in settings}
@@ -33,7 +33,7 @@ def index():
 
 @settings_bp.route("/update", methods=["POST"])
 @login_required
-@roles_required("admin")
+@permissions_required("settings.manage")
 def update_settings():
     allowed_keys = {
         "clinic_name", "clinic_address", "clinic_phone", "clinic_email",
@@ -70,7 +70,7 @@ def update_settings():
 
 @settings_bp.route("/exchange-rate/add", methods=["POST"])
 @login_required
-@roles_required("admin")
+@permissions_required("settings.manage")
 def add_exchange_rate():
     rate_date_str = request.form.get("rate_date", "")
     rate_value = request.form.get("eur_try_rate", "")
@@ -110,7 +110,7 @@ def add_exchange_rate():
 
 @settings_bp.route("/exchange-rate/fetch", methods=["POST"])
 @login_required
-@roles_required("admin")
+@permissions_required("settings.manage")
 def fetch_exchange_rate():
     from app.services.exchange_service import fetch_and_store_rate
     try:

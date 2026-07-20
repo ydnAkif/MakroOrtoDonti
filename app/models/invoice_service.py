@@ -6,7 +6,7 @@ from datetime import date
 from decimal import Decimal, InvalidOperation
 from typing import Optional, List, Dict, Any
 
-from sqlalchemy import select, update
+from sqlalchemy import Integer, cast, select, update
 
 from .models import (
     ExchangeRate, Invoice, InvoiceItem, InvoiceItemType,
@@ -91,22 +91,23 @@ class InvoiceService:
             ).scalar_one_or_none()
             or "MKR"
         )
-        next_num_str = (
-            session.execute(
-                select(Settings.value).where(Settings.key == "invoice_next_number")
-            ).scalar_one_or_none()
-            or "1"
-        )
-        next_num = int(next_num_str)
-        year = (invoice_date or date.today()).year
-        invoice_number = f"{prefix}-{year}-{next_num:04d}"
-
-        # Atomic update to prevent race conditions
-        session.execute(
+        # Increment and return in one database statement. SQLite serializes this
+        # write and PostgreSQL applies a row lock, so concurrent workers cannot
+        # observe and reuse the same counter value.
+        incremented = session.execute(
             update(Settings)
             .where(Settings.key == "invoice_next_number")
-            .values(value=str(next_num + 1))
-        )
+            .values(value=cast(Settings.value, Integer) + 1)
+            .returning(Settings.value)
+        ).scalar_one_or_none()
+        if incremented is None:
+            # A correctly migrated database always has this row. Keeping the
+            # failure explicit prevents silently issuing duplicate numbers.
+            raise RuntimeError("invoice_next_number ayarı bulunamadı.")
+
+        next_num = int(incremented) - 1
+        year = (invoice_date or date.today()).year
+        invoice_number = f"{prefix}-{year}-{next_num:04d}"
         session.flush()
 
         return invoice_number

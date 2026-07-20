@@ -1,5 +1,6 @@
 from flask import Blueprint, render_template, redirect, url_for, flash, request, jsonify
 from flask_login import login_required
+from app.authz import permissions_required
 
 from app.extensions import db
 from app.models.models import Party, PartyType, Invoice, WhatsAppSession
@@ -9,6 +10,7 @@ whatsapp_bp = Blueprint("whatsapp", __name__)
 
 @whatsapp_bp.route("/")
 @login_required
+@permissions_required("messaging.use")
 def index():
     from app.services.whatsapp_service import WhatsAppService
     status = WhatsAppService.get_status()
@@ -30,6 +32,7 @@ def index():
 
 @whatsapp_bp.route("/connect", methods=["POST"])
 @login_required
+@permissions_required("messaging.use")
 def connect():
     from app.services.whatsapp_service import WhatsAppService
     phone = request.form.get("phone_number", "").strip()
@@ -40,6 +43,7 @@ def connect():
 
 @whatsapp_bp.route("/disconnect", methods=["POST"])
 @login_required
+@permissions_required("messaging.use")
 def disconnect():
     from app.services.whatsapp_service import WhatsAppService
     result = WhatsAppService.disconnect()
@@ -49,6 +53,7 @@ def disconnect():
 
 @whatsapp_bp.route("/send", methods=["POST"])
 @login_required
+@permissions_required("messaging.use")
 def send_message():
     from app.services.whatsapp_service import WhatsAppService
     phone = request.form.get("phone_number", "").strip()
@@ -65,6 +70,7 @@ def send_message():
 
 @whatsapp_bp.route("/send-invoice/<int:invoice_id>", methods=["POST"])
 @login_required
+@permissions_required("messaging.use")
 def send_invoice(invoice_id):
     from app.services.whatsapp_service import WhatsAppService
     invoice = db.get_or_404(Invoice, invoice_id)
@@ -75,6 +81,7 @@ def send_invoice(invoice_id):
 
 @whatsapp_bp.route("/send-bulk", methods=["POST"])
 @login_required
+@permissions_required("messaging.use")
 def send_bulk():
     from app.services.whatsapp_service import WhatsAppService
     import time
@@ -105,6 +112,7 @@ def send_bulk():
 
 @whatsapp_bp.route("/status")
 @login_required
+@permissions_required("messaging.use")
 def status():
     from app.services.whatsapp_service import WhatsAppService
     status = WhatsAppService.get_status()

@@ -4,6 +4,7 @@ from decimal import Decimal
 
 from flask import Blueprint, render_template, request
 from flask_login import login_required
+from app.authz import permissions_required
 from sqlalchemy.orm import selectinload
 
 from app.extensions import db
@@ -94,6 +95,7 @@ def _trend_rows(start: date, end: date, invoices: list[Invoice], payments: list[
 
 @reports_bp.route("/")
 @login_required
+@permissions_required("reports.view")
 def index():
     today = date.today()
     start_date, end_date, selected_period = _resolve_period(today)

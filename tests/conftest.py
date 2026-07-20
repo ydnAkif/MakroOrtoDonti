@@ -161,6 +161,8 @@ def live_server_url(tmp_path_factory):
         ))
         db.session.add(Treatment(name="E2E Muayene", category="other", price_eur=Decimal("50.00")))
         db.session.add(ExchangeRate(rate_date=date.today(), eur_to_try=Decimal("40.0000"), source="ecb"))
+        db.session.add(Settings(key="invoice_prefix", value="MKR"))
+        db.session.add(Settings(key="invoice_next_number", value="1"))
         db.session.commit()
 
     server = make_server("127.0.0.1", 0, e2e_app)

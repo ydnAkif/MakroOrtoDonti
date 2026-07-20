@@ -5,7 +5,7 @@ from decimal import Decimal
 
 from app.extensions import db
 from app.models.models import Payment, PaymentMethod, Invoice, ExchangeRate
-from app.authz import roles_required
+from app.authz import permissions_required
 
 payments_bp = Blueprint("payments", __name__)
 
@@ -20,6 +20,7 @@ def _payment_status(invoice: Invoice, total_paid_eur: Decimal, as_of: date) -> s
 
 @payments_bp.route("/")
 @login_required
+@permissions_required("billing.view")
 def list_payments():
     search = request.args.get("search", "").strip()
     method = request.args.get("method", "")
@@ -97,6 +98,7 @@ def list_payments():
 
 @payments_bp.route("/add", methods=["GET", "POST"])
 @login_required
+@permissions_required("billing.edit")
 def add_payment():
     if request.method == "POST":
         from app.services.validation_service import parse_date, parse_enum, parse_decimal
@@ -202,7 +204,7 @@ def add_payment():
 
 @payments_bp.route("/<int:payment_id>/delete", methods=["POST"])
 @login_required
-@roles_required("admin")
+@permissions_required("billing.delete")
 def delete_payment(payment_id):
     payment = db.get_or_404(Payment, payment_id)
     invoice = payment.invoice

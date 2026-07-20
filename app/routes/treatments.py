@@ -1,40 +1,31 @@
 from flask import Blueprint, render_template, redirect, url_for, flash, request, jsonify
 from flask_login import login_required
 import io
-from math import isfinite
 
 from app.extensions import db
 from app.models.models import Treatment, TreatmentCategory
-from app.authz import roles_required
+from app.authz import permissions_required
+from app.services.validation_service import (
+    TREATMENT_CATEGORY_ALIASES,
+    normalize_treatment_fields,
+)
 
 treatments_bp = Blueprint("treatments", __name__)
 
 
 def _treatment_form_values():
     """Validate and normalize the treatment fields shared by add/edit."""
-    name = request.form.get("name", "").strip()
-    description = request.form.get("description", "").strip() or None
-    category = request.form.get("category", "")
-    raw_price = request.form.get("price_eur", "").strip().replace(",", ".")
-
-    if not name or len(name) > 200:
-        raise ValueError("Tedavi adı 1–200 karakter olmalıdır.")
-    if description and len(description) > 2000:
-        raise ValueError("Tedavi açıklaması 2000 karakteri aşamaz.")
-    if category not in TreatmentCategory.ALL:
-        raise ValueError("Geçersiz tedavi kategorisi.")
-    try:
-        price_eur = float(raw_price)
-    except (TypeError, ValueError) as exc:
-        raise ValueError("Tedavi fiyatı sayısal olmalıdır.") from exc
-    if not isfinite(price_eur) or price_eur < 0:
-        raise ValueError("Tedavi fiyatı negatif veya sonsuz olamaz.")
-
-    return name, description, category, round(price_eur, 2)
+    return normalize_treatment_fields(
+        request.form.get("name"),
+        request.form.get("description"),
+        request.form.get("category"),
+        request.form.get("price_eur"),
+    )
 
 
 @treatments_bp.route("/")
 @login_required
+@permissions_required("clinical.view")
 def list_treatments():
     category = request.args.get("category", "")
     search = request.args.get("search", "").strip()
@@ -77,7 +68,7 @@ def list_treatments():
 
 @treatments_bp.route("/add", methods=["GET", "POST"])
 @login_required
-@roles_required("admin")
+@permissions_required("clinical.edit")
 def add_treatment():
     if request.method == "POST":
         try:
@@ -113,7 +104,7 @@ def add_treatment():
 
 @treatments_bp.route("/<int:treatment_id>/edit", methods=["GET", "POST"])
 @login_required
-@roles_required("admin")
+@permissions_required("clinical.edit")
 def edit_treatment(treatment_id):
     treatment = db.get_or_404(Treatment, treatment_id)
 
@@ -148,7 +139,7 @@ def edit_treatment(treatment_id):
 
 @treatments_bp.route("/<int:treatment_id>/delete", methods=["POST"])
 @login_required
-@roles_required("admin")
+@permissions_required("clinical.edit")
 def delete_treatment(treatment_id):
     treatment = db.get_or_404(Treatment, treatment_id)
     treatment.is_active = False
@@ -157,29 +148,7 @@ def delete_treatment(treatment_id):
     return redirect(url_for("treatments.list_treatments"))
 
 
-CATEGORY_MAP = {
-    "ortodonti": "orthodontic",
-    "orthodontic": "orthodontic",
-    "protetik": "prosthetic",
-    "prosthetic": "prosthetic",
-    "cerrahi": "surgical",
-    "surgical": "surgical",
-    "koruyucu": "preventive",
-    "preventive": "preventive",
-    "restoratif": "restorative",
-    "restorative": "restorative",
-    "periodontik": "periodontic",
-    "periodontoloji": "periodontic",
-    "periodontic": "periodontic",
-    "endodontik": "endodontic",
-    "endodonti": "endodontic",
-    "endodontic": "endodontic",
-    "implant": "implant",
-    "kozmetik": "cosmetic",
-    "cosmetic": "cosmetic",
-    "diger": "other",
-    "other": "other",
-}
+CATEGORY_MAP = TREATMENT_CATEGORY_ALIASES
 
 CATEGORY_LABELS_REV = {
     "ortodonti": "orthodontic",
@@ -202,7 +171,7 @@ CATEGORY_LABELS_REV = {
 
 @treatments_bp.route("/import", methods=["GET", "POST"])
 @login_required
-@roles_required("admin")
+@permissions_required("clinical.edit")
 def import_treatments():
     if request.method == "POST":
         file = request.files.get("file")
@@ -231,23 +200,16 @@ def import_treatments():
                     skipped += 1
                     continue
 
-                name = str(row[0]).strip()
-                if not name:
+                try:
+                    name, description, category, price = normalize_treatment_fields(
+                        row[0],
+                        row[3] if len(row) > 3 else None,
+                        row[1] if len(row) > 1 else "other",
+                        row[2] if len(row) > 2 else None,
+                    )
+                except ValueError:
                     skipped += 1
                     continue
-
-                # Column B: category (TR or EN)
-                raw_cat = str(row[1]).strip().lower() if len(row) > 1 and row[1] else "other"
-                category = CATEGORY_MAP.get(raw_cat, "other")
-
-                # Column C: price EUR
-                try:
-                    price = float(row[2]) if len(row) > 2 and row[2] else 0.0
-                except (ValueError, TypeError):
-                    price = 0.0
-
-                # Column D: description
-                description = str(row[3]).strip() if len(row) > 3 and row[3] else None
 
                 existing = db.session.execute(
                     db.select(Treatment).where(Treatment.name == name)
@@ -291,7 +253,7 @@ def import_treatments():
 
 @treatments_bp.route("/api/update", methods=["POST"])
 @login_required
-@roles_required("admin")
+@permissions_required("clinical.edit")
 def api_update_treatment():
     data = request.get_json()
     if not data or "id" not in data:
@@ -301,18 +263,20 @@ def api_update_treatment():
     if not treatment:
         return jsonify({"error": "Tedavi bulunamadı"}), 404
 
-    if "name" in data:
-        treatment.name = str(data["name"]).strip()
-    if "category" in data:
-        cat_raw = str(data["category"]).strip().lower()
-        treatment.category = CATEGORY_MAP.get(cat_raw, cat_raw)
-    if "price_eur" in data:
-        try:
-            treatment.price_eur = float(data["price_eur"])
-        except (ValueError, TypeError):
-            return jsonify({"error": "Geçersiz fiyat"}), 400
-    if "description" in data:
-        treatment.description = str(data["description"]).strip() or None
+    try:
+        name, description, category, price = normalize_treatment_fields(
+            data.get("name", treatment.name),
+            data.get("description", treatment.description),
+            data.get("category", treatment.category),
+            data.get("price_eur", treatment.price_eur),
+        )
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+
+    treatment.name = name
+    treatment.description = description
+    treatment.category = category
+    treatment.price_eur = price
 
     db.session.commit()
 
