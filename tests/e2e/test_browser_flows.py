@@ -7,6 +7,30 @@ import pytest
 AXE_SOURCE = Path(__file__).parents[2] / "app/static/vendor/axe.min.js"
 
 
+def test_turkish_font_families_are_loaded(page, live_server_url):
+    page.goto(f"{live_server_url}/login")
+    page.wait_for_function("document.fonts.status === 'loaded'")
+
+    result = page.evaluate("""() => {
+        const heading = document.querySelector('.login-form h2');
+        const body = document.querySelector('.login-form > p');
+        const loadedFamilies = [...document.fonts]
+            .filter(face => face.status === 'loaded')
+            .map(face => face.family.replaceAll('"', ''));
+        return {
+            headingFamily: getComputedStyle(heading).fontFamily,
+            bodyFamily: getComputedStyle(body).fontFamily,
+            familjenLoaded: loadedFamilies.includes('Familjen Grotesk'),
+            manropeLoaded: loadedFamilies.includes('Manrope'),
+        };
+    }""")
+
+    assert result["headingFamily"].startswith('"Familjen Grotesk"')
+    assert result["bodyFamily"].startswith('Manrope') or result["bodyFamily"].startswith('"Manrope"')
+    assert result["familjenLoaded"] is True
+    assert result["manropeLoaded"] is True
+
+
 @pytest.mark.parametrize("viewport", [{"width": 400, "height": 765}, {"width": 1280, "height": 900}])
 def test_authenticated_shell_has_no_serious_accessibility_violations(authenticated_page, viewport):
     page = authenticated_page
