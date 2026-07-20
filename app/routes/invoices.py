@@ -5,6 +5,7 @@ import io
 import json
 
 from app.extensions import db
+from app.services.exchange_service import get_latest_rate, get_latest_usd_rate
 from app.models.models import (
     ExchangeRate, INVOICE_CATEGORY_LABELS, Invoice, InvoiceItem, InvoiceItemType,
     Party, PartyType, PatientTreatment, Treatment,
@@ -181,6 +182,8 @@ def add_invoice():
         .order_by(ExchangeRate.rate_date.desc())
         .limit(1)
     ).scalar_one_or_none()
+    
+    current_usd_rate = get_latest_usd_rate() or 0
 
     # Prepare treatments for JSON serialization
     treatments_json = [
@@ -201,6 +204,7 @@ def add_invoice():
         patient_treatments=patient_treatments,
         treatments=treatments_json,
         current_rate=current_rate,
+        current_usd_rate=current_usd_rate,
         category_labels=INVOICE_CATEGORY_LABELS,
         today=date.today(),
         selected_party_id=request.args.get("party_id", type=int),

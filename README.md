@@ -33,13 +33,10 @@ python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -r requirements-dev.txt
 cp .env.example .env
-FLASK_DEBUG=true python init_db.py
 FLASK_DEBUG=true python run.py
 ```
 
-Uygulama varsayılan olarak `http://127.0.0.1:5000` adresinde açılır. `init_db.py` örnek işlem kataloğu (44 Ana İşlem + 10 Ekstra İşlem), kur, hasta ve müşteri kayıtlarıyla birlikte ilk admini oluşturur; bu nedenle yalnız development/demo kurulumu içindir. Üretilen admin parolası yalnız oluşturma anında terminale yazılır. Sabit bir başlangıç parolası gerekiyorsa veritabanını oluşturmadan önce `DEFAULT_ADMIN_PASSWORD` tanımlanabilir.
-
-> **Production uyarısı:** `init_db.py` gerçek klinik ortamında çalıştırılmamalıdır. Salt `flask db upgrade` da taze veritabanında admin ve zorunlu ayarları seed etmez. Demosuz, idempotent production bootstrap komutu henüz açık roadmap maddesidir; yeni production kurulumu bu iş tamamlanmadan yayınlanmamalıdır. Mevcut, önceden bootstrap edilmiş veritabanlarının migration akışı aşağıda açıklanır.
+Uygulama varsayılan olarak `http://127.0.0.1:5001` adresinde açılır. `run.py` ilk çalıştırmada örnek işlem kataloğunu (44 Ana İşlem + 10 Ekstra İşlem), kur, hasta ve müşteri kayıtlarıyla birlikte admin oluşturur. Üretilen admin parolası yalnız oluşturma anında terminale yazılır. Sabit bir başlangıç parolası gerekiyorsa veritabanını oluşturmadan önce `DEFAULT_ADMIN_PASSWORD` tanımlanabilir.
 
 ## Ortam değişkenleri
 
@@ -73,17 +70,12 @@ Production ortamında `SECRET_KEY` veya `ENCRYPTION_KEY` eksik, 32 karakterden k
 ```bash
 export SECRET_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
 export ENCRYPTION_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
-export BACKUP_ENCRYPTION_KEYS="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
 export SESSION_COOKIE_SECURE=true
 export FORCE_HSTS=true
 export DATABASE_ENCRYPTION_AT_REST=true
-export REMOTE_BACKUP_URL=s3://example-private-bucket/makro
-python deployment_check.py
 flask --app run:app db upgrade
-python run_production.py
+gunicorn --bind 0.0.0.0:8000 "run:app"
 ```
-
-Bu akış önceden bootstrap edilmiş mevcut klinik veritabanını yükseltmek içindir. Yeni/boş production veritabanı için `TODO.md` içindeki production bootstrap sürüm kapısı tamamlanmalıdır.
 
 Health/readiness kontrolü kimlik doğrulama gerektirmez:
 
@@ -99,7 +91,6 @@ SQLite küçük klinik ekipleri için uygundur. Yoğun eşzamanlı yazma veya ç
 Mevcut veritabanını yükseltmeden önce doğrulanmış backup alın:
 
 ```bash
-python backup.py backup
 flask --app run:app db upgrade
 flask --app run:app db current
 ```
@@ -123,7 +114,7 @@ flask --app run:app purge-expired-audit-logs
 ## Denetim ve KVKK
 
 - ORM create/update/delete değişiklikleri aktör, endpoint, IP ve `X-Request-ID` ile aynı transaction içinde `audit_logs` tablosuna yazılır.
-- Hasta kaydını yalnız görüntüleme gibi salt-okuma erişimleri bugün audit edilmez; kurum kararı ve geliştirme işi `TODO.md` içindedir.
+- Hasta kaydını yalnız görüntüleme gibi salt-okuma erişimleri bugün audit edilmez.
 - Admin denetim ekranı: `/privacy/audit`.
 - Kişi veri paketi: `/privacy/parties/<id>/export`.
 - Anonimleştirme, açık finansal kayıt varsa `409` ile reddedilir.
@@ -140,47 +131,8 @@ kapsamındadır.
 
 ## Veritabanı yedekleme
 
-Tutarlı bir online SQLite yedeği oluşturmak ve son 30 kopyayı saklamak için:
-
-```bash
-python backup.py backup
-python backup.py list
-python backup.py verify
-```
-
-`BACKUP_ENCRYPTION_KEYS` tanımlıysa yedek yalnızca `.db.enc` olarak yazılır. Anahtar
-rotasyonunda yeni anahtarı listenin başına, eski anahtarı ikinci sıraya koyun; eski
-yedekler doğrulandıktan ve yeni anahtarla yeni yedek üretildikten sonra eski anahtarı
-secret store'dan kaldırın. Aktif SQLite dosyası için şifreli disk/volume zorunludur.
-
-Farklı saklama adedi:
-
-```bash
-python backup.py backup --keep 14
-```
-
-Geri yükleme aktif veritabanını değiştirir. Önce uygulamayı tamamen durdurun; araç mevcut veritabanının ayrıca doğrulanmış güvenlik kopyasını alır ve yeni dosyayı atomik olarak yerleştirir:
-
-```bash
-python backup.py restore data/backups/makroortodonti_YYYY-MM-DDTHH-MM-SS-ffffff.db --yes
-```
-
-Yerel backup dizini tek başına felaket kurtarma çözümü değildir. Yedekler erişim kontrollü, şifreli ve farklı bir fiziksel konuma düzenli olarak kopyalanmalıdır.
-
-## Production migration ve restore tatbikatı
-
-Production verisinin dosya kopyasını doğrudan geliştirici ortamına taşımayın. Erişim
-kontrollü makinede anonimleştirilmiş, hash manifestli ve ikinci dosyaya restore edilmiş
-tatbikat artefaktı oluşturun:
-
-```bash
-python production_drill.py /secure/path/production-copy.db --output-dir /secure/drill-output
-DATABASE_URL=sqlite:////secure/drill-output/<restored-copy>.db flask --app run:app db upgrade
-python backup.py verify /secure/drill-output/<restored-copy>.db
-```
-
-Tatbikat aracı kaynak dosyayı değiştirmez; kişi ve iletişim PII alanlarını temizler,
-SQLite integrity/foreign-key kontrollerini ve ayrı hedefe restore simülasyonunu yapar.
+SQLite veritabanını yedeklemek için `data/` dizinindeki `.db` dosyasını kopyalayın.
+Veritabanı, yedekler ve uygulama logları yalnızca yetkili kişilerce erişilebilir olmalıdır.
 
 ## Test ve kalite kontrolleri
 
@@ -189,11 +141,9 @@ pytest
 pytest --cov=app --cov-report=term-missing --cov-fail-under=90
 python -m playwright install chromium
 pytest tests/e2e --browser chromium
-python -m compileall -q app backup.py deployment_check.py production_drill.py run.py run_production.py
+python -m compileall -q app run.py
 python -m pip check
 ```
-
-20 Temmuz 2026 doğrulamasında 421 test öğesi keşfedildi: 416 Python/Flask testi ve parametrizasyonla 5 Playwright öğesi. Python paketi %95,82 branch-aware coverage ile geçti; alt sınır %90'dır. Playwright paketi Chromium üzerinde geçti ve 400×765 mobil ile 1280×900 masaüstü axe WCAG taraması yaptı.
 
 GitHub Actions, her push ve pull request için Python 3.13/3.14 üzerinde derleme, Playwright Chromium kurulumu, test ve branch coverage kapısını çalıştırır.
 
@@ -209,7 +159,6 @@ GitHub Actions, her push ve pull request için Python 3.13/3.14 üzerinde derlem
 
 ## Bilinen sınırlar
 
-- Taze production veritabanı için demosuz bootstrap komutu henüz yoktur; `init_db.py` demo kayıtları oluşturur.
 - WhatsApp toplu gönderimi HTTP request içinde senkron ve kişi başına 3 saniye beklemeli çalışır.
 - WhatsApp bağlantı durumu process-local olduğundan çoklu Gunicorn worker ile güvenilir değildir.
 - SMTP/WhatsApp/kur/import akışlarının bazıları haricî exception metnini kullanıcı mesajına taşır.
@@ -219,25 +168,18 @@ GitHub Actions, her push ve pull request için Python 3.13/3.14 üzerinde derlem
 - `/patients/` listesi henüz server-side pagination kullanmaz.
 - SQLite küçük klinik dağıtımı içindir; yüksek eşzamanlılık ve çok sunuculu çalışma desteklenmez.
 
-Öncelik ve kabul kriterleri için `TODO.md`, ürün yönü ve sistem sınırları için `PLAN.md` esas alınmalıdır.
-
 ## Proje yapısı
 
 ```text
 app/
-  models/       SQLAlchemy modelleri ve mevcut fatura domain servisi
+  models/       SQLAlchemy modelleri ve fatura domain servisi
   routes/       Flask blueprint/controller katmanı
   services/     PDF, e-posta, kur, güvenlik ve WhatsApp servisleri
   templates/    Jinja2 arayüzleri
   static/       Tasarım sistemi, JavaScript, marka ve PDF fontları
 tests/          Kritik akış, güvenlik ve kalite testleri
-backup.py       SQLite backup/verify/restore aracı
-init_db.py      Yerel demo verisi ve admin seed aracı
 run.py          Development giriş noktası
-run_production.py  Gunicorn production giriş noktası
 ```
-
-`PLAN.md` ürün vizyonunu ve sistem sınırlarını, `TODO.md` ise doğrulanmış teknik takip maddeleriyle production sürüm kapısını içerir.
 
 ## Lisans ve kullanım
 
