@@ -3,10 +3,26 @@ from flask_login import login_required
 from datetime import date
 
 from app.extensions import db
-from app.models.models import Party, PartyType, Treatment, Invoice, PatientTreatment, ExchangeRate
+from app.models.models import Party, PartyType, WorkOrder, Treatment, TreatmentCategory, ExchangeRate
 from app.authz import permissions_required
 
 parties_bp = Blueprint("parties", __name__)
+
+
+def _get_treatments_by_category(category):
+    treatments = db.session.execute(
+        db.select(Treatment)
+        .where(Treatment.category == category, Treatment.is_active == True)
+        .order_by(Treatment.name)
+    ).scalars().all()
+    return [{"id": t.id, "name": t.name, "price": float(t.price_eur), "currency": t.currency} for t in treatments]
+
+
+def _get_current_rate():
+    rate = db.session.execute(
+        db.select(ExchangeRate).order_by(ExchangeRate.rate_date.desc()).limit(1)
+    ).scalar_one_or_none()
+    return float(rate.eur_to_try) if rate else 0
 
 
 @parties_bp.route("/")
@@ -14,29 +30,19 @@ parties_bp = Blueprint("parties", __name__)
 @permissions_required("clinical.view")
 def list_parties():
     search = request.args.get("search", "").strip()
-    party_type = request.args.get("type", "")
 
-    query = db.select(Party).where(Party.is_active == True)
+    query = db.select(Party).where(
+        Party.party_type == PartyType.DENTIST,
+        Party.is_active == True,
+    )
 
-    if party_type:
-        from app.services.validation_service import parse_enum
-
-        parsed_type = parse_enum(PartyType, party_type)
-        if parsed_type is None:
-            flash("Geçersiz kişi tipi.", "warning")
-            return redirect(url_for("parties.list_parties"))
-        query = query.where(Party.party_type == parsed_type)
-    
     if search:
         search_pattern = f"%{search}%"
         query = query.where(
             db.or_(
                 Party.name.ilike(search_pattern),
-                Party.first_name.ilike(search_pattern),
-                Party.last_name.ilike(search_pattern),
                 Party.phone.ilike(search_pattern),
                 Party.email.ilike(search_pattern),
-                Party.tax_id.ilike(search_pattern),
             )
         )
 
@@ -44,18 +50,10 @@ def list_parties():
     pagination = db.paginate(query, page=max(request.args.get("page", 1, type=int), 1), per_page=25, max_per_page=100, error_out=False)
     parties = pagination.items
 
-    type_labels = {
-        "patient": "Hasta",
-        "dentist_customer": "Diş Hekimi Müşterisi",
-        "company_customer": "Kurumsal Müşteri",
-    }
-
     return render_template(
         "parties/list.html",
         parties=parties,
         search=search,
-        selected_type=party_type,
-        type_labels=type_labels,
         pagination=pagination,
     )
 
@@ -65,43 +63,22 @@ def list_parties():
 @permissions_required("clinical.edit")
 def add_party():
     if request.method == "POST":
-        from app.services.validation_service import parse_date, parse_enum
-        party_type = parse_enum(PartyType, request.form.get("party_type", ""))
-        if not party_type:
-            flash("Geçersiz müşteri tipi seçildi.", "danger")
-            return redirect(url_for("parties.add_party"))
-
-        dob = parse_date(request.form.get("date_of_birth", "")) if request.form.get("date_of_birth") else None
-        if request.form.get("date_of_birth") and not dob:
-            flash("Geçersiz doğum tarihi formatı.", "danger")
-            return redirect(url_for("parties.add_party"))
-
         party = Party(
-            party_type=party_type,
-            name=request.form.get("name", "").strip() or f"{request.form.get('first_name', '')} {request.form.get('last_name', '')}".strip(),
-            first_name=request.form.get("first_name", "").strip() or None,
-            last_name=request.form.get("last_name", "").strip() or None,
-            date_of_birth=dob,
+            party_type=PartyType.DENTIST,
+            name=request.form.get("name", "").strip(),
             phone=request.form.get("phone", "").strip() or None,
             email=request.form.get("email", "").strip() or None,
             address=request.form.get("address", "").strip() or None,
             tax_id=request.form.get("tax_id", "").strip() or None,
             notes=request.form.get("notes", "").strip() or None,
-            treatment_status=request.form.get("treatment_status", "active"),
-            contact_person=request.form.get("contact_person", "").strip() or None,
-            contact_phone=request.form.get("contact_phone", "").strip() or None,
             is_active=request.form.get("is_active") == "on",
         )
-        party.referred_by_id = request.form.get("referred_by_id", type=int)
         db.session.add(party)
         db.session.commit()
         flash(f"{party.display_name} başarıyla eklendi.", "success")
         return redirect(url_for("parties.detail_party", party_id=party.id))
 
-    dentists = db.session.execute(
-        db.select(Party).where(Party.party_type == PartyType.DENTIST_CUSTOMER, Party.is_active == True).order_by(Party.name)
-    ).scalars().all()
-    return render_template("parties/form.html", party=None, dentists=dentists)
+    return render_template("parties/form.html", party=None)
 
 
 @parties_bp.route("/<int:party_id>")
@@ -110,26 +87,23 @@ def add_party():
 def detail_party(party_id):
     party = db.get_or_404(Party, party_id)
 
-    invoices = db.session.execute(
-        db.select(Invoice)
-        .where(Invoice.party_id == party_id, Invoice.is_deleted == False)
-        .order_by(Invoice.invoice_date.desc())
+    work_orders = db.session.execute(
+        db.select(WorkOrder)
+        .where(WorkOrder.party_id == party_id)
+        .order_by(WorkOrder.work_date.desc())
     ).scalars().all()
 
-    total_owed_eur = sum(inv.total_eur for inv in invoices if inv.status == Invoice.STATUS_PENDING)
-    total_owed_try = sum(inv.total_try for inv in invoices if inv.status == Invoice.STATUS_PENDING)
-
-    current_rate = db.session.execute(
-        db.select(ExchangeRate).order_by(ExchangeRate.rate_date.desc()).limit(1)
-    ).scalar_one_or_none()
+    total_apparatus = sum(wo.apparatus_price for wo in work_orders)
+    total_extra = sum(wo.extra_price for wo in work_orders)
+    total_overall = sum(wo.total_price for wo in work_orders)
 
     return render_template(
         "parties/detail.html",
         party=party,
-        invoices=invoices,
-        total_owed_eur=total_owed_eur,
-        total_owed_try=total_owed_try,
-        current_rate=current_rate,
+        work_orders=work_orders,
+        total_apparatus=total_apparatus,
+        total_extra=total_extra,
+        total_overall=total_overall,
     )
 
 
@@ -140,41 +114,19 @@ def edit_party(party_id):
     party = db.get_or_404(Party, party_id)
 
     if request.method == "POST":
-        from app.services.validation_service import parse_date, parse_enum
-        party_type = parse_enum(PartyType, request.form.get("party_type", ""))
-        if not party_type:
-            flash("Geçersiz müşteri tipi seçildi.", "danger")
-            return redirect(url_for("parties.edit_party", party_id=party.id))
-
-        dob = parse_date(request.form.get("date_of_birth", "")) if request.form.get("date_of_birth") else None
-        if request.form.get("date_of_birth") and not dob:
-            flash("Geçersiz doğum tarihi formatı.", "danger")
-            return redirect(url_for("parties.edit_party", party_id=party.id))
-
-        party.party_type = party_type
-        party.name = request.form.get("name", "").strip() or (f"{request.form['first_name']} {request.form['last_name']}" if request.form.get("first_name") else request.form.get("company_name", ""))
-        party.first_name = request.form.get("first_name", "").strip() or None
-        party.last_name = request.form.get("last_name", "").strip() or None
-        party.date_of_birth = dob
+        party.name = request.form.get("name", "").strip()
         party.phone = request.form.get("phone", "").strip() or None
         party.email = request.form.get("email", "").strip() or None
         party.address = request.form.get("address", "").strip() or None
         party.tax_id = request.form.get("tax_id", "").strip() or None
         party.notes = request.form.get("notes", "").strip() or None
-        party.treatment_status = request.form.get("treatment_status", "active")
-        party.contact_person = request.form.get("contact_person", "").strip() or None
-        party.contact_phone = request.form.get("contact_phone", "").strip() or None
         party.is_active = request.form.get("is_active") == "on"
-        party.referred_by_id = request.form.get("referred_by_id", type=int)
-        
+
         db.session.commit()
         flash(f"{party.display_name} güncellendi.", "success")
         return redirect(url_for("parties.detail_party", party_id=party.id))
 
-    dentists = db.session.execute(
-        db.select(Party).where(Party.party_type == PartyType.DENTIST_CUSTOMER, Party.is_active == True).order_by(Party.name)
-    ).scalars().all()
-    return render_template("parties/form.html", party=party, dentists=dentists)
+    return render_template("parties/form.html", party=party)
 
 
 @parties_bp.route("/<int:party_id>/delete", methods=["POST"])
@@ -183,7 +135,108 @@ def edit_party(party_id):
 def delete_party(party_id):
     party = db.get_or_404(Party, party_id)
     party.is_active = False
-    
     db.session.commit()
     flash(f"{party.display_name} silindi.", "warning")
     return redirect(url_for("parties.list_parties"))
+
+
+@parties_bp.route("/<int:party_id>/work-orders/add", methods=["GET", "POST"])
+@login_required
+@permissions_required("clinical.edit")
+def add_work_order(party_id):
+    party = db.get_or_404(Party, party_id)
+
+    if request.method == "POST":
+        from app.services.validation_service import parse_date, parse_float
+
+        work_date = parse_date(request.form.get("work_date", ""))
+        if not work_date:
+            flash("Geçersiz tarih.", "danger")
+            return redirect(url_for("parties.add_work_order", party_id=party.id))
+
+        apparatus_price = parse_float(request.form.get("apparatus_price", "0")) or 0
+        extra_price = parse_float(request.form.get("extra_price", "0")) or 0
+
+        wo = WorkOrder(
+            party_id=party_id,
+            work_date=work_date,
+            apparatus_type=request.form.get("apparatus_type", "").strip(),
+            extra_addons=request.form.get("extra_addons", "").strip() or None,
+            patient_name=request.form.get("patient_name", "").strip(),
+            apparatus_price=apparatus_price,
+            extra_price=extra_price,
+            total_price=apparatus_price + extra_price,
+            notes=request.form.get("notes", "").strip() or None,
+        )
+        db.session.add(wo)
+        db.session.commit()
+        flash("İş emri başarıyla eklendi.", "success")
+        return redirect(url_for("parties.detail_party", party_id=party.id))
+
+    today = date.today().isoformat()
+    from app.services.exchange_service import get_latest_rate, get_latest_usd_rate
+    return render_template(
+        "parties/work_order_form.html",
+        party=party,
+        work_order=None,
+        today=today,
+        ana_islemler_treatments=_get_treatments_by_category(TreatmentCategory.ANA_ISLEMLER),
+        ekstra_islemler_treatments=_get_treatments_by_category(TreatmentCategory.EKSTRA_ISLEMLER),
+        eur_to_try=_get_current_rate(),
+        usd_to_try=get_latest_usd_rate() or 0,
+    )
+
+
+@parties_bp.route("/<int:party_id>/work-orders/<int:wo_id>/edit", methods=["GET", "POST"])
+@login_required
+@permissions_required("clinical.edit")
+def edit_work_order(party_id, wo_id):
+    party = db.get_or_404(Party, party_id)
+    wo = db.get_or_404(WorkOrder, wo_id)
+
+    if request.method == "POST":
+        from app.services.validation_service import parse_date, parse_float
+
+        work_date = parse_date(request.form.get("work_date", ""))
+        if not work_date:
+            flash("Geçersiz tarih.", "danger")
+            return redirect(url_for("parties.edit_work_order", party_id=party.id, wo_id=wo.id))
+
+        apparatus_price = parse_float(request.form.get("apparatus_price", "0")) or 0
+        extra_price = parse_float(request.form.get("extra_price", "0")) or 0
+
+        wo.work_date = work_date
+        wo.apparatus_type = request.form.get("apparatus_type", "").strip()
+        wo.extra_addons = request.form.get("extra_addons", "").strip() or None
+        wo.patient_name = request.form.get("patient_name", "").strip()
+        wo.apparatus_price = apparatus_price
+        wo.extra_price = extra_price
+        wo.total_price = apparatus_price + extra_price
+        wo.notes = request.form.get("notes", "").strip() or None
+
+        db.session.commit()
+        flash("İş emri güncellendi.", "success")
+        return redirect(url_for("parties.detail_party", party_id=party.id))
+
+    from app.services.exchange_service import get_latest_rate, get_latest_usd_rate
+    return render_template(
+        "parties/work_order_form.html",
+        party=party,
+        work_order=wo,
+        today=wo.work_date.isoformat(),
+        ana_islemler_treatments=_get_treatments_by_category(TreatmentCategory.ANA_ISLEMLER),
+        ekstra_islemler_treatments=_get_treatments_by_category(TreatmentCategory.EKSTRA_ISLEMLER),
+        eur_to_try=_get_current_rate(),
+        usd_to_try=get_latest_usd_rate() or 0,
+    )
+
+
+@parties_bp.route("/<int:party_id>/work-orders/<int:wo_id>/delete", methods=["POST"])
+@login_required
+@permissions_required("clinical.delete")
+def delete_work_order(party_id, wo_id):
+    wo = db.get_or_404(WorkOrder, wo_id)
+    db.session.delete(wo)
+    db.session.commit()
+    flash("İş emri silindi.", "warning")
+    return redirect(url_for("parties.detail_party", party_id=party_id))

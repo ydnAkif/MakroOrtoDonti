@@ -143,7 +143,6 @@ def test_invoice_form_totals_and_item_modal_reset_contract(client):
 
     assert 'id="subtotal-eur"' in html
     assert 'id="grand-total-eur"' in html
-    assert 'id="grand-total-try"' in html
     assert "line-subtotal-eur" not in html
     assert "line-vat-eur" not in html
     assert "function resetItemForm" in html
@@ -161,10 +160,10 @@ def test_invoice_category_and_date_rate_api(client, app):
 
     with app.app_context():
         party = db.session.execute(
-            db.select(Party).where(Party.party_type == PartyType.PATIENT).limit(1)
+            db.select(Party).where(Party.party_type == PartyType.DENTIST).limit(1)
         ).scalar_one()
         treatment = db.session.execute(
-            db.select(Treatment).where(Treatment.category == "other").limit(1)
+            db.select(Treatment).where(Treatment.category == "ana_islemler").limit(1)
         ).scalar_one()
 
     response = client.post("/invoices/add", data={
@@ -180,9 +179,9 @@ def test_invoice_category_and_date_rate_api(client, app):
     })
     assert response.status_code == 302
 
-    list_response = client.get("/invoices/?category=other")
+    list_response = client.get("/invoices/?category=ana_islemler")
     assert list_response.status_code == 200
-    assert "Diğer tedavi" in list_response.get_data(as_text=True)
+    assert "Ana İşlemler" in list_response.get_data(as_text=True)
 
 
 def test_reports_use_payments_for_collections_without_double_counting(client, app):
@@ -190,7 +189,7 @@ def test_reports_use_payments_for_collections_without_double_counting(client, ap
 
     with app.app_context():
         party = db.session.execute(
-            db.select(Party).where(Party.party_type == PartyType.PATIENT).limit(1)
+            db.select(Party).where(Party.party_type == PartyType.DENTIST).limit(1)
         ).scalar_one()
         treatment = db.session.execute(
             db.select(Treatment).where(Treatment.name == "Consultation")
@@ -304,29 +303,27 @@ def test_payment_rejects_amount_above_remaining_balance(client, app):
 # ==================== YENI TESTLER ====================
 
 def test_party_crud_patient(client, app):
-    """Hasta tipi Party CRUD testi."""
+    """Dis hekimi tipi Party CRUD testi."""
     login(client, "admin", "admin-pass")
 
     # Create
     response = client.post("/parties/add", data={
-        "party_type": "patient",
-        "first_name": "Ahmet",
-        "last_name": "Yilmaz",
+        "party_type": "dentist",
+        "name": "Dr. Ahmet Yilmaz",
         "phone": "+905551234567",
         "email": "ahmet@test.com",
-        "treatment_status": "active",
+        "is_active": "on",
     }, follow_redirects=False)
     assert response.status_code == 302
 
     with app.app_context():
         party = db.session.execute(
-            db.select(Party).where(Party.first_name == "Ahmet", Party.last_name == "Yilmaz")
+            db.select(Party).where(Party.name == "Dr. Ahmet Yilmaz")
         ).scalar_one()
-        assert party.party_type == PartyType.PATIENT
-        assert party.display_name == "Ahmet Yilmaz"
+        assert party.party_type == PartyType.DENTIST
+        assert party.display_name == "Dr. Ahmet Yilmaz"
         assert party.phone == "+905551234567"
         assert party.email == "ahmet@test.com"
-        assert party.treatment_status == "active"
 
         # Read
         response = client.get(f"/parties/{party.id}")
@@ -334,18 +331,16 @@ def test_party_crud_patient(client, app):
 
         # Update
         response = client.post(f"/parties/{party.id}/edit", data={
-            "party_type": "patient",
-            "first_name": "Ahmet Guncel",
-            "last_name": "Yilmaz",
+            "party_type": "dentist",
+            "name": "Dr. Ahmet Guncel Yilmaz",
             "phone": "+905551234567",
             "email": "ahmet@test.com",
-            "treatment_status": "completed",
+            "is_active": "on",
         }, follow_redirects=False)
         assert response.status_code == 302
 
         db.session.refresh(party)
-        assert party.first_name == "Ahmet Guncel"
-        assert party.treatment_status == "completed"
+        assert party.name == "Dr. Ahmet Guncel Yilmaz"
 
         # Delete (soft)
         response = client.post(f"/parties/{party.id}/delete", follow_redirects=False)
@@ -359,7 +354,7 @@ def test_party_crud_dentist_customer(client, app):
     login(client, "admin", "admin-pass")
 
     response = client.post("/parties/add", data={
-        "party_type": "dentist_customer",
+        "party_type": "dentist",
         "name": "Dr. Mehmet Oz",
         "phone": "+905559876543",
         "email": "mehmet@dentist.com",
@@ -371,7 +366,7 @@ def test_party_crud_dentist_customer(client, app):
         party = db.session.execute(
             db.select(Party).where(Party.name == "Dr. Mehmet Oz")
         ).scalar_one()
-        assert party.party_type == PartyType.DENTIST_CUSTOMER
+        assert party.party_type == PartyType.DENTIST
         assert party.display_name == "Dr. Mehmet Oz"
         assert party.tax_id == "12345678901"
 
@@ -381,14 +376,12 @@ def test_party_crud_company_customer(client, app):
     login(client, "admin", "admin-pass")
 
     response = client.post("/parties/add", data={
-        "party_type": "company_customer",
+        "party_type": "dentist",
         "name": "ABC Saglik A.S.",
         "phone": "+902125551234",
         "email": "info@abc.com",
         "address": "Istanbul",
         "tax_id": "1234567890",
-        "contact_person": "Ali Veli",
-        "contact_phone": "+905551112233",
     }, follow_redirects=False)
     assert response.status_code == 302
 
@@ -396,9 +389,8 @@ def test_party_crud_company_customer(client, app):
         party = db.session.execute(
             db.select(Party).where(Party.name == "ABC Saglik A.S.")
         ).scalar_one()
-        assert party.party_type == PartyType.COMPANY_CUSTOMER
-        assert party.contact_person == "Ali Veli"
-        assert party.contact_phone == "+905551112233"
+        assert party.party_type == PartyType.DENTIST
+        assert party.display_name == "ABC Saglik A.S."
 
 
 def test_changing_patient_type_deactivates_legacy_patient(client, app):
@@ -406,15 +398,15 @@ def test_changing_patient_type_deactivates_legacy_patient(client, app):
 
     with app.app_context():
         party = db.session.execute(
-            db.select(Party).where(Party.party_type == PartyType.PATIENT)
+            db.select(Party).where(Party.party_type == PartyType.DENTIST)
         ).scalar_one()
         party_id = party.id
 
     response = client.post(
         f"/parties/{party_id}/edit",
         data={
-            "party_type": "company_customer",
-            "name": "Ayse Saglik Ltd.",
+            "party_type": "dentist",
+            "name": "Dr. Ayse Guncel",
             "phone": "5551112233",
             "is_active": "on",
         },
@@ -424,11 +416,12 @@ def test_changing_patient_type_deactivates_legacy_patient(client, app):
 
     with app.app_context():
         party = db.session.get(Party, party_id)
-        assert party.party_type == PartyType.COMPANY_CUSTOMER
+        assert party.party_type == PartyType.DENTIST
         assert party.is_active is True
+        assert party.name == "Dr. Ayse Guncel"
 
 
-@pytest.mark.parametrize("price,category", [("-1", "other"), ("nan", "other"), ("10", "invalid")])
+@pytest.mark.parametrize("price,category", [("-1", "ana_islemler"), ("nan", "ana_islemler"), ("10", "invalid")])
 def test_treatment_route_rejects_invalid_financial_values(client, app, price, category):
     login(client, "admin", "admin-pass")
 
@@ -449,48 +442,26 @@ def test_treatment_route_rejects_invalid_financial_values(client, app, price, ca
 
 
 def test_party_type_filter(client, app):
-    """Party tipine gore filtreleme testi."""
+    """Party listesi sadece dis hekimlerini gostermeli."""
     login(client, "admin", "admin-pass")
 
-    # Her tipte birer tane olustur
-    for ptype, name in [
-        ("patient", "Hasta Test"),
-        ("dentist_customer", "Dr. Dis Hekimi"),
-        ("company_customer", "XYZ Ltd."),
-    ]:
-        if ptype == "patient":
-            client.post("/parties/add", data={
-                "party_type": ptype, "first_name": "Hasta", "last_name": "Test",
-                "phone": "+905551112233", "email": "hasta@test.com"
-            })
-        elif ptype == "dentist_customer":
-            client.post("/parties/add", data={
-                "party_type": ptype, "name": name, "phone": "+905552223344",
-                "email": "dis@test.com", "tax_id": "11122233344"
-            })
-        else:
-            client.post("/parties/add", data={
-                "party_type": ptype, "name": name, "phone": "+905553334455",
-                "email": "xyz@test.com", "tax_id": "55566677788",
-                "contact_person": "Kisi", "contact_phone": "+905554445566"
-            })
-
-    # Filtrele
-    response = client.get("/parties/?type=patient")
-    assert response.status_code == 200
-
-    with app.app_context():
-        parties = db.session.execute(
-            db.select(Party).where(Party.party_type == PartyType.PATIENT, Party.is_active == True)
-        ).scalars().all()
-        assert all(p.party_type == PartyType.PATIENT for p in parties)
+    # Create some DENTIST parties
+    client.post("/parties/add", data={
+        "party_type": "dentist", "name": "Dr. Hekim Test",
+        "phone": "+905551112233", "email": "hasta@test.com",
+    })
+    client.post("/parties/add", data={
+        "party_type": "dentist", "name": "Dr. Dis Hekimi",
+        "phone": "+905552223344", "email": "dis@test.com",
+    })
 
     response = client.get("/parties/")
     html = response.get_data(as_text=True)
-    assert "Müşteriler" in html
+    assert "Diş Hekimleri" in html
+    assert "Dr. Hekim Test" in html
     with app.app_context():
         active_count = db.session.scalar(
-            db.select(db.func.count(Party.id)).where(Party.is_active == True)
+            db.select(db.func.count(Party.id)).where(Party.is_active == True, Party.party_type == PartyType.DENTIST)
         )
     assert html.count('title="Görüntüle"') == active_count
     assert html.count('title="Düzenle"') == active_count
@@ -502,7 +473,7 @@ def test_invoice_flexible_items(client, app):
 
     with app.app_context():
         party = db.session.execute(
-            db.select(Party).where(Party.party_type == PartyType.PATIENT).limit(1)
+            db.select(Party).where(Party.party_type == PartyType.DENTIST).limit(1)
         ).scalar_one()
         treatments = db.session.execute(
             db.select(Treatment).where(Treatment.is_active == True).limit(3)
@@ -568,7 +539,7 @@ def test_invoice_vat_discount_calculations(client, app):
 
     with app.app_context():
         party = db.session.execute(
-            db.select(Party).where(Party.party_type == PartyType.PATIENT).limit(1)
+            db.select(Party).where(Party.party_type == PartyType.DENTIST).limit(1)
         ).scalar_one()
 
     items = [{
@@ -609,7 +580,7 @@ def test_payment_flow(client, app):
 
     with app.app_context():
         party = db.session.execute(
-            db.select(Party).where(Party.party_type == PartyType.PATIENT).limit(1)
+            db.select(Party).where(Party.party_type == PartyType.DENTIST).limit(1)
         ).scalar_one()
 
     # Invoice olustur
@@ -699,7 +670,7 @@ def test_party_invoice_link_and_debt_calculation(client, app):
 
     with app.app_context():
         party = db.session.execute(
-            db.select(Party).where(Party.party_type == PartyType.PATIENT).limit(1)
+            db.select(Party).where(Party.party_type == PartyType.DENTIST).limit(1)
         ).scalar_one()
 
     # 2 fatura olustur
@@ -741,7 +712,7 @@ def test_reports_aging_report(client, app):
 
     with app.app_context():
         party = db.session.execute(
-            db.select(Party).where(Party.party_type == PartyType.PATIENT).limit(1)
+            db.select(Party).where(Party.party_type == PartyType.DENTIST).limit(1)
         ).scalar_one()
 
     # Farkli tarihlerde faturalar olustur
@@ -823,7 +794,7 @@ def test_party_api_info(client, app):
 
     with app.app_context():
         party = db.session.execute(
-            db.select(Party).where(Party.party_type == PartyType.PATIENT).limit(1)
+            db.select(Party).where(Party.party_type == PartyType.DENTIST).limit(1)
         ).scalar_one()
 
     response = client.get(f"/invoices/api/party/{party.id}")

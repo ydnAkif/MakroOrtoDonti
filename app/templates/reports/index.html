@@ -76,10 +76,10 @@
 <div class="row g-4 mb-4">
     <div class="col-xl-7">
         <section class="card h-100" aria-labelledby="treatment-title">
-            <div class="card-header"><span class="page-eyebrow mb-1">Klinik üretim</span><h2 class="h5 mb-0" id="treatment-title">En çok faturalanan tedaviler</h2></div>
-            <div class="card-body p-0"><div class="table-responsive"><table class="table table-hover"><thead><tr><th>Tedavi</th><th>Kategori</th><th class="text-end">Adet</th><th class="text-end">Tutar</th></tr></thead><tbody>
-                {% for stat in treatment_stats %}<tr><td><strong>{{ stat.name }}</strong></td><td><span class="invoice-category-badge">{{ category_labels.get(stat.category, stat.category) }}</span></td><td class="text-end">{{ stat.count }}</td><td class="text-end fw-bold">€{{ "{:,.2f}".format(stat.amount_eur) }}</td></tr>
-                {% else %}<tr><td colspan="4" class="empty-state text-muted"><i class="bi bi-clipboard2-pulse"></i>Bu dönemde faturalanmış tedavi yok.</td></tr>{% endfor %}
+            <div class="card-header"><span class="page-eyebrow mb-1">Klinik üretim</span><h2 class="h5 mb-0" id="treatment-title">En çok faturalanan işlemler</h2></div>
+            <div class="card-body p-0"><div class="table-responsive"><table class="table table-hover"><thead><tr><th>İşlem</th><th>Kategori</th><th class="text-end">Adet</th><th class="text-end">Tutar</th></tr></thead><tbody>
+                {% for stat in treatment_stats %}<tr><td><strong>{{ stat.name }}</strong></td><td><span class="invoice-category-badge">{{ category_labels.get(stat.category, stat.category) }}</span></td><td class="text-end">{{ stat.count }}</td><td class="text-end fw-bold">₺{{ "{:,.2f}".format(stat.amount_eur) }}</td></tr>
+                {% else %}<tr><td colspan="4" class="empty-state text-muted"><i class="bi bi-clipboard2-pulse"></i>Bu dönemde faturalanmış işlem yok.</td></tr>{% endfor %}
             </tbody></table></div></div>
         </section>
     </div>

@@ -73,9 +73,9 @@ def app(tmp_path):
         db.session.flush()
 
         treatments_seed = [
-            Treatment(name="Consultation", category="other", price_eur=50.0),
-            Treatment(name="Crown", category="prosthetic", price_eur=200.0),
-            Treatment(name="Extraction", category="surgical", price_eur=100.0),
+            Treatment(name="Consultation", category="ana_islemler", price_eur=50.0),
+            Treatment(name="Crown", category="ekstra_islemler", price_eur=200.0),
+            Treatment(name="Extraction", category="ana_islemler", price_eur=100.0),
         ]
         for t in treatments_seed:
             db.session.add(t)
@@ -83,16 +83,12 @@ def app(tmp_path):
 
         # Create Party linked to Patient
         party = Party(
-            party_type=PartyType.PATIENT,
-            name=f"{patient.first_name} {patient.last_name}",
-            first_name=patient.first_name,
-            last_name=patient.last_name,
+            party_type=PartyType.DENTIST,
+            name=f"Dr. {patient.first_name} {patient.last_name}",
             phone=patient.phone,
             email=patient.email,
             address=patient.address,
             notes=patient.notes,
-            date_of_birth=patient.date_of_birth,
-            treatment_status=patient.treatment_status,
             is_active=patient.is_active,
         )
         db.session.add(party)
@@ -161,10 +157,10 @@ def live_server_url(tmp_path_factory):
             password_hash=bcrypt.hashpw(b"admin-pass", bcrypt.gensalt()).decode(),
         ))
         db.session.add(Party(
-            party_type=PartyType.PATIENT, name="E2E Hasta", first_name="E2E",
-            last_name="Hasta", phone="5551112233",
+            party_type=PartyType.DENTIST, name="Dr. E2E Hekim",
+            phone="5551112233",
         ))
-        db.session.add(Treatment(name="E2E Muayene", category="other", price_eur=Decimal("50.00")))
+        db.session.add(Treatment(name="E2E Muayene", category="ana_islemler", price_eur=Decimal("50.00")))
         db.session.add(ExchangeRate(rate_date=date.today(), eur_to_try=Decimal("40.0000"), source="ecb"))
         db.session.add(Settings(key="invoice_prefix", value="MKR"))
         db.session.add(Settings(key="invoice_next_number", value="1"))

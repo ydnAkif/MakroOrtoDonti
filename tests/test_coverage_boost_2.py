@@ -19,7 +19,7 @@ from conftest import login
 
 
 def _create_party(session, **kwargs):
-    defaults = {"party_type": PartyType.PATIENT, "name": "Test Party", "is_active": True}
+    defaults = {"party_type": PartyType.DENTIST, "name": "Test Party", "is_active": True}
     defaults.update(kwargs)
     p = Party(**defaults)
     session.add(p)
@@ -241,13 +241,13 @@ class TestParties:
 
     def test_list_parties_with_type_filter(self, client, app):
         login(client, "admin", "admin-pass")
-        resp = client.get("/parties/?type=patient")
+        resp = client.get("/parties/")
         assert resp.status_code == 200
 
     def test_list_parties_invalid_type(self, client, app):
         login(client, "admin", "admin-pass")
         resp = client.get("/parties/?type=invalid_type_xyz", follow_redirects=False)
-        assert resp.status_code == 302
+        assert resp.status_code == 200
 
     def test_add_party_get(self, client, app):
         login(client, "admin", "admin-pass")
@@ -371,18 +371,18 @@ class TestParties:
 class TestPatients:
     def test_list_patients(self, client, app):
         login(client, "admin", "admin-pass")
-        resp = client.get("/patients/")
-        assert resp.status_code == 200
+        resp = client.get("/patients/", follow_redirects=False)
+        assert resp.status_code == 302
 
     def test_list_patients_search(self, client, app):
         login(client, "admin", "admin-pass")
-        resp = client.get("/patients/?search=Ayse")
-        assert resp.status_code == 200
+        resp = client.get("/patients/?search=Ayse", follow_redirects=False)
+        assert resp.status_code == 302
 
     def test_add_patient_get(self, client, app):
         login(client, "admin", "admin-pass")
         resp = client.get("/patients/add")
-        assert resp.status_code == 200
+        assert resp.status_code == 404
 
     def test_add_patient_post(self, client, app):
         login(client, "admin", "admin-pass")
@@ -395,19 +395,19 @@ class TestPatients:
             "notes": "Note",
             "treatment_status": "active",
         }, follow_redirects=False)
-        assert resp.status_code == 302
+        assert resp.status_code == 404
 
     def test_detail_patient(self, client, app):
         with app.app_context():
-            p = _create_party(db.session, party_type=PartyType.PATIENT, name="Patient Detail")
+            p = _create_party(db.session, party_type=PartyType.DENTIST, name="Patient Detail")
             pid = p.id
         login(client, "admin", "admin-pass")
-        resp = client.get(f"/patients/{pid}")
-        assert resp.status_code == 200
+        resp = client.get(f"/patients/{pid}", follow_redirects=False)
+        assert resp.status_code == 302
 
     def test_detail_non_patient_redirects(self, client, app):
         with app.app_context():
-            p = _create_party(db.session, party_type=PartyType.COMPANY_CUSTOMER, name="Company")
+            p = _create_party(db.session, party_type=PartyType.DENTIST, name="Company")
             pid = p.id
         login(client, "admin", "admin-pass")
         resp = client.get(f"/patients/{pid}", follow_redirects=False)
@@ -415,15 +415,15 @@ class TestPatients:
 
     def test_edit_patient_get(self, client, app):
         with app.app_context():
-            p = _create_party(db.session, party_type=PartyType.PATIENT, name="Patient Edit")
+            p = _create_party(db.session, party_type=PartyType.DENTIST, name="Patient Edit")
             pid = p.id
         login(client, "admin", "admin-pass")
         resp = client.get(f"/patients/{pid}/edit")
-        assert resp.status_code == 200
+        assert resp.status_code == 404
 
     def test_edit_patient_post(self, client, app):
         with app.app_context():
-            p = _create_party(db.session, party_type=PartyType.PATIENT, name="Patient Edit Post")
+            p = _create_party(db.session, party_type=PartyType.DENTIST, name="Patient Edit Post")
             pid = p.id
         login(client, "admin", "admin-pass")
         resp = client.post(f"/patients/{pid}/edit", data={
@@ -433,19 +433,19 @@ class TestPatients:
             "email": "updated@test.com",
             "treatment_status": "active",
         }, follow_redirects=False)
-        assert resp.status_code == 302
+        assert resp.status_code == 404
 
     def test_delete_patient(self, client, app):
         with app.app_context():
-            p = _create_party(db.session, party_type=PartyType.PATIENT, name="Patient Delete")
+            p = _create_party(db.session, party_type=PartyType.DENTIST, name="Patient Delete")
             pid = p.id
         login(client, "admin", "admin-pass")
         resp = client.post(f"/patients/{pid}/delete", follow_redirects=False)
-        assert resp.status_code == 302
+        assert resp.status_code == 404
 
     def test_add_patient_treatment(self, client, app):
         with app.app_context():
-            p = _create_party(db.session, party_type=PartyType.PATIENT, name="Patient Treat")
+            p = _create_party(db.session, party_type=PartyType.DENTIST, name="Patient Treat")
             pid = p.id
             t = db.session.execute(db.select(Treatment).limit(1)).scalar_one()
             tid = t.id
@@ -456,22 +456,22 @@ class TestPatients:
             "notes": "Test notes",
             "price_override": "75.50",
         }, follow_redirects=False)
-        assert resp.status_code == 302
+        assert resp.status_code == 404
 
     def test_add_patient_treatment_missing_fields(self, client, app):
         with app.app_context():
-            p = _create_party(db.session, party_type=PartyType.PATIENT, name="No Fields")
+            p = _create_party(db.session, party_type=PartyType.DENTIST, name="No Fields")
             pid = p.id
         login(client, "admin", "admin-pass")
         resp = client.post(f"/patients/{pid}/add-treatment", data={
             "treatment_id": "",
             "treatment_date": "",
         }, follow_redirects=False)
-        assert resp.status_code == 302
+        assert resp.status_code == 404
 
     def test_add_patient_treatment_invalid_date(self, client, app):
         with app.app_context():
-            p = _create_party(db.session, party_type=PartyType.PATIENT, name="Bad Date")
+            p = _create_party(db.session, party_type=PartyType.DENTIST, name="Bad Date")
             pid = p.id
             t = db.session.execute(db.select(Treatment).limit(1)).scalar_one()
             tid = t.id
@@ -480,7 +480,7 @@ class TestPatients:
             "treatment_id": tid,
             "treatment_date": "not-a-date",
         }, follow_redirects=False)
-        assert resp.status_code == 302
+        assert resp.status_code == 404
 
 
 # ============================================================
@@ -495,7 +495,7 @@ class TestTreatments:
 
     def test_list_treatments_with_category(self, client, app):
         login(client, "admin", "admin-pass")
-        resp = client.get("/treatments/?category=prosthetic")
+        resp = client.get("/treatments/?category=ekstra_islemler")
         assert resp.status_code == 200
 
     def test_list_treatments_with_search(self, client, app):
@@ -513,7 +513,7 @@ class TestTreatments:
         resp = client.post("/treatments/add", data={
             "name": "New Treatment",
             "description": "A new treatment",
-            "category": "orthodontic",
+            "category": "ana_islemler",
             "price_eur": "150.00",
         }, follow_redirects=False)
         assert resp.status_code == 302
@@ -531,7 +531,7 @@ class TestTreatments:
         login(client, "admin", "admin-pass")
         resp = client.post("/treatments/add", data={
             "name": "",
-            "category": "other",
+            "category": "ana_islemler",
             "price_eur": "100",
         }, follow_redirects=False)
         assert resp.status_code == 302
@@ -540,7 +540,7 @@ class TestTreatments:
         login(client, "admin", "admin-pass")
         resp = client.post("/treatments/add", data={
             "name": "A" * 201,
-            "category": "other",
+            "category": "ana_islemler",
             "price_eur": "100",
         }, follow_redirects=False)
         assert resp.status_code == 302
@@ -549,7 +549,7 @@ class TestTreatments:
         login(client, "admin", "admin-pass")
         resp = client.post("/treatments/add", data={
             "name": "Valid Name",
-            "category": "other",
+            "category": "ana_islemler",
             "price_eur": "100",
             "description": "D" * 2001,
         }, follow_redirects=False)
@@ -559,7 +559,7 @@ class TestTreatments:
         login(client, "admin", "admin-pass")
         resp = client.post("/treatments/add", data={
             "name": "Neg Price",
-            "category": "other",
+            "category": "ana_islemler",
             "price_eur": "-50",
         }, follow_redirects=False)
         assert resp.status_code == 302
@@ -568,7 +568,7 @@ class TestTreatments:
         login(client, "admin", "admin-pass")
         resp = client.post("/treatments/add", data={
             "name": "NonNum",
-            "category": "other",
+            "category": "ana_islemler",
             "price_eur": "not-a-number",
         }, follow_redirects=False)
         assert resp.status_code == 302
@@ -588,7 +588,7 @@ class TestTreatments:
         login(client, "admin", "admin-pass")
         resp = client.post(f"/treatments/{tid}/edit", data={
             "name": "Updated Treatment",
-            "category": "prosthetic",
+            "category": "ekstra_islemler",
             "price_eur": "250",
         }, follow_redirects=False)
         assert resp.status_code == 302
@@ -635,7 +635,7 @@ class TestTreatments:
         wb = Workbook()
         ws = wb.active
         ws.append(["Name", "Category", "Price", "Description"])
-        ws.append(["Imported Treatment", "ortodonti", 120.50, "Imported desc"])
+        ws.append(["Imported Treatment", "ana_islemler", 120.50, "Imported desc"])
         ws.append(["", "", "", ""])
         buf = io.BytesIO()
         wb.save(buf)
@@ -657,7 +657,7 @@ class TestTreatments:
         wb = Workbook()
         ws = wb.active
         ws.append(["Name", "Category", "Price", "Description"])
-        ws.append([existing_name, "surgical", 999.99, "Updated via import"])
+        ws.append([existing_name, "ana_islemler", 999.99, "Updated via import"])
         buf = io.BytesIO()
         wb.save(buf)
         buf.seek(0)
@@ -675,7 +675,7 @@ class TestTreatments:
             tid = t.id
         login(client, "admin", "admin-pass")
         resp = client.post("/treatments/api/update",
-            data=json.dumps({"id": tid, "name": "API Updated", "price_eur": 300, "category": "cerrahi"}),
+            data=json.dumps({"id": tid, "name": "API Updated", "price_eur": 300, "category": "ana_islemler"}),
             content_type="application/json",
         )
         assert resp.status_code == 200
@@ -715,7 +715,7 @@ class TestTreatments:
             tid = t.id
         login(client, "admin", "admin-pass")
         resp = client.post("/treatments/api/update",
-            data=json.dumps({"id": tid, "category": "protetik"}),
+            data=json.dumps({"id": tid, "category": "ekstra_islemler"}),
             content_type="application/json",
         )
         assert resp.status_code == 200
@@ -1161,7 +1161,7 @@ class TestSecurityService:
 class TestEmailServiceFull:
     def test_send_email_success(self, client, app):
         with app.app_context():
-            p = _create_party(db.session, name="Email Party", email="recv@test.com", party_type=PartyType.PATIENT)
+            p = _create_party(db.session, name="Email Party", email="recv@test.com", party_type=PartyType.DENTIST)
             inv = _create_invoice(db.session, p.id)
             with patch("app.services.email_service.get_smtp_config", return_value={
                 "smtp_server": "localhost", "smtp_port": "587",
@@ -1176,7 +1176,7 @@ class TestEmailServiceFull:
 
     def test_send_email_value_error(self, client, app):
         with app.app_context():
-            p = _create_party(db.session, name="VE Party", email="ve@test.com", party_type=PartyType.PATIENT)
+            p = _create_party(db.session, name="VE Party", email="ve@test.com", party_type=PartyType.DENTIST)
             inv = _create_invoice(db.session, p.id)
             with patch("app.services.email_service.get_smtp_config", side_effect=ValueError("Decrypt failed")):
                 from app.services.email_service import send_invoice_email
@@ -1186,7 +1186,7 @@ class TestEmailServiceFull:
 
     def test_send_email_generic_exception(self, client, app):
         with app.app_context():
-            p = _create_party(db.session, name="Exc Party", email="exc@test.com", party_type=PartyType.PATIENT)
+            p = _create_party(db.session, name="Exc Party", email="exc@test.com", party_type=PartyType.DENTIST)
             inv = _create_invoice(db.session, p.id)
             with patch("app.services.email_service.get_smtp_config", side_effect=Exception("SMTP down")):
                 from app.services.email_service import send_invoice_email
@@ -1418,7 +1418,7 @@ class TestPaymentsEdgeCases:
 class TestPatientTreatments:
     def test_add_treatment_empty_price_override(self, client, app):
         with app.app_context():
-            p = _create_party(db.session, party_type=PartyType.PATIENT, name="Empty Price")
+            p = _create_party(db.session, party_type=PartyType.DENTIST, name="Empty Price")
             pid = p.id
             t = db.session.execute(db.select(Treatment).limit(1)).scalar_one()
             tid = t.id
@@ -1428,7 +1428,7 @@ class TestPatientTreatments:
             "treatment_date": date.today().strftime("%d.%m.%Y"),
             "price_override": "",
         }, follow_redirects=False)
-        assert resp.status_code == 302
+        assert resp.status_code == 404
 
 
 # ============================================================

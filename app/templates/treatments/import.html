@@ -1,9 +1,9 @@
 {% extends "base.html" %}
-{% block title %}Tedavi İçe Aktar - {{ clinic_name }}{% endblock %}
+{% block title %}İşlem İçe Aktar - {{ clinic_name }}{% endblock %}
 
 {% block content %}
 <header class="page-header">
-    <div><span class="page-eyebrow">Toplu işlem</span><h1>Tedavileri içe aktar</h1><p class="page-description">Kataloğu Excel dosyasından güvenli biçimde ekleyin veya güncelleyin.</p></div>
+    <div><span class="page-eyebrow">Toplu işlem</span><h1>İşlemleri içe aktar</h1><p class="page-description">Kataloğu Excel dosyasından güvenli biçimde ekleyin veya güncelleyin.</p></div>
     <a href="{{ url_for('treatments.list_treatments') }}" class="btn btn-outline-secondary">
         <i class="bi bi-arrow-left"></i> Geri
     </a>
@@ -21,13 +21,14 @@
                             <tr><th>Sütun</th><th>Alan</th><th>Açıklama</th></tr>
                         </thead>
                         <tbody>
-                            <tr><td>A</td><td><strong>Tedavi Adı</strong></td><td>Zorunlu</td></tr>
-                            <tr><td>B</td><td>Kategori</td><td>TR veya EN (ortodonti, protetik, cerrahi, implant, vb.)</td></tr>
-                            <tr><td>C</td><td>Fiyat (EUR)</td><td>Sayısal değer</td></tr>
+                            <tr><td>A</td><td><strong>İşlem Adı</strong></td><td>Zorunlu</td></tr>
+                            <tr><td>B</td><td>Kategori</td><td>ana_islemler veya ekstra_islemler</td></tr>
+                            <tr><td>C</td><td>Fiyat</td><td>Sayısal değer</td></tr>
                             <tr><td>D</td><td>Açıklama</td><td>Opsiyonel</td></tr>
+                            <tr><td>E</td><td>Para Birimi</td><td>TL, EUR veya USD (boş ise TL)</td></tr>
                         </tbody>
                     </table>
-                    <small class="text-muted">İlk satır başlık satırı olarak atlanır. Mevcut tedaviler aynı adda bulunursa fiyat ve kategori güncellenir.</small>
+                    <small class="text-muted">İlk satır başlık satırı olarak atlanır. Mevcut işlemler aynı adda bulunursa fiyat ve kategori güncellenir.</small>
                 </div>
 
                 <form method="POST" enctype="multipart/form-data">

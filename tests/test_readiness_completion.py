@@ -71,14 +71,14 @@ def test_invoice_counter_fails_closed_when_setting_missing(tmp_path):
 
 
 def test_treatment_validation_is_shared_and_strict():
-    assert normalize_treatment_fields(" Muayene ", " Açıklama ", "diğer", "12,50") == (
-        "Muayene", "Açıklama", "other", __import__("decimal").Decimal("12.50")
+    assert normalize_treatment_fields(" Muayene ", " Açıklama ", "ana_islemler", "12,50") == (
+        "Muayene", "Açıklama", "ana_islemler", __import__("decimal").Decimal("12.50")
     )
     for values in [
-        ("", None, "other", "1"),
+        ("", None, "ana_islemler", "1"),
         ("Test", None, "bilinmeyen", "1"),
-        ("Test", None, "other", "nan"),
-        ("Test", None, "other", "-1"),
+        ("Test", None, "ana_islemler", "nan"),
+        ("Test", None, "ana_islemler", "-1"),
     ]:
         try:
             normalize_treatment_fields(*values)

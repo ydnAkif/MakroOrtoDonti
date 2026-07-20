@@ -149,7 +149,7 @@ def _make_valid_item(**overrides):
 def test_invoice_service_rejects_zero_quantity(app):
     with app.app_context():
         party = db.session.execute(
-            db.select(Party).where(Party.party_type == PartyType.PATIENT).limit(1)
+            db.select(Party).where(Party.party_type == PartyType.DENTIST).limit(1)
         ).scalar_one()
         with pytest.raises(ValueError, match="sıfırdan büyük"):
             InvoiceService.create_invoice(
@@ -162,7 +162,7 @@ def test_invoice_service_rejects_zero_quantity(app):
 def test_invoice_service_rejects_negative_quantity(app):
     with app.app_context():
         party = db.session.execute(
-            db.select(Party).where(Party.party_type == PartyType.PATIENT).limit(1)
+            db.select(Party).where(Party.party_type == PartyType.DENTIST).limit(1)
         ).scalar_one()
         with pytest.raises(ValueError, match="sıfırdan büyük"):
             InvoiceService.create_invoice(
@@ -175,7 +175,7 @@ def test_invoice_service_rejects_negative_quantity(app):
 def test_invoice_service_rejects_negative_unit_price(app):
     with app.app_context():
         party = db.session.execute(
-            db.select(Party).where(Party.party_type == PartyType.PATIENT).limit(1)
+            db.select(Party).where(Party.party_type == PartyType.DENTIST).limit(1)
         ).scalar_one()
         with pytest.raises(ValueError, match="negatif olamaz"):
             InvoiceService.create_invoice(
@@ -188,7 +188,7 @@ def test_invoice_service_rejects_negative_unit_price(app):
 def test_invoice_service_rejects_vat_over_100(app):
     with app.app_context():
         party = db.session.execute(
-            db.select(Party).where(Party.party_type == PartyType.PATIENT).limit(1)
+            db.select(Party).where(Party.party_type == PartyType.DENTIST).limit(1)
         ).scalar_one()
         with pytest.raises(ValueError, match="KDV oranı"):
             InvoiceService.create_invoice(
@@ -201,7 +201,7 @@ def test_invoice_service_rejects_vat_over_100(app):
 def test_invoice_service_rejects_percent_discount_over_100(app):
     with app.app_context():
         party = db.session.execute(
-            db.select(Party).where(Party.party_type == PartyType.PATIENT).limit(1)
+            db.select(Party).where(Party.party_type == PartyType.DENTIST).limit(1)
         ).scalar_one()
         with pytest.raises(ValueError, match="100"):
             InvoiceService.create_invoice(
@@ -214,7 +214,7 @@ def test_invoice_service_rejects_percent_discount_over_100(app):
 def test_invoice_service_rejects_amount_discount_exceeding_line_total(app):
     with app.app_context():
         party = db.session.execute(
-            db.select(Party).where(Party.party_type == PartyType.PATIENT).limit(1)
+            db.select(Party).where(Party.party_type == PartyType.DENTIST).limit(1)
         ).scalar_one()
         with pytest.raises(ValueError, match="satır tutarını"):
             InvoiceService.create_invoice(
@@ -232,7 +232,7 @@ def test_invoice_service_rejects_amount_discount_exceeding_line_total(app):
 def test_invoice_service_rejects_empty_description(app):
     with app.app_context():
         party = db.session.execute(
-            db.select(Party).where(Party.party_type == PartyType.PATIENT).limit(1)
+            db.select(Party).where(Party.party_type == PartyType.DENTIST).limit(1)
         ).scalar_one()
         with pytest.raises(ValueError, match="boş olamaz"):
             InvoiceService.create_invoice(
@@ -255,7 +255,7 @@ def test_invoice_service_rejects_unknown_party(app):
 def test_invoice_service_rejects_empty_items_list(app):
     with app.app_context():
         party = db.session.execute(
-            db.select(Party).where(Party.party_type == PartyType.PATIENT).limit(1)
+            db.select(Party).where(Party.party_type == PartyType.DENTIST).limit(1)
         ).scalar_one()
         with pytest.raises(ValueError, match="en az bir kalem"):
             InvoiceService.create_invoice(

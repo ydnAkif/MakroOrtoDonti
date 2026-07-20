@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 
@@ -40,6 +41,21 @@ def create_app(config_class=Config) -> Flask:
     login_manager.init_app(app)
     csrf.init_app(app)
     migrate.init_app(app, db)
+
+    def _fromjson(s):
+        if not s:
+            return []
+        try:
+            return json.loads(s)
+        except (json.JSONDecodeError, TypeError):
+            return []
+
+    app.jinja_env.filters["fromjson"] = _fromjson
+
+    def _currency_symbol(currency):
+        return {"TL": "₺", "EUR": "€", "USD": "$"}.get(currency, "₺")
+
+    app.jinja_env.filters["currency_symbol"] = _currency_symbol
 
     # Register transactional audit listeners before handling requests.
     from .services import audit_service  # noqa: F401
@@ -104,10 +120,8 @@ def create_app(config_class=Config) -> Flask:
             "auto_rate_error": auto_rate_error,
             "page_url": page_url,
             "party_type_labels": {
-                "patient": "Hastalar",
-                "dentist_customer": "Diş Hekimi Müşterileri",
-                "company_customer": "Kurumsal Müşteriler",
-                "": "Müşteriler",
+                "dentist": "Diş Hekimleri",
+                "": "Diş Hekimleri",
             },
         }
 

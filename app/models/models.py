@@ -28,32 +28,17 @@ if TYPE_CHECKING:
 
 
 class TreatmentCategory:
-    ORTHODONTIC = "orthodontic"
-    PROSTHETIC = "prosthetic"
-    SURGICAL = "surgical"
-    PREVENTIVE = "preventive"
-    RESTORATIVE = "restorative"
-    PERIODONTIC = "periodontic"
-    ENDODONTIC = "endodontic"
-    IMPLANT = "implant"
-    COSMETIC = "cosmetic"
-    OTHER = "other"
+    ANA_ISLEMLER = "ana_islemler"
+    EKSTRA_ISLEMLER = "ekstra_islemler"
 
     ALL = [
-        ORTHODONTIC,
-        PROSTHETIC,
-        SURGICAL,
-        PREVENTIVE,
-        RESTORATIVE,
-        PERIODONTIC,
-        ENDODONTIC,
-        IMPLANT,
-        COSMETIC,
-        OTHER,
+        ANA_ISLEMLER,
+        EKSTRA_ISLEMLER,
     ]
 
 
 class PartyType(PyEnum):
+    DENTIST = "dentist"
     PATIENT = "patient"
     DENTIST_CUSTOMER = "dentist_customer"
     COMPANY_CUSTOMER = "company_customer"
@@ -68,16 +53,8 @@ class InvoiceItemType(PyEnum):
 
 
 INVOICE_CATEGORY_LABELS = {
-    TreatmentCategory.ORTHODONTIC: "Ortodonti",
-    TreatmentCategory.PROSTHETIC: "Protetik",
-    TreatmentCategory.SURGICAL: "Cerrahi",
-    TreatmentCategory.PREVENTIVE: "Koruyucu",
-    TreatmentCategory.RESTORATIVE: "Restoratif",
-    TreatmentCategory.PERIODONTIC: "Periodontoloji",
-    TreatmentCategory.ENDODONTIC: "Endodonti",
-    TreatmentCategory.IMPLANT: "İmplant",
-    TreatmentCategory.COSMETIC: "Kozmetik",
-    TreatmentCategory.OTHER: "Diğer tedavi",
+    TreatmentCategory.ANA_ISLEMLER: "Ana İşlemler",
+    TreatmentCategory.EKSTRA_ISLEMLER: "Ekstra İşlemler",
     InvoiceItemType.PRODUCT.value: "Ürün",
     InvoiceItemType.SERVICE.value: "Hizmet",
     InvoiceItemType.LAB.value: "Laboratuvar",
@@ -100,7 +77,7 @@ class Party(Base, TimestampMixin):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     party_type: Mapped[str] = mapped_column(
-        SQLEnum(PartyType), nullable=False, default=PartyType.PATIENT, index=True
+        SQLEnum(PartyType), nullable=False, default=PartyType.DENTIST, index=True
     )
     # Common fields
     name: Mapped[str] = mapped_column(String(200), nullable=False)  # full name or company name
@@ -137,6 +114,9 @@ class Party(Base, TimestampMixin):
     treatments: Mapped[list["PatientTreatment"]] = relationship(
         back_populates="party", lazy="selectin"
     )
+    work_orders: Mapped[list["WorkOrder"]] = relationship(
+        back_populates="party", lazy="selectin"
+    )
 
     __table_args__ = (
         UniqueConstraint("name", "phone", "party_type", name="uq_party_identity"),
@@ -144,17 +124,7 @@ class Party(Base, TimestampMixin):
 
     @property
     def display_name(self) -> str:
-        if self.party_type == PartyType.PATIENT:
-            return f"{self.first_name or ''} {self.last_name or ''}".strip() or self.name
         return self.name
-
-    @property
-    def is_patient(self) -> bool:
-        return self.party_type == PartyType.PATIENT
-
-    @property
-    def full_name(self) -> str:
-        return self.display_name
 
     def __repr__(self) -> str:
         return f"<Party {self.display_name} ({self.party_type.value})>"
@@ -185,9 +155,10 @@ class Treatment(Base, TimestampMixin):
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     category: Mapped[str] = mapped_column(
-        String(50), nullable=False, default=TreatmentCategory.OTHER
+        String(50), nullable=False, default=TreatmentCategory.ANA_ISLEMLER
     )
     price_eur: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    currency: Mapped[str] = mapped_column(String(3), nullable=False, default="TL")
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, index=True)
 
     patient_treatments: Mapped[list["PatientTreatment"]] = relationship(
@@ -202,7 +173,8 @@ class Treatment(Base, TimestampMixin):
     )
 
     def __repr__(self) -> str:
-        return f"<Treatment {self.name} €{self.price_eur:.2f}>"
+        symbol = "€" if self.currency == "EUR" else "₺"
+        return f"<Treatment {self.name} {symbol}{self.price_eur:.2f}>"
 
 
 class Patient(Base, TimestampMixin, SoftDeleteMixin):
@@ -277,6 +249,7 @@ class ExchangeRate(Base, TimestampMixin):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     rate_date: Mapped[date] = mapped_column(nullable=False, index=True)
     eur_to_try: Mapped[Decimal] = mapped_column(Numeric(12, 4), nullable=False)
+    usd_to_try: Mapped[Decimal] = mapped_column(Numeric(12, 4), nullable=True)
     source: Mapped[str] = mapped_column(String(50), default="ecb", nullable=False)
 
     __table_args__ = (
@@ -284,7 +257,7 @@ class ExchangeRate(Base, TimestampMixin):
     )
 
     def __repr__(self) -> str:
-        return f"<ExchangeRate {self.rate_date}: 1€ = {self.eur_to_try:.2f}₺>"
+        return f"<ExchangeRate {self.rate_date}: 1€ = {self.eur_to_try:.2f}₺, 1$ = {self.usd_to_try or 0:.2f}₺>"
 
 
 class Invoice(Base, TimestampMixin):
@@ -495,6 +468,29 @@ class Payment(Base, TimestampMixin):
 
     def __repr__(self) -> str:
         return f"<Payment {self.invoice_id} €{self.amount_eur:.2f} ₺{self.amount_try:.2f}>"
+
+
+class WorkOrder(Base, TimestampMixin):
+    __tablename__ = "work_orders"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    party_id: Mapped[int] = mapped_column(ForeignKey("parties.id"), nullable=False, index=True)
+    work_date: Mapped[date] = mapped_column(nullable=False, index=True)
+    apparatus_type: Mapped[str] = mapped_column(Text, nullable=False)
+    extra_addons: Mapped[str | None] = mapped_column(Text, nullable=True)
+    patient_name: Mapped[str] = mapped_column(String(200), nullable=False)
+    apparatus_price: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=Decimal("0.00"))
+    extra_price: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=Decimal("0.00"))
+    total_price: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=Decimal("0.00"))
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    party: Mapped["Party"] = relationship(lazy="selectin")
+
+    def recalculate_total(self) -> None:
+        self.total_price = money(self.apparatus_price + self.extra_price)
+
+    def __repr__(self) -> str:
+        return f"<WorkOrder {self.patient_name} ({self.apparatus_type}) €{self.total_price:.2f}>"
 
 
 class LoginAttempt(Base, TimestampMixin):

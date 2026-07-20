@@ -82,7 +82,7 @@ class TestDatabaseMigration:
                 db.select(Patient).limit(1)
             ).scalar_one()
             party = db.session.execute(
-                db.select(Party).where(Party.party_type == PartyType.PATIENT).limit(1)
+                db.select(Party).where(Party.party_type == PartyType.DENTIST).limit(1)
             ).scalar_one()
             patient.party_id = party.id
             db.session.flush()
@@ -535,7 +535,7 @@ class TestWhatsAppService:
 
         with app.app_context():
             party = db.session.execute(
-                db.select(Party).where(Party.party_type == PartyType.PATIENT).limit(1)
+                db.select(Party).where(Party.party_type == PartyType.DENTIST).limit(1)
             ).scalar_one()
             invoice = InvoiceService.create_invoice(
                 session=db.session,
@@ -637,7 +637,7 @@ class TestWhatsAppRoutes:
         login(client, "admin", "admin-pass")
         with app.app_context():
             party = db.session.execute(
-                db.select(Party).where(Party.party_type == PartyType.PATIENT).limit(1)
+                db.select(Party).where(Party.party_type == PartyType.DENTIST).limit(1)
             ).scalar_one()
             inv = InvoiceService.create_invoice(
                 session=db.session,
@@ -658,7 +658,7 @@ class TestWhatsAppRoutes:
         login(client, "admin", "admin-pass")
         with app.app_context():
             party = db.session.execute(
-                db.select(Party).where(Party.party_type == PartyType.PATIENT).limit(1)
+                db.select(Party).where(Party.party_type == PartyType.DENTIST).limit(1)
             ).scalar_one()
             pid = party.id
 
@@ -719,7 +719,7 @@ class TestPrivacyRoutes:
         login(client, "admin", "admin-pass")
         with app.app_context():
             party = db.session.execute(
-                db.select(Party).where(Party.party_type == PartyType.PATIENT).limit(1)
+                db.select(Party).where(Party.party_type == PartyType.DENTIST).limit(1)
             ).scalar_one()
             InvoiceService.create_invoice(
                 session=db.session,
@@ -739,7 +739,7 @@ class TestPrivacyRoutes:
         login(client, "admin", "admin-pass")
         with app.app_context():
             party = db.session.execute(
-                db.select(Party).where(Party.party_type == PartyType.PATIENT).limit(1)
+                db.select(Party).where(Party.party_type == PartyType.DENTIST).limit(1)
             ).scalar_one()
             pid = party.id
 
@@ -823,7 +823,7 @@ class TestEmailService:
             db.session.commit()
 
             party = db.session.execute(
-                db.select(Party).where(Party.party_type == PartyType.PATIENT).limit(1)
+                db.select(Party).where(Party.party_type == PartyType.DENTIST).limit(1)
             ).scalar_one()
             inv = InvoiceService.create_invoice(
                 session=db.session,
@@ -891,7 +891,7 @@ class TestValidationService:
     def test_parse_enum_valid(self):
         from app.models.models import PartyType
         from app.services.validation_service import parse_enum
-        assert parse_enum(PartyType, "patient") == PartyType.PATIENT
+        assert parse_enum(PartyType, "dentist") == PartyType.DENTIST
 
     def test_parse_enum_invalid(self):
         from app.models.models import PartyType
@@ -1033,7 +1033,7 @@ class TestInvoicesExtra:
         login(client, "admin", "admin-pass")
         with app.app_context():
             party = db.session.execute(
-                db.select(Party).where(Party.party_type == PartyType.PATIENT).limit(1)
+                db.select(Party).where(Party.party_type == PartyType.DENTIST).limit(1)
             ).scalar_one()
             from app.models.invoice_service import InvoiceService
             inv = InvoiceService.create_invoice(
@@ -1060,7 +1060,7 @@ class TestInvoicesExtra:
         login(client, "admin", "admin-pass")
         with app.app_context():
             party = db.session.execute(
-                db.select(Party).where(Party.party_type == PartyType.PATIENT).limit(1)
+                db.select(Party).where(Party.party_type == PartyType.DENTIST).limit(1)
             ).scalar_one()
             from app.models.invoice_service import InvoiceService
             inv = InvoiceService.create_invoice(
@@ -1084,7 +1084,7 @@ class TestInvoicesExtra:
         login(client, "admin", "admin-pass")
         with app.app_context():
             party = db.session.execute(
-                db.select(Party).where(Party.party_type == PartyType.PATIENT).limit(1)
+                db.select(Party).where(Party.party_type == PartyType.DENTIST).limit(1)
             ).scalar_one()
             from app.models.invoice_service import InvoiceService
             inv = InvoiceService.create_invoice(
@@ -1125,7 +1125,7 @@ class TestInvoicesExtra:
         login(client, "admin", "admin-pass")
         with app.app_context():
             party = db.session.execute(
-                db.select(Party).where(Party.party_type == PartyType.PATIENT).limit(1)
+                db.select(Party).where(Party.party_type == PartyType.DENTIST).limit(1)
             ).scalar_one()
             pid = party.id
 
@@ -1170,7 +1170,7 @@ class TestTreatmentsExtra:
         login(client, "admin", "admin-pass")
         response = client.post("/treatments/add", data={
             "name": "",
-            "category": "other",
+            "category": "ana_islemler",
             "price_eur": "50",
         }, follow_redirects=False)
         assert response.status_code == 302
@@ -1188,7 +1188,7 @@ class TestTreatmentsExtra:
         login(client, "admin", "admin-pass")
         response = client.post("/treatments/add", data={
             "name": "Long Desc",
-            "category": "other",
+            "category": "ana_islemler",
             "price_eur": "50",
             "description": "x" * 2001,
         }, follow_redirects=False)
@@ -1232,12 +1232,12 @@ class TestTreatmentsExtra:
     def test_api_update_category_mapping(self, client, app):
         login(client, "admin", "admin-pass")
         response = client.post("/treatments/api/update",
-            data=json.dumps({"id": 1, "category": "ortodonti"}),
+            data=json.dumps({"id": 1, "category": "ana_islemler"}),
             content_type="application/json",
         )
         assert response.status_code == 200
         data = response.get_json()
-        assert data["treatment"]["category"] == "orthodontic"
+        assert data["treatment"]["category"] == "ana_islemler"
 
     def test_import_get_form(self, client, app):
         login(client, "admin", "admin-pass")
@@ -1324,9 +1324,9 @@ class TestModelsExtra:
         from app.models.models import Party, PartyType
         with app.app_context():
             party = db.session.execute(
-                db.select(Party).where(Party.party_type == PartyType.PATIENT).limit(1)
+                db.select(Party).where(Party.party_type == PartyType.DENTIST).limit(1)
             ).scalar_one()
-            assert party.full_name == party.display_name
+            assert party.display_name == party.name
 
     def test_treatment_repr(self, client, app):
         from app.extensions import db
@@ -1340,7 +1340,7 @@ class TestModelsExtra:
         from app.models.models import Invoice, Party, PartyType
         from app.models.invoice_service import InvoiceService
         with app.app_context():
-            party = db.session.execute(db.select(Party).where(Party.party_type == PartyType.PATIENT).limit(1)).scalar_one()
+            party = db.session.execute(db.select(Party).where(Party.party_type == PartyType.DENTIST).limit(1)).scalar_one()
             inv = InvoiceService.create_invoice(
                 session=db.session, party_id=party.id,
                 items=[{"item_type": "service", "description": "Repr Test", "quantity": 1, "unit_price_eur": 100}],
@@ -1353,7 +1353,7 @@ class TestModelsExtra:
         from app.models.models import InvoiceItem, Party, PartyType
         from app.models.invoice_service import InvoiceService
         with app.app_context():
-            party = db.session.execute(db.select(Party).where(Party.party_type == PartyType.PATIENT).limit(1)).scalar_one()
+            party = db.session.execute(db.select(Party).where(Party.party_type == PartyType.DENTIST).limit(1)).scalar_one()
             inv = InvoiceService.create_invoice(
                 session=db.session, party_id=party.id,
                 items=[{"item_type": "service", "description": "Item Repr", "quantity": 2, "unit_price_eur": 50}],
@@ -1411,7 +1411,7 @@ class TestModelsExtra:
         from app.models.models import Party, PartyType
         from app.models.invoice_service import InvoiceService
         with app.app_context():
-            party = db.session.execute(db.select(Party).where(Party.party_type == PartyType.PATIENT).limit(1)).scalar_one()
+            party = db.session.execute(db.select(Party).where(Party.party_type == PartyType.DENTIST).limit(1)).scalar_one()
             inv = InvoiceService.create_invoice(
                 session=db.session, party_id=party.id,
                 items=[
@@ -1464,7 +1464,7 @@ class TestInvoiceServiceExtra:
 
         with app.app_context():
             party = db.session.execute(
-                db.select(Party).where(Party.party_type == PartyType.PATIENT).limit(1)
+                db.select(Party).where(Party.party_type == PartyType.DENTIST).limit(1)
             ).scalar_one()
             pt = db.session.execute(db.select(PatientTreatment).limit(1)).scalar_one()
             inv = InvoiceService.create_invoice_from_treatments(
@@ -1488,7 +1488,7 @@ class TestPdfServiceExtra:
         from app.models.invoice_service import InvoiceService
         from app.services.pdf_service import generate_invoice_pdf
         with app.app_context():
-            party = db.session.execute(db.select(Party).where(Party.party_type == PartyType.PATIENT).limit(1)).scalar_one()
+            party = db.session.execute(db.select(Party).where(Party.party_type == PartyType.DENTIST).limit(1)).scalar_one()
             inv = InvoiceService.create_invoice(
                 session=db.session, party_id=party.id,
                 items=[{"item_type": "service", "description": "PDF Test", "quantity": 1, "unit_price_eur": 100}],

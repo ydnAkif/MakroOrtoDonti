@@ -6,10 +6,10 @@
     <div class="dashboard-hero-content">
         <span class="page-eyebrow text-white-50">Klinik özeti</span>
         <h1 id="dashboard-title">Bugünün akışına<br>hakim olun.</h1>
-        <p>Hasta hareketlerini, açık faturaları ve tahsilat görünümünü tek bakışta izleyin.</p>
+        <p>Diş hekimi hareketlerini, açık faturaları ve tahsilat görünümünü tek bakışta izleyin.</p>
         <div class="d-flex flex-wrap gap-2">
             <a href="{{ url_for('invoices.add_invoice') }}" class="btn btn-light"><i class="bi bi-plus-lg"></i>Yeni fatura</a>
-            <a href="{{ url_for('parties.add_party') }}" class="btn btn-outline-light"><i class="bi bi-person-plus"></i>Yeni müşteri</a>
+            <a href="{{ url_for('parties.add_party') }}" class="btn btn-outline-light"><i class="bi bi-person-plus"></i>Yeni diş hekimi</a>
         </div>
         {% if current_rate %}
         <div class="hero-meta"><span><i class="bi bi-currency-exchange me-1"></i>1 EUR = ₺{{ "{:,.4f}".format(current_rate.eur_to_try) }}</span><span>{{ current_rate.rate_date.strftime('%d.%m.%Y') }} kuru</span></div>
@@ -20,7 +20,7 @@
 <div class="row g-3 mb-4">
     <div class="col-6 col-xl-3">
         <article class="card metric-card h-100">
-            <div class="card-body"><span class="metric-icon"><i class="bi bi-people"></i></span><div class="metric-label">Toplam hasta</div><p class="metric-value">{{ total_patients }}</p></div>
+            <div class="card-body"><span class="metric-icon"><i class="bi bi-heart-pulse"></i></span><div class="metric-label">Toplam diş hekimi</div><p class="metric-value">{{ total_patients }}</p></div>
         </article>
     </div>
     <div class="col-6 col-xl-3">
@@ -55,7 +55,7 @@
                         {% for inv in recent_invoices %}
                             <tr>
                                 <td><a href="{{ url_for('invoices.detail_invoice', invoice_id=inv.id) }}">{{ inv.invoice_number }}</a></td>
-                                <td>{{ inv.party.display_name if inv.party else (inv.patient.full_name if inv.patient else '-') }}</td>
+                                <td>{{ inv.party.display_name if inv.party else '-' }}</td>
                                 <td><strong>€{{ "{:,.2f}".format(inv.total_eur) }}</strong><br><small class="text-muted">₺{{ "{:,.2f}".format(inv.total_try) }}</small></td>
                                 <td>{% if inv.status == 'pending' %}<span class="badge bg-warning table-pill table-pill--status">Bekliyor</span>{% elif inv.status == 'paid' %}<span class="badge bg-success table-pill table-pill--status">Ödendi</span>{% elif inv.status == 'overdue' %}<span class="badge bg-danger table-pill table-pill--status">Gecikmiş</span>{% else %}<span class="badge bg-secondary table-pill table-pill--status">İptal</span>{% endif %}</td>
                             </tr>
@@ -70,25 +70,23 @@
     </div>
 
     <div class="col-xl-5">
-        <section class="card h-100" aria-labelledby="recent-patients-title">
+        <section class="card h-100" aria-labelledby="recent-dentists-title">
             <div class="card-header d-flex justify-content-between align-items-center">
-                <div><span class="page-eyebrow mb-1">Klinik hareketi</span><h2 class="h5 mb-0" id="recent-patients-title">Son hastalar</h2></div>
-                <a href="{{ url_for('patients.list_patients') }}" class="btn btn-sm btn-outline-primary" aria-label="Tüm hastaları gör"><i class="bi bi-arrow-right"></i></a>
+                <div><span class="page-eyebrow mb-1">Klinik hareketi</span><h2 class="h5 mb-0" id="recent-dentists-title">Son diş hekimleri</h2></div>
+                <a href="{{ url_for('parties.list_parties') }}" class="btn btn-sm btn-outline-primary" aria-label="Tüm diş hekimlerini gör"><i class="bi bi-arrow-right"></i></a>
             </div>
             <div class="list-group list-group-flush">
                 {% for p in recent_patients %}
-                {% set st = (p.treatment_status or 'active')|lower %}
-                <a href="{{ url_for('patients.detail_patient', patient_id=p.id) }}" class="list-group-item list-group-item-action p-3">
+                <a href="{{ url_for('parties.detail_party', party_id=p.id) }}" class="list-group-item list-group-item-action p-3">
                     <div class="d-flex justify-content-between align-items-center gap-3">
                         <div class="d-flex align-items-center min-w-0">
-                            <div class="avatar-circle me-3 bg-primary bg-opacity-10 text-primary fw-bold rounded-circle d-flex align-items-center justify-content-center" style="width:42px;height:42px;">{{ (p.full_name[:2] if p.full_name else 'H')|upper }}</div>
-                            <div><h3 class="h6 mb-1">{{ p.full_name }}</h3><small class="text-muted">{{ p.phone or 'Telefon eklenmemiş' }}</small></div>
+                            <div class="avatar-circle me-3 bg-success bg-opacity-10 text-success fw-bold rounded-circle d-flex align-items-center justify-content-center" style="width:42px;height:42px;">{{ (p.name[:2] if p.name else 'DH')|upper }}</div>
+                            <div><h3 class="h6 mb-1">{{ p.name }}</h3><small class="text-muted">{{ p.phone or 'Telefon eklenmemiş' }}</small></div>
                         </div>
-                        {% if st == 'active' %}<span class="badge bg-success">Aktif</span>{% elif st == 'completed' %}<span class="badge bg-primary">Tamamlandı</span>{% elif st == 'planned' %}<span class="badge bg-info">Planlandı</span>{% elif st == 'on_hold' %}<span class="badge bg-warning">Beklemede</span>{% else %}<span class="badge bg-secondary">Pasif</span>{% endif %}
                     </div>
                 </a>
                 {% else %}
-                <div class="empty-state text-muted"><i class="bi bi-person-plus"></i>Henüz hasta bulunmuyor.<br><a href="{{ url_for('parties.add_party') }}">İlk hastayı ekleyin</a></div>
+                <div class="empty-state text-muted"><i class="bi bi-person-plus"></i>Henüz diş hekimi bulunmuyor.<br><a href="{{ url_for('parties.add_party') }}">İlk diş hekimini ekleyin</a></div>
                 {% endfor %}
             </div>
         </section>

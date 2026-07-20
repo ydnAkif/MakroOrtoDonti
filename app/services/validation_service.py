@@ -6,21 +6,16 @@ from app.models.models import TreatmentCategory
 
 
 TREATMENT_CATEGORY_ALIASES = {
-    "ortodonti": "orthodontic", "orthodontic": "orthodontic",
-    "protetik": "prosthetic", "prosthetic": "prosthetic",
-    "cerrahi": "surgical", "surgical": "surgical",
-    "koruyucu": "preventive", "preventive": "preventive",
-    "restoratif": "restorative", "restorative": "restorative",
-    "periodontik": "periodontic", "periodontoloji": "periodontic",
-    "periodontic": "periodontic", "perio": "periodontic",
-    "endodontik": "endodontic", "endodonti": "endodontic",
-    "endodontic": "endodontic", "endo": "endodontic",
-    "implant": "implant", "kozmetik": "cosmetic", "cosmetic": "cosmetic",
-    "diğer": "other", "diger": "other", "other": "other",
+    "ana_islemler": "ana_islemler", "ana işlemler": "ana_islemler",
+    "ana islemler": "ana_islemler", "ana": "ana_islemler",
+    "ekstra_islemler": "ekstra_islemler", "ekstra işlemler": "ekstra_islemler",
+    "ekstra islemler": "ekstra_islemler", "ekstra": "ekstra_islemler",
 }
 
+VALID_CURRENCIES = ("TL", "EUR", "USD")
 
-def normalize_treatment_fields(name, description, category, price_eur):
+
+def normalize_treatment_fields(name, description, category, price_eur, currency=None):
     """Validate treatment input identically for forms, JSON and spreadsheets."""
     clean_name = str(name or "").strip()
     clean_description = str(description or "").strip() or None
@@ -28,18 +23,23 @@ def normalize_treatment_fields(name, description, category, price_eur):
     clean_category = TREATMENT_CATEGORY_ALIASES.get(raw_category)
 
     if not clean_name or len(clean_name) > 200:
-        raise ValueError("Tedavi adı 1–200 karakter olmalıdır.")
+        raise ValueError("İşlem adı 1–200 karakter olmalıdır.")
     if clean_description and len(clean_description) > 2000:
-        raise ValueError("Tedavi açıklaması 2000 karakteri aşamaz.")
+        raise ValueError("İşlem açıklaması 2000 karakteri aşamaz.")
     if clean_category not in TreatmentCategory.ALL:
-        raise ValueError("Geçersiz tedavi kategorisi.")
+        raise ValueError("Geçersiz işlem kategorisi.")
 
     price = parse_decimal(price_eur)
     if price is None:
-        raise ValueError("Geçersiz tedavi fiyatı; sayısal olmalıdır.")
+        raise ValueError("Geçersiz işlem fiyatı; sayısal olmalıdır.")
     if price < 0:
-        raise ValueError("Tedavi fiyatı negatif olamaz.")
-    return clean_name, clean_description, clean_category, price
+        raise ValueError("İşlem fiyatı negatif olamaz.")
+
+    clean_currency = str(currency or "TL").strip().upper()
+    if clean_currency not in VALID_CURRENCIES:
+        clean_currency = "TL"
+
+    return clean_name, clean_description, clean_category, price, clean_currency
 
 def parse_date(date_str: str) -> date | None:
     """Safely parse an ISO date string, returning None if malformed or empty."""

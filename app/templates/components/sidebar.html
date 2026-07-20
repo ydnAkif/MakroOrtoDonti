@@ -2,8 +2,8 @@
     <div class="nav-section-label">Çalışma alanı</div>
     <ul class="nav flex-column">
         <li class="nav-item"><a class="nav-link {% if request.endpoint == 'dashboard.index' %}active{% endif %}" href="{{ url_for('dashboard.index') }}" {% if request.endpoint == 'dashboard.index' %}aria-current="page"{% endif %}><i class="bi bi-grid-1x2" aria-hidden="true"></i><span>Genel bakış</span></a></li>
-        <li class="nav-item"><a class="nav-link {% if 'parties' in request.endpoint|default('') or 'patients' in request.endpoint|default('') %}active{% endif %}" href="{{ url_for('parties.list_parties') }}" {% if 'parties' in request.endpoint|default('') or 'patients' in request.endpoint|default('') %}aria-current="page"{% endif %}><i class="bi bi-people" aria-hidden="true"></i><span>Müşteriler</span></a></li>
-        <li class="nav-item"><a class="nav-link {% if 'treatment' in request.endpoint|default('') %}active{% endif %}" href="{{ url_for('treatments.list_treatments') }}" {% if 'treatment' in request.endpoint|default('') %}aria-current="page"{% endif %}><i class="bi bi-clipboard2-pulse" aria-hidden="true"></i><span>Tedavi kataloğu</span></a></li>
+        <li class="nav-item"><a class="nav-link {% if 'parties' in request.endpoint|default('') %}active{% endif %}" href="{{ url_for('parties.list_parties') }}" {% if 'parties' in request.endpoint|default('') %}aria-current="page"{% endif %}><i class="bi bi-heart-pulse" aria-hidden="true"></i><span>Diş Hekimleri</span></a></li>
+        <li class="nav-item"><a class="nav-link {% if 'treatment' in request.endpoint|default('') %}active{% endif %}" href="{{ url_for('treatments.list_treatments') }}" {% if 'treatment' in request.endpoint|default('') %}aria-current="page"{% endif %}><i class="bi bi-clipboard2-pulse" aria-hidden="true"></i><span>İşlem kataloğu</span></a></li>
     </ul>
 
     <div class="nav-section-label">Finans</div>
@@ -21,6 +21,6 @@
 
     <div class="sidebar-footer">
         <strong>Makro klinik konsolu</strong><br>
-        Hasta, tedavi ve finans akışı tek yerde.
+        Diş hekimi, iş emri ve finans akışı tek yerde.
     </div>
 </nav>

@@ -1,0 +1,300 @@
+{% extends "base.html" %}
+{% block title %}{% if work_order %}İş Emri Düzenle{% else %}Yeni İş Emri{% endif %} - {{ clinic_name }}{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{{ url_for('parties.list_parties') }}">Diş Hekimleri</a></li>
+            <li class="breadcrumb-item"><a href="{{ url_for('parties.detail_party', party_id=party.id) }}">{{ party.display_name }}</a></li>
+            <li class="breadcrumb-item active">{% if work_order %}İş Emri Düzenle{% else %}Yeni İş Emri{% endif %}</li>
+        </ol>
+    </nav>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-md-10">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-clipboard2-plus"></i>
+                    {% if work_order %}İş Emri Düzenle{% else %}Yeni İş Emri Ekle{% endif %}
+                    <small class="text-muted ms-2">{{ party.display_name }}</small>
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('parties.edit_work_order', party_id=party.id, wo_id=work_order.id) if work_order else url_for('parties.add_work_order', party_id=party.id) }}">
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label for="work_date" class="form-label">Tarih <span class="text-danger">*</span></label>
+                            <input type="date" class="form-control" id="work_date" name="work_date" value="{{ work_order.work_date.isoformat() if work_order else today }}" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="patient_name" class="form-label">Hasta Adı Soyadı <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="patient_name" name="patient_name" value="{{ work_order.patient_name if work_order else '' }}" required placeholder="Hasta adı soyadı">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Aparey Türü <span class="text-danger">*</span></label>
+                            <div id="apparatus-component" style="position:relative;">
+                                <input type="text" class="form-control mb-2" id="apparatus-search"
+                                       placeholder="Aparey ara ve eklemek için tıkla..." autocomplete="off">
+                                <div class="typeahead-list list-group shadow-sm" id="apparatus-dropdown" style="display:none;"></div>
+                                <div id="apparatus-tags" class="d-flex flex-wrap gap-1 mt-2"></div>
+                                <input type="hidden" id="apparatus_type" name="apparatus_type" value="{{ work_order.apparatus_type if work_order else '' }}">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mt-2">
+                        <div class="col-12">
+                            <label class="form-label">Ekstra Eklentiler</label>
+                            <div id="extra-addons-component" style="position:relative;">
+                                <input type="text" class="form-control mb-2" id="extra-addons-search"
+                                       placeholder="Ekstra işlem ara ve eklemek için tıkla..." autocomplete="off">
+                                <div class="typeahead-list list-group shadow-sm" id="extra-addons-dropdown" style="display:none;"></div>
+                                <div id="extra-addons-tags" class="d-flex flex-wrap gap-1 mt-2"></div>
+                                <input type="hidden" id="extra_addons" name="extra_addons" value="{{ work_order.extra_addons if work_order else '' }}">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mt-2">
+                        <div class="col-md-4">
+                            <label for="apparatus_price" class="form-label">Aparey Fiyatı (₺) <span class="text-danger">*</span></label>
+                            <input type="number" step="0.01" min="0" class="form-control" id="apparatus_price" name="apparatus_price" value="{{ '{:.2f}'.format(work_order.apparatus_price) if work_order else '0.00' }}" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="extra_price" class="form-label">Ekstra Eklenti Fiyatı (₺)</label>
+                            <input type="number" step="0.01" min="0" class="form-control" id="extra_price" name="extra_price" value="{{ '{:.2f}'.format(work_order.extra_price) if work_order else '0.00' }}">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Toplam Fiyat (₺)</label>
+                            <input type="text" class="form-control fw-bold" id="total_display" value="{{ '{:.2f}'.format(work_order.total_price) if work_order else '0.00' }}" readonly>
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mt-2">
+                        <div class="col-12">
+                            <label for="notes" class="form-label">Notlar</label>
+                            <textarea class="form-control" id="notes" name="notes" rows="2">{{ work_order.notes if work_order else '' }}</textarea>
+                        </div>
+                    </div>
+
+                    <hr>
+                    <div class="d-flex justify-content-between">
+                        <a href="{{ url_for('parties.detail_party', party_id=party.id) }}" class="btn btn-outline-secondary">
+                            <i class="bi bi-arrow-left"></i> İptal
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-lg"></i> {% if work_order %}Güncelle{% else %}Kaydet{% endif %}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const EUR_TO_TRY = {{ eur_to_try }};
+    const USD_TO_TRY = {{ usd_to_try }};
+    const apparatusPrice = document.getElementById('apparatus_price');
+    const extraPrice = document.getElementById('extra_price');
+    const totalDisplay = document.getElementById('total_display');
+
+    function toTL(price, currency) {
+        if (currency === 'EUR') return Math.round(price * EUR_TO_TRY * 100) / 100;
+        if (currency === 'USD') {
+            if (USD_TO_TRY > 0) return Math.round(price * USD_TO_TRY * 100) / 100;
+            return price;
+        }
+        return price;
+    }
+
+    function updateTotal() {
+        const a = parseFloat(apparatusPrice.value) || 0;
+        const e = parseFloat(extraPrice.value) || 0;
+        totalDisplay.value = (a + e).toFixed(2);
+    }
+
+    apparatusPrice.addEventListener('input', updateTotal);
+    extraPrice.addEventListener('input', updateTotal);
+
+    const anaTreatments = {{ ana_islemler_treatments|tojson|safe }};
+    const ekstraTreatments = {{ ekstra_islemler_treatments|tojson|safe }};
+
+    let selectedApparatus = [];
+    let selectedExtras = [];
+    let apparatusBlurTimer = null;
+    let extraBlurTimer = null;
+
+    function normalizeText(value) {
+        return (value || '').toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    }
+
+    function formatPrice(price, currency) {
+        var sym = currency === 'EUR' ? '\u20AC' : currency === 'USD' ? '\u0024' : '\u20BA';
+        return new Intl.NumberFormat('tr-TR', {minimumFractionDigits: 2, maximumFractionDigits: 2}).format(price) + ' ' + sym;
+    }
+
+    function renderApparatusTags() {
+        const container = document.getElementById('apparatus-tags');
+        container.innerHTML = '';
+        let totalTL = 0;
+        selectedApparatus.forEach(function(item, index) {
+            var tl = toTL(item.price, item.currency);
+            totalTL += tl;
+            const tag = document.createElement('span');
+            tag.className = 'badge bg-primary text-white d-inline-flex align-items-center gap-1';
+            tag.style.fontSize = '0.85em';
+            tag.textContent = item.name + ' (' + formatPrice(item.price, item.currency) + ')';
+            const removeBtn = document.createElement('button');
+            removeBtn.type = 'button';
+            removeBtn.className = 'btn-close btn-close-sm';
+            removeBtn.style.fontSize = '0.65em';
+            removeBtn.style.filter = 'brightness(0) invert(1)';
+            removeBtn.setAttribute('aria-label', 'Kaldır');
+            removeBtn.addEventListener('click', function() {
+                selectedApparatus.splice(index, 1);
+                renderApparatusTags();
+                syncApparatusHidden();
+            });
+            tag.appendChild(removeBtn);
+            container.appendChild(tag);
+        });
+        apparatusPrice.value = totalTL.toFixed(2);
+        updateTotal();
+    }
+
+    function syncApparatusHidden() {
+        document.getElementById('apparatus_type').value = JSON.stringify(selectedApparatus);
+    }
+
+    function renderApparatusDropdown(query) {
+        const dropdown = document.getElementById('apparatus-dropdown');
+        const nq = normalizeText(query);
+        const matches = anaTreatments.filter(function(t) {
+            return !nq || normalizeText(t.name).indexOf(nq) !== -1;
+        }).slice(0, 50);
+
+        dropdown.innerHTML = '';
+        if (!matches.length) { dropdown.style.display = 'none'; return; }
+        matches.forEach(function(t) {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'list-group-item list-group-item-action d-flex justify-content-between align-items-center';
+            btn.innerHTML = '<span>' + t.name + '</span><small class="text-muted">' + formatPrice(t.price, t.currency) + '</small>';
+            btn.addEventListener('mousedown', function(e) {
+                e.preventDefault();
+                clearTimeout(apparatusBlurTimer);
+                selectedApparatus.push({id: t.id, name: t.name, price: t.price, currency: t.currency});
+                renderApparatusTags();
+                syncApparatusHidden();
+                document.getElementById('apparatus-search').value = '';
+                document.getElementById('apparatus-search').focus();
+                renderApparatusDropdown('');
+            });
+            dropdown.appendChild(btn);
+        });
+        dropdown.style.display = 'block';
+    }
+
+    document.getElementById('apparatus-search').addEventListener('input', function() { renderApparatusDropdown(this.value); });
+    document.getElementById('apparatus-search').addEventListener('focus', function() { renderApparatusDropdown(this.value); });
+    document.getElementById('apparatus-search').addEventListener('blur', function() {
+        apparatusBlurTimer = setTimeout(function() { document.getElementById('apparatus-dropdown').style.display = 'none'; }, 250);
+    });
+
+    function renderExtraTags() {
+        const container = document.getElementById('extra-addons-tags');
+        container.innerHTML = '';
+        let totalTL = 0;
+        selectedExtras.forEach(function(item, index) {
+            var tl = toTL(item.price, item.currency);
+            totalTL += tl;
+            const tag = document.createElement('span');
+            tag.className = 'badge bg-info text-dark d-inline-flex align-items-center gap-1';
+            tag.style.fontSize = '0.85em';
+            tag.textContent = item.name + ' (' + formatPrice(item.price, item.currency) + ')';
+            const removeBtn = document.createElement('button');
+            removeBtn.type = 'button';
+            removeBtn.className = 'btn-close btn-close-sm';
+            removeBtn.style.fontSize = '0.65em';
+            removeBtn.setAttribute('aria-label', 'Kaldır');
+            removeBtn.addEventListener('click', function() {
+                selectedExtras.splice(index, 1);
+                renderExtraTags();
+                syncExtrasHidden();
+            });
+            tag.appendChild(removeBtn);
+            container.appendChild(tag);
+        });
+        extraPrice.value = totalTL.toFixed(2);
+        updateTotal();
+    }
+
+    function syncExtrasHidden() {
+        document.getElementById('extra_addons').value = JSON.stringify(selectedExtras);
+    }
+
+    function renderExtraDropdown(query) {
+        const dropdown = document.getElementById('extra-addons-dropdown');
+        const nq = normalizeText(query);
+        const matches = ekstraTreatments.filter(function(t) {
+            return !nq || normalizeText(t.name).indexOf(nq) !== -1;
+        }).slice(0, 50);
+
+        dropdown.innerHTML = '';
+        if (!matches.length) { dropdown.style.display = 'none'; return; }
+        matches.forEach(function(t) {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'list-group-item list-group-item-action d-flex justify-content-between align-items-center';
+            btn.innerHTML = '<span>' + t.name + '</span><small class="text-muted">' + formatPrice(t.price, t.currency) + '</small>';
+            btn.addEventListener('mousedown', function(e) {
+                e.preventDefault();
+                clearTimeout(extraBlurTimer);
+                selectedExtras.push({id: t.id, name: t.name, price: t.price, currency: t.currency});
+                renderExtraTags();
+                syncExtrasHidden();
+                document.getElementById('extra-addons-search').value = '';
+                document.getElementById('extra-addons-search').focus();
+                renderExtraDropdown('');
+            });
+            dropdown.appendChild(btn);
+        });
+        dropdown.style.display = 'block';
+    }
+
+    document.getElementById('extra-addons-search').addEventListener('input', function() { renderExtraDropdown(this.value); });
+    document.getElementById('extra-addons-search').addEventListener('focus', function() { renderExtraDropdown(this.value); });
+    document.getElementById('extra-addons-search').addEventListener('blur', function() {
+        extraBlurTimer = setTimeout(function() { document.getElementById('extra-addons-dropdown').style.display = 'none'; }, 250);
+    });
+
+    function loadExistingItems(existingStr, treatments) {
+        if (!existingStr) return [];
+        try {
+            var parsed = JSON.parse(existingStr);
+            if (Array.isArray(parsed)) return parsed;
+        } catch(e) {}
+        var trimmed = existingStr.trim();
+        if (!trimmed) return [];
+        var match = treatments.find(function(t) { return t.name === trimmed; });
+        if (match) return [{id: match.id, name: match.name, price: match.price, currency: match.currency}];
+        return [{id: 0, name: trimmed, price: 0, currency: 'TL'}];
+    }
+
+    var existingApparatus = '{{ work_order.apparatus_type|safe if work_order and work_order.apparatus_type else "" }}';
+    selectedApparatus = loadExistingItems(existingApparatus, anaTreatments);
+    if (selectedApparatus.length) { renderApparatusTags(); syncApparatusHidden(); }
+
+    var existingExtra = '{{ work_order.extra_addons|safe if work_order and work_order.extra_addons else "" }}';
+    selectedExtras = loadExistingItems(existingExtra, ekstraTreatments);
+    if (selectedExtras.length) { renderExtraTags(); syncExtrasHidden(); }
+});
+</script>
+{% endblock %}

@@ -1,15 +1,15 @@
 {% extends "base.html" %}
-{% block title %}Tedaviler - {{ clinic_name }}{% endblock %}
+{% block title %}İşlemler - {{ clinic_name }}{% endblock %}
 
 {% block content %}
 <header class="page-header">
-    <div><span class="page-eyebrow">Klinik katalog</span><h1>Tedavi kataloğu</h1><p class="page-description">Tedavi tanımlarını, kategorileri ve EUR fiyatlarını güncel tutun.</p></div>
+    <div><span class="page-eyebrow">Klinik katalog</span><h1>İşlem kataloğu</h1><p class="page-description">İşlem tanımlarını, kategorileri ve fiyatlarını güncel tutun.</p></div>
     <div class="d-flex gap-2">
         <a href="{{ url_for('treatments.import_treatments') }}" class="btn btn-outline-success">
             <i class="bi bi-upload"></i> XLS içe aktar
         </a>
         <a href="{{ url_for('treatments.add_treatment') }}" class="btn btn-primary">
-            <i class="bi bi-plus-lg"></i> Yeni tedavi
+            <i class="bi bi-plus-lg"></i> Yeni işlem
         </a>
     </div>
 </header>
@@ -30,7 +30,7 @@
                 </div>
                 <div class="col-md-5">
                     <label class="form-label">Ara</label>
-                    <input type="text" class="form-control js-table-filter" data-target="tbody tr" name="search" value="{{ search }}" placeholder="Tedavi adı ile ara...">
+                    <input type="text" class="form-control js-table-filter" data-target="tbody tr" name="search" value="{{ search }}" placeholder="İşlem adı ile ara...">
                 </div>
                 <div class="col-md-2">
                     <button type="submit" class="btn btn-primary w-100">Ara</button>
@@ -47,11 +47,10 @@
             <table class="table table-hover align-middle mb-0" id="treatmentsTable">
                 <thead class="table-light">
                     <tr>
-                        <th style="width:30%">Tedavi</th>
+                        <th style="width:30%">İşlem</th>
                         <th style="width:15%">Kategori</th>
-                        <th style="width:35%">Açıklama</th>
-                        <th style="width:12%" class="text-end">Fiyat (EUR)</th>
-                        <th style="width:8%" class="text-end">İşlem</th>
+                        <th style="width:20%" class="text-end">Fiyat</th>
+                        <th style="width:20%" class="text-end">İşlem</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -65,9 +64,15 @@
                                 {% endfor %}
                             </select>
                         </td>
-                        <td class="editable" data-field="description" contenteditable="true">{{ treatment.description or '' }}</td>
                         <td class="text-end">
-                            <input type="number" step="0.01" min="0" class="form-control form-control-sm text-end editable-input" data-field="price_eur" value="{{ treatment.price_eur }}" style="width:100px">
+                            <div class="d-flex align-items-center justify-content-end gap-1">
+                                <input type="number" step="0.01" min="0" class="form-control form-control-sm text-end editable-input" data-field="price_eur" value="{{ treatment.price_eur }}" style="width:90px">
+                                <select class="form-select form-select-sm editable-select" data-field="currency" style="width:60px">
+                                    <option value="TL" {% if treatment.currency == 'TL' %}selected{% endif %}>₺</option>
+                                    <option value="EUR" {% if treatment.currency == 'EUR' %}selected{% endif %}>€</option>
+                                    <option value="USD" {% if treatment.currency == 'USD' %}selected{% endif %}>$</option>
+                                </select>
+                            </div>
                         </td>
                         <td class="text-end">
                             <button class="btn btn-sm btn-success save-row d-none" title="Kaydet" aria-label="Satırdaki değişiklikleri kaydet">
@@ -76,15 +81,15 @@
                             <a href="{{ url_for('treatments.edit_treatment', treatment_id=treatment.id) }}" class="btn btn-sm btn-outline-primary" title="Tam Form">
                                 <i class="bi bi-pencil"></i>
                             </a>
-                            <form method="POST" action="{{ url_for('treatments.delete_treatment', treatment_id=treatment.id) }}" class="d-inline" onsubmit="return confirm('Bu tedaviyi silmek istediğinize emin misiniz?')">
-                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Sil" aria-label="{{ treatment.name }} tedavisini sil">
+                            <form method="POST" action="{{ url_for('treatments.delete_treatment', treatment_id=treatment.id) }}" class="d-inline" onsubmit="return confirm('Bu işlemi silmek istediğinize emin misiniz?')">
+                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Sil" aria-label="{{ treatment.name }} işlemini sil">
                                     <i class="bi bi-trash"></i>
                                 </button>
                             </form>
                         </td>
                     </tr>
                     {% else %}
-                    <tr><td colspan="5" class="text-center text-muted py-4">Tedavi bulunamadı.</td></tr>
+                    <tr><td colspan="4" class="text-center text-muted py-4">İşlem bulunamadı.</td></tr>
                     {% endfor %}
                 </tbody>
             </table>
@@ -158,9 +163,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 saveBtn.disabled = false;
 
                 row.querySelector('[data-field="name"]').textContent = data.treatment.name;
-                row.querySelector('[data-field="description"]').textContent = data.treatment.description;
                 row.querySelector('[data-field="price_eur"]').value = data.treatment.price_eur;
                 row.querySelector('[data-field="category"]').value = data.treatment.category;
+                row.querySelector('[data-field="currency"]').value = data.treatment.currency;
             } else {
                 alert('Hata: ' + (data.error || 'Bilinmeyen hata'));
                 saveBtn.innerHTML = '<i class="bi bi-check-lg"></i>';

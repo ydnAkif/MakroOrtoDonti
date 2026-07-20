@@ -10,15 +10,15 @@ from conftest import login
 def test_mutation_creates_actor_and_request_correlated_audit_log(client, app):
     login(client, "admin", "admin-pass")
     with app.app_context():
-        party = db.session.execute(db.select(Party).where(Party.party_type == PartyType.PATIENT)).scalar_one()
+        party = db.session.execute(db.select(Party).where(Party.party_type == PartyType.DENTIST)).scalar_one()
         party_id = party.id
 
     response = client.post(
         f"/parties/{party_id}/edit",
         headers={"X-Request-ID": "audit-correlation-test"},
         data={
-            "party_type": "patient", "first_name": "Denetimli", "last_name": "Hasta",
-            "phone": "5551112233", "treatment_status": "active", "is_active": "on",
+            "party_type": "dentist", "name": "Denetimli Hekim",
+            "phone": "5551112233", "is_active": "on",
         },
     )
     assert response.status_code == 302
@@ -32,7 +32,7 @@ def test_mutation_creates_actor_and_request_correlated_audit_log(client, app):
         assert row is not None
         assert row.actor_username == "admin"
         assert row.action == "update"
-        assert "first_name" in row.changes_json
+        assert "name" in row.changes_json
 
 
 def test_security_headers_and_request_id_are_present(client):
@@ -45,7 +45,7 @@ def test_security_headers_and_request_id_are_present(client):
 def test_kvkk_export_is_admin_only_and_contains_financial_record(client, app):
     login(client, "admin", "admin-pass")
     with app.app_context():
-        party_id = db.session.execute(db.select(Party).where(Party.party_type == PartyType.PATIENT)).scalar_one().id
+        party_id = db.session.execute(db.select(Party).where(Party.party_type == PartyType.DENTIST)).scalar_one().id
     response = client.get(f"/privacy/parties/{party_id}/export")
     assert response.status_code == 200
     assert response.mimetype == "application/json"
@@ -90,7 +90,7 @@ def test_email_success_path_uses_tls_login_and_pdf(monkeypatch, app):
     with app.app_context():
         invoice = db.session.execute(db.select(Invoice).limit(1)).scalar_one_or_none()
         if invoice is None:
-            party = db.session.execute(db.select(Party).where(Party.party_type == PartyType.PATIENT)).scalar_one()
+            party = db.session.execute(db.select(Party).where(Party.party_type == PartyType.DENTIST)).scalar_one()
             party.email = "patient@test"
             invoice = Invoice(
                 party=party, invoice_number="TEST-EMAIL", invoice_date=__import__("datetime").date.today(),

@@ -238,7 +238,7 @@ def index():
 
     patient_status_rows = db.session.execute(
         db.select(Party.treatment_status, db.func.count(Party.id).label("count"))
-        .where(Party.party_type == PartyType.PATIENT, Party.is_active == True)
+        .where(Party.party_type == PartyType.DENTIST, Party.is_active == True)
         .group_by(Party.treatment_status)
     ).all()
     patient_stats = [

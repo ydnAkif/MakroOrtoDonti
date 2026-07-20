@@ -95,7 +95,7 @@ def add_invoice():
             else:
                 # Create a party for this patient if needed
                 party = Party(
-                    party_type=PartyType.PATIENT,
+                    party_type=PartyType.DENTIST,
                     name=f"{patient.first_name} {patient.last_name}",
                     first_name=patient.first_name,
                     last_name=patient.last_name,

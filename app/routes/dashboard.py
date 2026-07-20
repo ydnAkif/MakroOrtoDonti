@@ -13,7 +13,7 @@ dashboard_bp = Blueprint("dashboard", __name__)
 def index():
     total_patients = db.session.execute(
         db.select(db.func.count(Party.id)).where(
-            Party.party_type == PartyType.PATIENT,
+            Party.party_type == PartyType.DENTIST,
             Party.is_active == True
         )
     ).scalar() or 0
@@ -52,7 +52,7 @@ def index():
 
     recent_patients = db.session.execute(
         db.select(Party)
-        .where(Party.party_type == PartyType.PATIENT, Party.is_active == True)
+        .where(Party.party_type == PartyType.DENTIST, Party.is_active == True)
         .order_by(Party.created_at.desc())
         .limit(5)
     ).scalars().all()

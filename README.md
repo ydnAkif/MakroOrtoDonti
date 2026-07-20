@@ -1,11 +1,11 @@
 # Makro Ortodonti
 
-Makro Ortodonti; hasta ve müşteri kayıtlarını, tedavi kataloğunu, EUR bazlı faturaları, tahsilatları ve klinik raporlarını tek yerde yöneten Flask tabanlı bir klinik operasyon uygulamasıdır.
+Makro Ortodonti; hasta ve müşteri kayıtlarını, işlem kataloğunu, EUR bazlı faturaları, tahsilatları ve klinik raporlarını tek yerde yöneten Flask tabanlı bir klinik operasyon uygulamasıdır.
 
 ## Öne çıkan özellikler
 
 - Hasta, diş hekimi müşterisi ve kurumsal müşteri yönetimi
-- Tedavi kataloğu ve Excel içe aktarma
+- İşlem kataloğu (Ana İşlemler / Ekstra İşlemler) ve Excel içe aktarma
 - EUR bazlı fatura, KDV/iskonto ve sabit fatura kuru
 - Kısmi tahsilat, vade takibi ve fazla ödeme koruması
 - Dönem hareketleri ile dönem sonu alacak yaşlandırması
@@ -37,7 +37,7 @@ FLASK_DEBUG=true python init_db.py
 FLASK_DEBUG=true python run.py
 ```
 
-Uygulama varsayılan olarak `http://127.0.0.1:5000` adresinde açılır. `init_db.py` örnek tedavi, kur, hasta ve müşteri kayıtlarıyla birlikte ilk admini oluşturur; bu nedenle yalnız development/demo kurulumu içindir. Üretilen admin parolası yalnız oluşturma anında terminale yazılır. Sabit bir başlangıç parolası gerekiyorsa veritabanını oluşturmadan önce `DEFAULT_ADMIN_PASSWORD` tanımlanabilir.
+Uygulama varsayılan olarak `http://127.0.0.1:5000` adresinde açılır. `init_db.py` örnek işlem kataloğu (44 Ana İşlem + 10 Ekstra İşlem), kur, hasta ve müşteri kayıtlarıyla birlikte ilk admini oluşturur; bu nedenle yalnız development/demo kurulumu içindir. Üretilen admin parolası yalnız oluşturma anında terminale yazılır. Sabit bir başlangıç parolası gerekiyorsa veritabanını oluşturmadan önce `DEFAULT_ADMIN_PASSWORD` tanımlanabilir.
 
 > **Production uyarısı:** `init_db.py` gerçek klinik ortamında çalıştırılmamalıdır. Salt `flask db upgrade` da taze veritabanında admin ve zorunlu ayarları seed etmez. Demosuz, idempotent production bootstrap komutu henüz açık roadmap maddesidir; yeni production kurulumu bu iş tamamlanmadan yayınlanmamalıdır. Mevcut, önceden bootstrap edilmiş veritabanlarının migration akışı aşağıda açıklanır.
 
@@ -104,7 +104,7 @@ flask --app run:app db upgrade
 flask --app run:app db current
 ```
 
-İlk revision boş şemayı da oluşturabilir; ancak uygulama için zorunlu settings/admin bootstrap'ını yapmaz. Mevcut veride eski `Patient` kayıtlarını `Party` ile eşler, tedavi geçmişini `party_id` üzerine taşır ve finans kolonlarını `Numeric` yapar. SQLite batch geçişi sonunda foreign-key kontrolü başarısızsa migration da başarısız olur. Uygulama yeni legacy `Patient` satırı üretmez; tablo yalnızca kontrollü geriye dönük veri geçişi için tutulur.
+İlk revision boş şemayı da oluşturabilir; ancak uygulama için zorunlu settings/admin bootstrap'ını yapmaz. Mevcut veride eski `Patient` kayıtlarını `Party` ile eşler, tedavi geçmişini `party_id` üzerine taşır ve finans kolonlarını `Numeric` yapar. `20260720_02` migration'ı mevcut tedavi kataloğunu siler ve Makro Ortodonti'ye özel 54 işlemle (44 Ana İşlemler + 10 Ekstra İşlemler) yeniden doldurur; bu migration'idempotent değildir ve yalnız bir kez çalıştırılmalıdır. SQLite batch geçişi sonunda foreign-key kontrolü başarısızsa migration da başarısız olur. Uygulama yeni legacy `Patient` satırı üretmez; tablo yalnızca kontrollü geriye dönük veri geçişi için tutulur.
 
 ## Zamanlanmış işler
 

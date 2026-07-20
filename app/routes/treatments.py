@@ -20,6 +20,7 @@ def _treatment_form_values():
         request.form.get("description"),
         request.form.get("category"),
         request.form.get("price_eur"),
+        request.form.get("currency"),
     )
 
 
@@ -43,16 +44,8 @@ def list_treatments():
 
     categories = TreatmentCategory.ALL
     category_labels = {
-        "orthodontic": "Ortodonti",
-        "prosthetic": "Protetik",
-        "surgical": "Cerrahi",
-        "preventive": "Koruyucu",
-        "restorative": "Restoratif",
-        "periodontic": "Periodontoloji (Diş Eti)",
-        "endodontic": "Endodonti (Kanal)",
-        "implant": "İmplant",
-        "cosmetic": "Kozmetik",
-        "other": "Diğer",
+        "ana_islemler": "Ana İşlemler",
+        "ekstra_islemler": "Ekstra İşlemler",
     }
 
     return render_template(
@@ -72,7 +65,7 @@ def list_treatments():
 def add_treatment():
     if request.method == "POST":
         try:
-            name, description, category, price_eur = _treatment_form_values()
+            name, description, category, price_eur, currency = _treatment_form_values()
         except ValueError as exc:
             flash(str(exc), "danger")
             return redirect(url_for("treatments.add_treatment"))
@@ -81,6 +74,7 @@ def add_treatment():
             description=description,
             category=category,
             price_eur=price_eur,
+            currency=currency,
         )
         db.session.add(treatment)
         db.session.commit()
@@ -88,16 +82,8 @@ def add_treatment():
         return redirect(url_for("treatments.list_treatments"))
 
     category_labels = {
-        "orthodontic": "Ortodonti",
-        "prosthetic": "Protetik",
-        "surgical": "Cerrahi",
-        "preventive": "Koruyucu",
-        "restorative": "Restoratif",
-        "periodontic": "Periodontoloji (Diş Eti)",
-        "endodontic": "Endodonti (Kanal)",
-        "implant": "İmplant",
-        "cosmetic": "Kozmetik",
-        "other": "Diğer",
+        "ana_islemler": "Ana İşlemler",
+        "ekstra_islemler": "Ekstra İşlemler",
     }
     return render_template("treatments/form.html", treatment=None, category_labels=category_labels)
 
@@ -110,7 +96,7 @@ def edit_treatment(treatment_id):
 
     if request.method == "POST":
         try:
-            name, description, category, price_eur = _treatment_form_values()
+            name, description, category, price_eur, currency = _treatment_form_values()
         except ValueError as exc:
             flash(str(exc), "danger")
             return redirect(url_for("treatments.edit_treatment", treatment_id=treatment.id))
@@ -118,21 +104,14 @@ def edit_treatment(treatment_id):
         treatment.description = description
         treatment.category = category
         treatment.price_eur = price_eur
+        treatment.currency = currency
         db.session.commit()
         flash(f"{treatment.name} güncellendi.", "success")
         return redirect(url_for("treatments.list_treatments"))
 
     category_labels = {
-        "orthodontic": "Ortodonti",
-        "prosthetic": "Protetik",
-        "surgical": "Cerrahi",
-        "preventive": "Koruyucu",
-        "restorative": "Restoratif",
-        "periodontic": "Periodontoloji (Diş Eti)",
-        "endodontic": "Endodonti (Kanal)",
-        "implant": "İmplant",
-        "cosmetic": "Kozmetik",
-        "other": "Diğer",
+        "ana_islemler": "Ana İşlemler",
+        "ekstra_islemler": "Ekstra İşlemler",
     }
     return render_template("treatments/form.html", treatment=treatment, category_labels=category_labels)
 
@@ -151,21 +130,10 @@ def delete_treatment(treatment_id):
 CATEGORY_MAP = TREATMENT_CATEGORY_ALIASES
 
 CATEGORY_LABELS_REV = {
-    "ortodonti": "orthodontic",
-    "protetik": "prosthetic",
-    "cerrahi": "surgical",
-    "koruyucu": "preventive",
-    "restoratif": "restorative",
-    "periodontoloji": "periodontic",
-    "periodontik": "periodontic",
-    "perio": "periodontic",
-    "endodonti": "endodontic",
-    "endodontik": "endodontic",
-    "endo": "endodontic",
-    "implant": "implant",
-    "kozmetik": "cosmetic",
-    "diğer": "other",
-    "diger": "other",
+    "ana_islemler": "ana_islemler", "ana işlemler": "ana_islemler",
+    "ana islemler": "ana_islemler", "ana": "ana_islemler",
+    "ekstra_islemler": "ekstra_islemler", "ekstra işlemler": "ekstra_islemler",
+    "ekstra islemler": "ekstra_islemler", "ekstra": "ekstra_islemler",
 }
 
 
@@ -201,11 +169,12 @@ def import_treatments():
                     continue
 
                 try:
-                    name, description, category, price = normalize_treatment_fields(
+                    name, description, category, price, currency = normalize_treatment_fields(
                         row[0],
                         row[3] if len(row) > 3 else None,
                         row[1] if len(row) > 1 else "other",
                         row[2] if len(row) > 2 else None,
+                        row[4] if len(row) > 4 else None,
                     )
                 except ValueError:
                     skipped += 1
@@ -218,6 +187,7 @@ def import_treatments():
                 if existing:
                     existing.price_eur = price
                     existing.category = category
+                    existing.currency = currency
                     if description:
                         existing.description = description
                     updated += 1
@@ -226,6 +196,7 @@ def import_treatments():
                         name=name,
                         category=category,
                         price_eur=price,
+                        currency=currency,
                         description=description,
                         is_active=True,
                     ))
@@ -261,14 +232,15 @@ def api_update_treatment():
 
     treatment = db.session.get(Treatment, data["id"])
     if not treatment:
-        return jsonify({"error": "Tedavi bulunamadı"}), 404
+        return jsonify({"error": "İşlem bulunamadı"}), 404
 
     try:
-        name, description, category, price = normalize_treatment_fields(
+        name, description, category, price, currency = normalize_treatment_fields(
             data.get("name", treatment.name),
             data.get("description", treatment.description),
             data.get("category", treatment.category),
             data.get("price_eur", treatment.price_eur),
+            data.get("currency", treatment.currency),
         )
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
@@ -277,6 +249,7 @@ def api_update_treatment():
     treatment.description = description
     treatment.category = category
     treatment.price_eur = price
+    treatment.currency = currency
 
     db.session.commit()
 
@@ -287,6 +260,7 @@ def api_update_treatment():
             "name": treatment.name,
             "category": treatment.category,
             "price_eur": float(treatment.price_eur),
+            "currency": treatment.currency,
             "description": treatment.description or "",
         }
     })

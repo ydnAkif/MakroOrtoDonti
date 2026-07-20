@@ -37,9 +37,34 @@ def fetch_eur_try_rate() -> float:
     raise RuntimeError(f"Failed to fetch EUR/TRY from providers: {last_error}")
 
 
+def fetch_usd_try_rate() -> float | None:
+    """Fetch current USD/TRY rate from public providers with fallback."""
+    providers = [
+        "https://api.frankfurter.dev/v2/rate/USD/TRY",
+        "https://api.frankfurter.app/latest?from=USD&to=TRY",
+    ]
+
+    for url in providers:
+        try:
+            resp = requests.get(url, timeout=10)
+            resp.raise_for_status()
+            data = resp.json()
+
+            if "rate" in data:
+                return float(data["rate"])
+
+            if "rates" in data and "TRY" in data["rates"]:
+                return float(data["rates"]["TRY"])
+        except Exception:
+            continue
+
+    return None
+
+
 def fetch_and_store_rate() -> float:
     """Fetch and store today's EUR/TRY rate."""
     rate_value = fetch_eur_try_rate()
+    usd_rate = fetch_usd_try_rate()
     today = date.today()
 
     existing = db.session.execute(
@@ -51,10 +76,13 @@ def fetch_and_store_rate() -> float:
 
     if existing:
         existing.eur_to_try = rate_value
+        if usd_rate is not None:
+            existing.usd_to_try = usd_rate
     else:
         db.session.add(ExchangeRate(
             rate_date=today,
             eur_to_try=rate_value,
+            usd_to_try=usd_rate,
             source="ecb",
         ))
 
@@ -70,6 +98,30 @@ def get_latest_rate() -> float | None:
         .limit(1)
     ).scalar_one_or_none()
     return rate.eur_to_try if rate else None
+
+
+def get_latest_usd_rate() -> float | None:
+    """Get the most recent USD/TRY rate, fetching live if DB is missing it."""
+    rate = db.session.execute(
+        db.select(ExchangeRate)
+        .order_by(ExchangeRate.rate_date.desc())
+        .limit(1)
+    ).scalar_one_or_none()
+    if rate and rate.usd_to_try is not None:
+        return float(rate.usd_to_try)
+
+    # DB'de kayit var ama USD kuru yoksa veya hic kayit yoksa canli çek
+    try:
+        usd_rate = fetch_usd_try_rate()
+        if usd_rate is not None:
+            if rate and rate.usd_to_try is None:
+                rate.usd_to_try = usd_rate
+                db.session.commit()
+            return usd_rate
+    except Exception:
+        pass
+
+    return None
 
 
 def get_rate_health(max_age_days: int = 2) -> dict:

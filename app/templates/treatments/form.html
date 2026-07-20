@@ -1,12 +1,12 @@
 {% extends "base.html" %}
-{% block title %}{% if treatment %}Düzenle{% else %}Yeni Tedavi{% endif %} - {{ clinic_name }}{% endblock %}
+{% block title %}{% if treatment %}Düzenle{% else %}Yeni İşlem{% endif %} - {{ clinic_name }}{% endblock %}
 
 {% block content %}
 <div class="mb-4">
     <nav aria-label="breadcrumb">
         <ol class="breadcrumb">
-            <li class="breadcrumb-item"><a href="{{ url_for('treatments.list_treatments') }}">Tedaviler</a></li>
-            <li class="breadcrumb-item active">{% if treatment %}{{ treatment.name }}{% else %}Yeni Tedavi{% endif %}</li>
+            <li class="breadcrumb-item"><a href="{{ url_for('treatments.list_treatments') }}">İşlemler</a></li>
+            <li class="breadcrumb-item active">{% if treatment %}{{ treatment.name }}{% else %}Yeni İşlem{% endif %}</li>
         </ol>
     </nav>
 </div>
@@ -17,20 +17,24 @@
             <div class="card-header bg-white">
                 <h5 class="mb-0">
                     <i class="bi bi-heart-pulse"></i>
-                    {% if treatment %}Tedavi Düzenle{% else %}Yeni Tedavi Ekle{% endif %}
+                    {% if treatment %}İşlem Düzenle{% else %}Yeni İşlem Ekle{% endif %}
                 </h5>
             </div>
             <div class="card-body">
                 <form method="POST" action="{{ url_for('treatments.edit_treatment', treatment_id=treatment.id) if treatment else url_for('treatments.add_treatment') }}">
                     <div class="row g-3">
                         <div class="col-md-8">
-                            <label for="name" class="form-label">Tedavi Adı <span class="text-danger">*</span></label>
+                            <label for="name" class="form-label">İşlem Adı <span class="text-danger">*</span></label>
                             <input type="text" class="form-control" id="name" name="name" value="{{ treatment.name if treatment else '' }}" maxlength="200" required>
                         </div>
                         <div class="col-md-4">
-                            <label for="price_eur" class="form-label">Fiyat (EUR) <span class="text-danger">*</span></label>
+                            <label for="price_eur" class="form-label">Fiyat <span class="text-danger">*</span></label>
                             <div class="input-group">
-                                <span class="input-group-text">€</span>
+                                <select class="form-select form-select-sm" id="currency" name="currency" style="max-width:70px" onchange="updatePriceLabel()">
+                                    <option value="TL" {% if treatment and treatment.currency == 'TL' %}selected{% endif %}>₺ TL</option>
+                                    <option value="EUR" {% if treatment and treatment.currency == 'EUR' %}selected{% endif %}>€ EUR</option>
+                                    <option value="USD" {% if treatment and treatment.currency == 'USD' %}selected{% endif %}>$ USD</option>
+                                </select>
                                 <input type="number" min="0" step="0.01" class="form-control" id="price_eur" name="price_eur" value="{{ treatment.price_eur if treatment else '' }}" required>
                             </div>
                         </div>
@@ -61,4 +65,21 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function updatePriceLabel() {
+    const currency = document.getElementById('currency').value;
+    const label = document.querySelector('label[for="price_eur"]');
+    if (currency === 'EUR') {
+        label.innerHTML = 'Fiyat (EUR) <span class="text-danger">*</span>';
+    } else if (currency === 'USD') {
+        label.innerHTML = 'Fiyat (USD) <span class="text-danger">*</span>';
+    } else {
+        label.innerHTML = 'Fiyat (TL) <span class="text-danger">*</span>';
+    }
+}
+document.addEventListener('DOMContentLoaded', updatePriceLabel);
+</script>
 {% endblock %}

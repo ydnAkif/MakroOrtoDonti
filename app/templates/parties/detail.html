@@ -5,24 +5,23 @@
 <div class="mb-4">
     <nav aria-label="breadcrumb">
         <ol class="breadcrumb">
-            <li class="breadcrumb-item"><a href="{{ url_for('parties.list_parties') }}">Müşteriler</a></li>
+            <li class="breadcrumb-item"><a href="{{ url_for('parties.list_parties') }}">Diş Hekimleri</a></li>
             <li class="breadcrumb-item active">{{ party.display_name }}</li>
         </ol>
     </nav>
 </div>
 
 <div class="row g-4">
-    <!-- Party Info -->
     <div class="col-md-4">
         <div class="card border-0 shadow-sm">
             <div class="card-header bg-white d-flex justify-content-between align-items-center">
-                <h5 class="mb-0"><i class="bi bi-person"></i> Müşteri Bilgileri</h5>
+                <h5 class="mb-0"><i class="bi bi-person"></i> Diş Hekimi Bilgileri</h5>
                 <div>
-                    <a href="{{ url_for('parties.edit_party', party_id=party.id) }}" class="btn btn-sm btn-outline-primary" aria-label="Müşteri kaydını düzenle">
+                    <a href="{{ url_for('parties.edit_party', party_id=party.id) }}" class="btn btn-sm btn-outline-primary" aria-label="Diş hekimi kaydını düzenle">
                         <i class="bi bi-pencil"></i>
                     </a>
-                    <form method="POST" action="{{ url_for('parties.delete_party', party_id=party.id) }}" class="d-inline" onsubmit="return confirm('Bu müşteriyi silmek istediğinize emin misiniz?');">
-                        <button type="submit" class="btn btn-sm btn-outline-danger" aria-label="Müşteri kaydını sil">
+                    <form method="POST" action="{{ url_for('parties.delete_party', party_id=party.id) }}" class="d-inline" onsubmit="return confirm('Bu diş hekimini silmek istediğinize emin misiniz?');">
+                        <button type="submit" class="btn btn-sm btn-outline-danger" aria-label="Diş hekimi kaydını sil">
                             <i class="bi bi-trash"></i>
                         </button>
                     </form>
@@ -30,11 +29,7 @@
             </div>
             <div class="card-body">
                 <h5>{{ party.display_name }}</h5>
-                <span class="badge bg-{% if party.party_type.value == 'patient' %}primary{% elif party.party_type.value == 'dentist_customer' %}success{% else %}info{% endif %} mb-2">
-                    {% if party.party_type.value == 'patient' %}Hasta
-                    {% elif party.party_type.value == 'dentist_customer' %}Diş Hekimi Müşterisi
-                    {% else %}Kurumsal Müşteri{% endif %}
-                </span>
+                <span class="badge bg-success mb-2">Diş Hekimi</span>
                 <hr>
                 {% if party.phone %}
                 <p class="text-muted mb-2"><i class="bi bi-telephone"></i> {{ party.phone }}</p>
@@ -48,36 +43,6 @@
                 {% if party.tax_id %}
                 <p class="text-muted mb-2"><i class="bi bi-card-text"></i> {{ party.tax_id }}</p>
                 {% endif %}
-                
-                {% if party.party_type.value == 'patient' %}
-                <hr>
-                <p class="mb-1"><strong>Doğum Tarihi:</strong> {% if party.date_of_birth %}{{ party.date_of_birth.strftime('%d.%m.%Y') }}{% else %}-{% endif %}</p>
-                <p class="mb-1"><strong>Tedavi Durumu:</strong> 
-                    {% set st = (party.treatment_status or 'active')|lower %}
-                    {% if st == 'active' %}
-                        <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 px-2 py-1"><i class="bi bi-activity me-1"></i> Aktif</span>
-                    {% elif st == 'completed' %}
-                        <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 px-2 py-1"><i class="bi bi-check-circle me-1"></i> Tamamlandı</span>
-                    {% elif st == 'planned' %}
-                        <span class="badge bg-info bg-opacity-10 text-info border border-info border-opacity-25 px-2 py-1"><i class="bi bi-calendar-event me-1"></i> Planlandı</span>
-                    {% elif st == 'on_hold' %}
-                        <span class="badge bg-warning bg-opacity-10 text-warning border border-warning border-opacity-25 px-2 py-1"><i class="bi bi-pause-circle me-1"></i> Beklemede</span>
-                    {% else %}
-                        <span class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-25 px-2 py-1"><i class="bi bi-circle me-1"></i> Pasif</span>
-                    {% endif %}
-                </p>
-                {% endif %}
-                
-                {% if party.party_type.value == 'company_customer' %}
-                <hr>
-                {% if party.contact_person %}
-                <p class="mb-1"><strong>İlgili Kişi:</strong> {{ party.contact_person }}</p>
-                {% endif %}
-                {% if party.contact_phone %}
-                <p class="mb-1"><strong>İlgili Kişi Tel:</strong> {{ party.contact_phone }}</p>
-                {% endif %}
-                {% endif %}
-                
                 {% if party.notes %}
                 <hr>
                 <p class="text-muted small mb-0"><i class="bi bi-journal-text"></i> {{ party.notes }}</p>
@@ -85,67 +50,118 @@
             </div>
         </div>
 
-        <!-- Debt Summary -->
-        {% if total_owed_eur > 0 %}
-        <div class="card border-0 shadow-sm mt-3 border-start border-danger border-4">
+        {% if total_overall > 0 %}
+        <div class="card border-0 shadow-sm mt-3 border-start border-primary border-4">
             <div class="card-body">
-                <h6 class="text-danger"><i class="bi bi-exclamation-triangle"></i> Açık Borç</h6>
-                <h4 class="mb-0">€{{ "{:,.2f}".format(total_owed_eur) }}</h4>
-                <small class="text-muted">₺{{ "{:,.2f}".format(total_owed_try) }}</small>
+                <h6 class="text-primary"><i class="bi bi-calculator"></i> Toplam İş Emri Özeti</h6>
+                <p class="mb-1">Aparey: ₺{{ "{:,.2f}".format(total_apparatus) }}</p>
+                <p class="mb-1">Ekstra: ₺{{ "{:,.2f}".format(total_extra) }}</p>
+                <h4 class="mb-0">₺{{ "{:,.2f}".format(total_overall) }}</h4>
             </div>
         </div>
         {% endif %}
     </div>
 
-    <!-- Invoices -->
     <div class="col-md-8">
         <div class="card border-0 shadow-sm">
             <div class="card-header bg-white d-flex justify-content-between align-items-center">
-                <h5 class="mb-0"><i class="bi bi-receipt"></i> Faturalar</h5>
-                <a href="{{ url_for('invoices.add_invoice') }}?party_id={{ party.id }}" class="btn btn-sm btn-primary">
-                    <i class="bi bi-plus"></i> Yeni Fatura
+                <h5 class="mb-0"><i class="bi bi-clipboard2-check"></i> İş Emirleri</h5>
+                <a href="{{ url_for('parties.add_work_order', party_id=party.id) }}" class="btn btn-sm btn-primary">
+                    <i class="bi bi-plus"></i> Yeni İş Emri
                 </a>
             </div>
             <div class="card-body p-0">
                 <div class="table-responsive">
-                    <table class="table table-hover mb-0">
+                    <table class="table table-hover mb-0" id="work-orders-table">
                         <thead class="table-light">
                             <tr>
-                                <th>Fatura No</th>
                                 <th>Tarih</th>
-                                <th>Tutar (EUR)</th>
-                                <th>Tutar (TRY)</th>
-                                <th>Durum</th>
+                                <th>Hasta</th>
+                                <th>Aparey Türü</th>
+                                <th class="text-end">Aparey (₺)</th>
+                                <th class="text-end">Ekstra (₺)</th>
+                                <th class="text-end">Toplam (₺)</th>
                                 <th></th>
                             </tr>
                         </thead>
                         <tbody>
-                            {% for inv in invoices %}
-                            <tr>
-                                <td><a href="{{ url_for('invoices.detail_invoice', invoice_id=inv.id) }}">{{ inv.invoice_number }}</a></td>
-                                <td>{{ inv.invoice_date.strftime('%d.%m.%Y') }}</td>
-                                <td>€{{ "{:,.2f}".format(inv.total_eur) }}</td>
-                                <td>₺{{ "{:,.2f}".format(inv.total_try) }}</td>
+                            {% for wo in work_orders %}
+                            <tr class="wo-row" data-wo-id="{{ wo.id }}" style="cursor:pointer">
+                                <td>{{ wo.work_date.strftime('%d.%m.%Y') }}</td>
+                                <td>{{ wo.patient_name }}</td>
                                 <td>
-                                    {% if inv.status == 'pending' %}
-                                    <span class="badge bg-warning table-pill table-pill--status">Bekliyor</span>
-                                    {% elif inv.status == 'paid' %}
-                                    <span class="badge bg-success table-pill table-pill--status">Ödendi</span>
-                                    {% elif inv.status == 'overdue' %}
-                                    <span class="badge bg-danger table-pill table-pill--status">Gecikmiş</span>
+                                    {% set items = wo.apparatus_type|fromjson %}
+                                    {% if items is iterable and items is not string and items|length > 0 %}
+                                        {% for item in items %}
+                                            <span class="badge bg-primary">{{ item.name if item is mapping else item }} ({{ (item.currency if item is mapping else 'TL')|currency_symbol }}{{ "{:,.2f}".format(item.price|float if item is mapping else 0) }})</span>
+                                        {% endfor %}
                                     {% else %}
-                                    <span class="badge bg-secondary table-pill table-pill--status">İptal</span>
+                                        <span class="apparatus-display">{{ wo.apparatus_type }}</span>
                                     {% endif %}
                                 </td>
+                                <td class="text-end">₺{{ "{:,.2f}".format(wo.apparatus_price) }}</td>
+                                <td class="text-end">₺{{ "{:,.2f}".format(wo.extra_price) }}</td>
+                                <td class="text-end fw-bold">₺{{ "{:,.2f}".format(wo.total_price) }}</td>
                                 <td>
-                                    <a href="{{ url_for('invoices.detail_invoice', invoice_id=inv.id) }}" class="btn btn-sm btn-outline-primary">
-                                        <i class="bi bi-eye"></i>
+                                    <a href="{{ url_for('parties.edit_work_order', party_id=party.id, wo_id=wo.id) }}" class="btn btn-sm btn-outline-primary" onclick="event.stopPropagation()">
+                                        <i class="bi bi-pencil"></i>
                                     </a>
+                                    <form method="POST" action="{{ url_for('parties.delete_work_order', party_id=party.id, wo_id=wo.id) }}" class="d-inline" onsubmit="return confirm('Bu iş emrini silmek istediğinize emin misiniz?');" onclick="event.stopPropagation()">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                            <tr class="wo-detail d-none" id="wo-detail-{{ wo.id }}">
+                                <td colspan="7" class="bg-light">
+                                    <div class="p-3">
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <strong><i class="bi bi-person"></i> Hasta:</strong> {{ wo.patient_name }}<br>
+                                                <strong><i class="bi bi-calendar"></i> Tarih:</strong> {{ wo.work_date.strftime('%d.%m.%Y') }}<br>
+                                                <strong><i class="bi bi-tools"></i> Aparey:</strong>
+                                                {% set items = wo.apparatus_type|fromjson %}
+                                                {% if items is iterable and items is not string and items|length > 0 %}
+                                                    {% for item in items %}
+                                                        <span class="badge bg-primary">{{ item.name if item is mapping else item }} ({{ (item.currency if item is mapping else 'TL')|currency_symbol }}{{ "{:,.2f}".format(item.price|float if item is mapping else 0) }})</span>
+                                                    {% endfor %}
+                                                {% else %}
+                                                    {{ wo.apparatus_type }}
+                                                {% endif %}
+                                            </div>
+                                            <div class="col-md-6">
+                                                <strong>Aparey Fiyatı:</strong> ₺{{ "{:,.2f}".format(wo.apparatus_price) }}<br>
+                                                <strong>Ekstra Fiyatı:</strong> ₺{{ "{:,.2f}".format(wo.extra_price) }}<br>
+                                                <strong class="text-primary">Toplam:</strong> <span class="text-primary fw-bold">₺{{ "{:,.2f}".format(wo.total_price) }}</span>
+                                            </div>
+                                        </div>
+                                        {% if wo.extra_addons %}
+                                        <div class="mt-2">
+                                            <strong>Ekstra Eklentiler:</strong>
+                                            <div class="mt-1">
+                                                {% set extras = wo.extra_addons|fromjson %}
+                                                {% if extras is iterable and extras is not string and extras | length > 0 %}
+                                                    {% for ex in extras %}
+                                                        <span class="badge bg-info text-dark">{{ ex.name if ex is mapping else ex }} ({{ (ex.currency if ex is mapping else 'TL')|currency_symbol }}{{ "{:,.2f}".format(ex.price|float if ex is mapping else 0) }})</span>
+                                                    {% endfor %}
+                                                {% else %}
+                                                    <span class="text-muted">{{ wo.extra_addons }}</span>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                        {% endif %}
+                                        {% if wo.notes %}
+                                        <div class="mt-2">
+                                            <strong>Notlar:</strong> <span class="text-muted">{{ wo.notes }}</span>
+                                        </div>
+                                        {% endif %}
+                                    </div>
                                 </td>
                             </tr>
                             {% else %}
                             <tr>
-                                <td colspan="6" class="text-center text-muted py-3">Henüz fatura yok.</td>
+                                <td colspan="7" class="text-center text-muted py-3">Henüz iş emri yok.</td>
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -155,4 +171,39 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const rows = document.querySelectorAll('.wo-row');
+    rows.forEach(function(row) {
+        row.addEventListener('click', function() {
+            const woId = row.dataset.woId;
+            const detail = document.getElementById('wo-detail-' + woId);
+            if (detail) {
+                const isHidden = detail.classList.contains('d-none');
+                document.querySelectorAll('.wo-detail').forEach(function(d) { d.classList.add('d-none'); });
+                if (isHidden) {
+                    detail.classList.remove('d-none');
+                }
+            }
+        });
+    });
+
+    document.querySelectorAll('.apparatus-display').forEach(function(el) {
+        const text = el.textContent.trim();
+        if (text.startsWith('[')) {
+            try {
+                const arr = JSON.parse(text);
+                if (Array.isArray(arr)) {
+                    el.innerHTML = arr.map(function(item) {
+                        return '<span class="badge bg-primary">' + (item.name || item) + '</span>';
+                    }).join(' ');
+                }
+            } catch(e) {}
+        }
+    });
+});
+</script>
 {% endblock %}

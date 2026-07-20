@@ -54,7 +54,7 @@ def test_dashboard_loads(client, app):
 
     with app.app_context():
         party = db.session.execute(
-            db.select(Party).where(Party.party_type == PartyType.PATIENT).limit(1)
+            db.select(Party).where(Party.party_type == PartyType.DENTIST).limit(1)
         ).scalar_one()
         client.post("/invoices/add", data={
             "party_id": party.id,
@@ -76,107 +76,94 @@ def test_dashboard_loads(client, app):
 # ==================== PATIENTS CRUD ====================
 
 def test_patient_list(client, app):
-    """Hasta listesi gorunmeli."""
+    """Hasta listesi redirect olmali."""
     login(client, "admin", "admin-pass")
-    response = client.get("/patients/")
-    assert response.status_code == 200
+    response = client.get("/patients/", follow_redirects=False)
+    assert response.status_code == 302
+    assert "/parties/" in response.location
 
 
 def test_patient_add(client, app):
-    """Hasta ekleme + otomatik Party olusturma."""
+    """Dis hekimi ekleme + otomatik Party olusturma."""
     login(client, "admin", "admin-pass")
 
-    response = client.post("/patients/add", data={
-        "first_name": "Zeynep",
-        "last_name": "Kaya",
+    response = client.post("/parties/add", data={
+        "name": "Dr. Zeynep Kaya",
         "phone": "5559998877",
         "email": "zeynep@test.com",
-        "treatment_status": "active",
+        "is_active": "on",
     }, follow_redirects=False)
     assert response.status_code == 302
 
     with app.app_context():
-        patient = db.session.execute(
-            db.select(Party).where(Party.first_name == "Zeynep", Party.last_name == "Kaya")
+        party = db.session.execute(
+            db.select(Party).where(Party.name == "Dr. Zeynep Kaya")
         ).scalar_one()
-        assert patient.phone == "5559998877"
-        assert patient.party_type == PartyType.PATIENT
+        assert party.phone == "5559998877"
+        assert party.party_type == PartyType.DENTIST
 
 
 def test_patient_detail(client, app):
-    """Hasta detay sayfasi acilmali."""
+    """Hasta detay sayfasi redirect olmali."""
     login(client, "admin", "admin-pass")
 
     with app.app_context():
-        patient_id = db.session.execute(db.select(Party).where(Party.party_type == PartyType.PATIENT).limit(1)).scalar_one().id
+        patient_id = db.session.execute(db.select(Party).where(Party.party_type == PartyType.DENTIST).limit(1)).scalar_one().id
 
-    response = client.get(f"/patients/{patient_id}")
-    assert response.status_code == 200
+    response = client.get(f"/patients/{patient_id}", follow_redirects=False)
+    assert response.status_code == 302
+    assert f"/parties/{patient_id}" in response.location
 
 
 def test_patient_edit(client, app):
-    """Hasta guncelleme + Party senkronizasyonu."""
+    """Dis hekimi guncelleme + Party senkronizasyonu."""
     login(client, "admin", "admin-pass")
 
     with app.app_context():
-        patient_id = db.session.execute(db.select(Party).where(Party.party_type == PartyType.PATIENT).limit(1)).scalar_one().id
+        patient_id = db.session.execute(db.select(Party).where(Party.party_type == PartyType.DENTIST).limit(1)).scalar_one().id
 
-    response = client.post(f"/patients/{patient_id}/edit", data={
-        "first_name": "Guncellenmis",
-        "last_name": "Hasta",
+    response = client.post(f"/parties/{patient_id}/edit", data={
+        "name": "Dr. Guncellenmis Hekim",
         "phone": "5550001122",
         "email": "updated@test.com",
-        "treatment_status": "completed",
+        "is_active": "on",
     }, follow_redirects=False)
     assert response.status_code == 302
 
     with app.app_context():
-        patient = db.session.get(Party, patient_id)
-        assert patient.first_name == "Guncellenmis"
-        assert patient.treatment_status == "completed"
+        party = db.session.get(Party, patient_id)
+        assert party.name == "Dr. Guncellenmis Hekim"
 
 
 def test_patient_delete(client, app):
-    """Hasta soft-delete + Party deaktivasyonu."""
+    """Dis hekimi soft-delete + Party deaktivasyonu."""
     login(client, "admin", "admin-pass")
 
     with app.app_context():
-        patient_id = db.session.execute(db.select(Party).where(Party.party_type == PartyType.PATIENT).limit(1)).scalar_one().id
+        patient_id = db.session.execute(db.select(Party).where(Party.party_type == PartyType.DENTIST).limit(1)).scalar_one().id
 
-    response = client.post(f"/patients/{patient_id}/delete", follow_redirects=False)
+    response = client.post(f"/parties/{patient_id}/delete", follow_redirects=False)
     assert response.status_code == 302
 
     with app.app_context():
-        patient = db.session.get(Party, patient_id)
-        assert patient.is_active is False
+        party = db.session.get(Party, patient_id)
+        assert party.is_active is False
 
 
 def test_patient_add_treatment(client, app):
-    """Hastaya tedavi ekleme."""
+    """Patients route redirect olmali."""
     login(client, "admin", "admin-pass")
 
     with app.app_context():
-        patient_id = db.session.execute(db.select(Party).where(Party.party_type == PartyType.PATIENT).limit(1)).scalar_one().id
-        treatment_id = db.session.execute(
-            db.select(Treatment).where(Treatment.name == "Crown")
-        ).scalar_one().id
+        patient_id = db.session.execute(db.select(Party).where(Party.party_type == PartyType.DENTIST).limit(1)).scalar_one().id
 
     response = client.post(f"/patients/{patient_id}/add-treatment", data={
-        "treatment_id": treatment_id,
+        "treatment_id": 1,
         "treatment_date": date.today().isoformat(),
         "price_override": "",
         "notes": "Test tedavi",
     }, follow_redirects=False)
-    assert response.status_code == 302
-
-    with app.app_context():
-        count = db.session.execute(
-            db.select(PatientTreatment).where(
-                PatientTreatment.party_id == patient_id,
-                PatientTreatment.treatment_id == treatment_id,
-            )
-        ).scalars().all()
-        assert len(count) >= 1
+    assert response.status_code == 404
 
 
 # ==================== TREATMENTS CRUD ====================
@@ -192,7 +179,7 @@ def test_treatment_list(client, app):
 def test_treatment_list_filter_category(client, app):
     """Tedavi listesi kategoriye gore filtrelenmeli."""
     login(client, "admin", "admin-pass")
-    response = client.get("/treatments/?category=prosthetic")
+    response = client.get("/treatments/?category=ekstra_islemler")
     assert response.status_code == 200
     assert "Crown" in response.get_data(as_text=True)
 
@@ -211,7 +198,7 @@ def test_treatment_add(client, app):
     response = client.post("/treatments/add", data={
         "name": "New Treatment",
         "description": "A new test treatment",
-        "category": "orthodontic",
+        "category": "ana_islemler",
         "price_eur": 150.00,
     }, follow_redirects=False)
     assert response.status_code == 302
@@ -220,7 +207,7 @@ def test_treatment_add(client, app):
         t = db.session.execute(
             db.select(Treatment).where(Treatment.name == "New Treatment")
         ).scalar_one()
-        assert t.category == "orthodontic"
+        assert t.category == "ana_islemler"
         assert t.price_eur == 150.00
 
 
@@ -236,7 +223,7 @@ def test_treatment_edit(client, app):
     response = client.post(f"/treatments/{treatment_id}/edit", data={
         "name": "Consultation Updated",
         "description": "Updated desc",
-        "category": "other",
+        "category": "ana_islemler",
         "price_eur": 75.00,
     }, follow_redirects=False)
     assert response.status_code == 302
@@ -303,9 +290,9 @@ def test_treatment_import_xlsx(client, app):
     wb = Workbook()
     ws = wb.active
     ws.append(["Tedavi Adi", "Kategori", "Fiyat (EUR)", "Aciklama"])
-    ws.append(["Imported Treatment 1", "ortodonti", 120.0, "Imported desc 1"])
-    ws.append(["Imported Treatment 2", "cerrahi", 300.0, "Imported desc 2"])
-    ws.append(["Consultation", "diger", 55.0, "Updated via import"])
+    ws.append(["Imported Treatment 1", "ana_islemler", 120.0, "Imported desc 1"])
+    ws.append(["Imported Treatment 2", "ana_islemler", 300.0, "Imported desc 2"])
+    ws.append(["Consultation", "ana_islemler", 55.0, "Updated via import"])
 
     buf = io.BytesIO()
     wb.save(buf)
@@ -324,7 +311,7 @@ def test_treatment_import_xlsx(client, app):
         ).scalar_one_or_none()
         assert t1 is not None
         assert t1.price_eur == 120.0
-        assert t1.category == "orthodontic"
+        assert t1.category == "ana_islemler"
 
         t2 = db.session.execute(
             db.select(Treatment).where(Treatment.name == "Imported Treatment 2")
@@ -377,7 +364,7 @@ def test_invoice_detail(client, app):
 
     with app.app_context():
         party = db.session.execute(
-            db.select(Party).where(Party.party_type == PartyType.PATIENT).limit(1)
+            db.select(Party).where(Party.party_type == PartyType.DENTIST).limit(1)
         ).scalar_one()
         client.post("/invoices/add", data={
             "party_id": party.id,
@@ -404,7 +391,7 @@ def test_invoice_status_update(client, app):
 
     with app.app_context():
         party = db.session.execute(
-            db.select(Party).where(Party.party_type == PartyType.PATIENT).limit(1)
+            db.select(Party).where(Party.party_type == PartyType.DENTIST).limit(1)
         ).scalar_one()
         client.post("/invoices/add", data={
             "party_id": party.id,
@@ -437,7 +424,7 @@ def test_invoice_soft_delete(client, app):
 
     with app.app_context():
         party = db.session.execute(
-            db.select(Party).where(Party.party_type == PartyType.PATIENT).limit(1)
+            db.select(Party).where(Party.party_type == PartyType.DENTIST).limit(1)
         ).scalar_one()
         client.post("/invoices/add", data={
             "party_id": party.id,
@@ -468,7 +455,7 @@ def test_invoice_with_party_preselect(client, app):
 
     with app.app_context():
         party_id = db.session.execute(
-            db.select(Party).where(Party.party_type == PartyType.PATIENT).limit(1)
+            db.select(Party).where(Party.party_type == PartyType.DENTIST).limit(1)
         ).scalar_one().id
 
     response = client.get(f"/invoices/add?party_id={party_id}")
@@ -483,7 +470,7 @@ def test_invoice_no_items_rejected(client, app):
 
     with app.app_context():
         party_id = db.session.execute(
-            db.select(Party).where(Party.party_type == PartyType.PATIENT).limit(1)
+            db.select(Party).where(Party.party_type == PartyType.DENTIST).limit(1)
         ).scalar_one().id
 
     response = client.post("/invoices/add", data={
@@ -501,7 +488,7 @@ def test_invoice_amount_discount(client, app):
 
     with app.app_context():
         party = db.session.execute(
-            db.select(Party).where(Party.party_type == PartyType.PATIENT).limit(1)
+            db.select(Party).where(Party.party_type == PartyType.DENTIST).limit(1)
         ).scalar_one()
 
     items = [{
@@ -534,7 +521,7 @@ def test_invoice_search(client, app):
 
     with app.app_context():
         party = db.session.execute(
-            db.select(Party).where(Party.party_type == PartyType.PATIENT).limit(1)
+            db.select(Party).where(Party.party_type == PartyType.DENTIST).limit(1)
         ).scalar_one()
         client.post("/invoices/add", data={
             "party_id": party.id,
@@ -563,7 +550,7 @@ def test_payment_add(client, app):
 
     with app.app_context():
         party = db.session.execute(
-            db.select(Party).where(Party.party_type == PartyType.PATIENT).limit(1)
+            db.select(Party).where(Party.party_type == PartyType.DENTIST).limit(1)
         ).scalar_one()
         client.post("/invoices/add", data={
             "party_id": party.id,
@@ -603,7 +590,7 @@ def test_payment_delete(client, app):
 
     with app.app_context():
         party = db.session.execute(
-            db.select(Party).where(Party.party_type == PartyType.PATIENT).limit(1)
+            db.select(Party).where(Party.party_type == PartyType.DENTIST).limit(1)
         ).scalar_one()
         client.post("/invoices/add", data={
             "party_id": party.id,
@@ -709,10 +696,10 @@ def test_party_search(client, app):
 
     with app.app_context():
         party = db.session.execute(
-            db.select(Party).where(Party.party_type == PartyType.PATIENT).limit(1)
+            db.select(Party).where(Party.party_type == PartyType.DENTIST).limit(1)
         ).scalar_one()
 
-    response = client.get(f"/parties/?search={party.first_name}")
+    response = client.get(f"/parties/?search={party.name}")
     assert response.status_code == 200
 
 
@@ -721,31 +708,25 @@ def test_party_referred_by(client, app):
     login(client, "admin", "admin-pass")
 
     with app.app_context():
-        dentist = db.session.execute(
-            db.select(Party).where(Party.party_type == PartyType.DENTIST_CUSTOMER).limit(1)
-        ).scalar_one_or_none()
-        if not dentist:
-            client.post("/parties/add", data={
-                "party_type": "dentist_customer",
-                "name": "Dr. Sevk Hekimi",
-                "phone": "5550000000",
-            })
-            dentist = db.session.execute(
-                db.select(Party).where(Party.name == "Dr. Sevk Hekimi")
-            ).scalar_one()
+        dentist = Party(
+            party_type=PartyType.DENTIST,
+            name="Dr. Sevk Hekimi",
+            phone="5550000000",
+        )
+        db.session.add(dentist)
+        db.session.flush()
 
-    response = client.post("/parties/add", data={
-        "party_type": "patient",
-        "first_name": "Sevkli",
-        "last_name": "Hasta",
-        "phone": "5551234567",
-        "referred_by_id": dentist.id,
-    }, follow_redirects=False)
-    assert response.status_code == 302
+        referred = Party(
+            party_type=PartyType.DENTIST,
+            name="Sevkli Hasta",
+            phone="5551234567",
+            referred_by_id=dentist.id,
+        )
+        db.session.add(referred)
+        db.session.commit()
 
-    with app.app_context():
         party = db.session.execute(
-            db.select(Party).where(Party.first_name == "Sevkli", Party.last_name == "Hasta")
+            db.select(Party).where(Party.name == "Sevkli Hasta")
         ).scalar_one()
         assert party.referred_by_id == dentist.id
 
@@ -758,7 +739,7 @@ def test_recalculate_totals_includes_discount_and_vat(client, app):
 
     with app.app_context():
         party = db.session.execute(
-            db.select(Party).where(Party.party_type == PartyType.PATIENT).limit(1)
+            db.select(Party).where(Party.party_type == PartyType.DENTIST).limit(1)
         ).scalar_one()
 
     # 2 adet x 100 EUR = 200 EUR, %10 indirim = 180 EUR, %20 KDV = 216 EUR
@@ -794,7 +775,7 @@ def test_party_only_invoice_detail_no_crash(client, app):
 
     with app.app_context():
         party = db.session.execute(
-            db.select(Party).where(Party.party_type == PartyType.PATIENT).limit(1)
+            db.select(Party).where(Party.party_type == PartyType.DENTIST).limit(1)
         ).scalar_one()
         client.post("/invoices/add", data={
             "party_id": party.id,
@@ -824,7 +805,7 @@ def test_party_only_dashboard_no_crash(client, app):
 
     with app.app_context():
         party = db.session.execute(
-            db.select(Party).where(Party.party_type == PartyType.PATIENT).limit(1)
+            db.select(Party).where(Party.party_type == PartyType.DENTIST).limit(1)
         ).scalar_one()
         client.post("/invoices/add", data={
             "party_id": party.id,
@@ -843,27 +824,20 @@ def test_party_only_dashboard_no_crash(client, app):
 
 
 def test_party_list_enum_badges(client, app):
-    """Bug #7: Parties listesinde badge renkleri dogru olmali."""
+    """Parties listesi dogru bicimde calismali."""
     login(client, "admin", "admin-pass")
 
-    # Create one of each type (is_active must be "on" to appear in list)
+    # Create DENTIST parties (is_active must be "on" to appear in list)
     client.post("/parties/add", data={
-        "party_type": "patient",
-        "first_name": "Badge",
-        "last_name": "TestPatient",
+        "party_type": "dentist",
+        "name": "Dr. Badge Test 1",
         "phone": "5559990001",
         "is_active": "on",
     })
     client.post("/parties/add", data={
-        "party_type": "dentist_customer",
-        "name": "Dr. Badge Test",
+        "party_type": "dentist",
+        "name": "Dr. Badge Test 2",
         "phone": "5559990002",
-        "is_active": "on",
-    })
-    client.post("/parties/add", data={
-        "party_type": "company_customer",
-        "name": "Badge Corp",
-        "phone": "5559990003",
         "is_active": "on",
     })
 
@@ -871,15 +845,9 @@ def test_party_list_enum_badges(client, app):
     response = client.get("/parties/")
     assert response.status_code == 200
     html = response.get_data(as_text=True)
-    assert "bg-primary" in html  # patient badge
-    assert "bg-success" in html  # dentist badge
-    assert "bg-info" in html     # company badge
-
-    # Filtered pages should also work
-    response = client.get("/parties/?type=dentist_customer")
-    assert response.status_code == 200
-    html = response.get_data(as_text=True)
-    assert "Dr. Badge Test" in html
+    assert "Diş Hekimleri" in html
+    assert "Dr. Badge Test 1" in html
+    assert "Dr. Badge Test 2" in html
 
 
 def test_payments_list_no_crash(client, app):
@@ -913,7 +881,7 @@ def test_email_service_party_only(client, app):
 
     with app.app_context():
         party = db.session.execute(
-            db.select(Party).where(Party.party_type == PartyType.PATIENT).limit(1)
+            db.select(Party).where(Party.party_type == PartyType.DENTIST).limit(1)
         ).scalar_one()
         client.post("/invoices/add", data={
             "party_id": party.id,
@@ -943,7 +911,7 @@ def test_whatsapp_service_party_only(client, app):
 
     with app.app_context():
         party = db.session.execute(
-            db.select(Party).where(Party.party_type == PartyType.PATIENT).limit(1)
+            db.select(Party).where(Party.party_type == PartyType.DENTIST).limit(1)
         ).scalar_one()
         client.post("/invoices/add", data={
             "party_id": party.id,
@@ -971,7 +939,7 @@ def test_invoice_vat_in_totals(client, app):
 
     with app.app_context():
         party = db.session.execute(
-            db.select(Party).where(Party.party_type == PartyType.PATIENT).limit(1)
+            db.select(Party).where(Party.party_type == PartyType.DENTIST).limit(1)
         ).scalar_one()
 
     items = [{

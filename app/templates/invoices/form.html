@@ -96,7 +96,7 @@
             <label class="form-label"><i class="bi bi-list-ul"></i> Fatura Kalemleri</label>
             <div class="alert alert-info small mb-3">
               <i class="bi bi-info-circle"></i>
-              Kalemleri eklemek için aşağıdan "Kalem Ekle" butonunu kullanın. Tedavi, ürün, hizmet, laboratuvar veya özel kalem tipleri ekleyebilirsiniz.
+              Kalemleri eklemek için aşağıdan "Kalem Ekle" butonunu kullanın. İşlem, ürün, hizmet, laboratuvar veya özel kalem tipleri ekleyebilirsiniz.
             </div>
             
             <div class="card bg-light border-0 mb-3">
@@ -108,10 +108,10 @@
                         <th style="width: 120px">Tip</th>
                         <th>Açıklama</th>
                         <th class="text-center" style="width: 80px">Adet</th>
-                        <th class="text-end" style="width: 120px">Birim (EUR)</th>
+                        <th class="text-end" style="width: 120px">Birim (₺)</th>
                         <th class="text-end" style="width: 120px">KDV %</th>
                         <th class="text-end" style="width: 120px">İskonto</th>
-                        <th class="text-end" style="width: 140px">Toplam (EUR)</th>
+                        <th class="text-end" style="width: 140px">Toplam (₺)</th>
                         <th style="width: 50px"></th>
                       </tr>
                     </thead>
@@ -120,23 +120,18 @@
                     </tbody>
                     <tfoot>
                       <tr class="table-light">
-                        <td colspan="6" class="text-end fw-bold">Ara Toplam (EUR):</td>
-                        <td class="text-end fw-bold" id="subtotal-eur">€0,00</td>
+                        <td colspan="6" class="text-end fw-bold">Ara Toplam (₺):</td>
+                        <td class="text-end fw-bold" id="subtotal-eur">₺0,00</td>
                         <td></td>
                       </tr>
                       <tr class="table-light">
-                        <td colspan="6" class="text-end fw-bold">Toplam KDV (EUR):</td>
-                        <td class="text-end fw-bold" id="total-vat-eur">€0,00</td>
+                        <td colspan="6" class="text-end fw-bold">Toplam KDV (₺):</td>
+                        <td class="text-end fw-bold" id="total-vat-eur">₺0,00</td>
                         <td></td>
                       </tr>
                       <tr class="table-primary">
-                        <td colspan="6" class="text-end fw-bold">GENEL TOPLAM (EUR):</td>
-                        <td class="text-end fw-bold fs-6" id="grand-total-eur">€0,00</td>
-                        <td></td>
-                      </tr>
-                      <tr class="table-primary">
-                        <td colspan="6" class="text-end fw-bold">GENEL TOPLAM (TRY):</td>
-                        <td class="text-end fw-bold fs-6" id="grand-total-try">₺0,00</td>
+                        <td colspan="6" class="text-end fw-bold">GENEL TOPLAM (₺):</td>
+                        <td class="text-end fw-bold fs-6" id="grand-total-eur">₺0,00</td>
                         <td></td>
                       </tr>
                     </tfoot>
@@ -145,7 +140,7 @@
                 
                 <div class="mt-3 d-flex gap-2">
                   <button type="button" class="btn btn-outline-primary" id="add-treatment-btn">
-                    <i class="bi bi-heart-pulse"></i> Tedavi Ekle
+                    <i class="bi bi-heart-pulse"></i> İşlem Ekle
                   </button>
                   <button type="button" class="btn btn-outline-success" id="add-product-btn">
                     <i class="bi bi-box"></i> Ürün Ekle
@@ -209,12 +204,12 @@
           <input type="hidden" name="item_type" id="item-type">
           
           <div id="treatment-field" class="mb-3 d-none">
-            <label class="form-label">Tedavi Seç <span class="text-danger">*</span></label>
+            <label class="form-label">İşlem Seç <span class="text-danger">*</span></label>
             <select class="form-select js-searchable-select" name="treatment_id" id="item-treatment-id" 
-                    data-search-placeholder="Katalogdan tedavi ara veya seçin...">
-              <option value="">Tedavi seçiniz...</option>
+                    data-search-placeholder="Katalogdan işlem ara veya seçin...">
+              <option value="">İşlem seçiniz...</option>
               {% for t in treatments %}
-              <option value="{{ t.id }}" data-price="{{ t.price_eur }}" data-description="{{ t.description or t.name }}">{{ t.name }} (€{{ "{:,.2f}".format(t.price_eur) }})</option>
+              <option value="{{ t.id }}" data-price="{{ t.price_eur }}" data-description="{{ t.description or t.name }}">{{ t.name }} (₺{{ "{:,.2f}".format(t.price_eur) }})</option>
               {% endfor %}
             </select>
           </div>
@@ -230,7 +225,7 @@
               <input type="number" class="form-control" name="quantity" id="item-quantity" value="1" min="1" required>
             </div>
             <div class="col-md-3">
-              <label class="form-label">Birim Fiyat (EUR) <span class="text-danger">*</span></label>
+              <label class="form-label">Birim Fiyat (₺) <span class="text-danger">*</span></label>
               <input type="number" step="0.01" class="form-control" name="unit_price_eur" id="item-unit-price-eur" required placeholder="0.00">
             </div>
             <div class="col-md-3">
@@ -242,7 +237,7 @@
               <select class="form-select" name="discount_type" id="item-discount-type">
                 <option value="">Yok</option>
                 <option value="percent">Yüzde (%)</option>
-                <option value="amount">Tutar (EUR)</option>
+                <option value="amount">Tutar (₺)</option>
               </select>
             </div>
             <div class="col-md-3">
@@ -272,7 +267,7 @@ function formatNumber(num) {
 }
 
 function formatCurrencyEUR(num) {
-    return '€' + formatNumber(num);
+    return '₺' + formatNumber(num);
 }
 
 function formatCurrencyTRY(num) {
@@ -352,7 +347,7 @@ function addItemToTable(item) {
     const calc = calculateLineTotal(item);
     
     const typeLabels = {
-        'treatment': ['bg-primary', 'Tedavi'],
+        'treatment': ['bg-primary', 'İşlem'],
         'product': ['bg-success', 'Ürün'],
         'service': ['bg-info', 'Hizmet'],
         'lab': ['bg-warning text-dark', 'Lab'],
@@ -396,12 +391,12 @@ function addItemToTable(item) {
         return cell;
     };
     appendTextCell(String(item.quantity), 'text-center');
-    appendTextCell('€' + formatNumber(item.unit_price_eur), 'text-end');
+    appendTextCell('₺' + formatNumber(item.unit_price_eur), 'text-end');
     appendTextCell('%' + formatNumber(item.vat_rate), 'text-end');
     const discountDisplay = item.discount_type
         ? (item.discount_type === 'percent'
             ? '%' + item.discount_value
-            : '€' + formatNumber(item.discount_value))
+            : '₺' + formatNumber(item.discount_value))
         : '-';
     appendTextCell(discountDisplay, 'text-end');
     appendTextCell(formatCurrencyEUR(calc.total), 'text-end fw-bold line-total-eur');
@@ -453,7 +448,7 @@ function openItemModal(type) {
     resetItemForm(type);
 
     const titles = {
-        'treatment': 'Tedavi Ekle',
+        'treatment': 'İşlem Ekle',
         'product': 'Ürün Ekle',
         'service': 'Hizmet Ekle',
         'lab': 'Laboratuvar Ekle',
@@ -520,7 +515,7 @@ document.getElementById('item-form').addEventListener('submit', function(e) {
         const treatmentInput = document.querySelector('#item-form input[name="treatment_id"]') || document.getElementById('item-treatment-id');
         const treatment_id = treatmentInput ? treatmentInput.value : '';
         if (!treatment_id) {
-            alert('Tedavi seçimi zorunludur.');
+            alert('İşlem seçimi zorunludur.');
             return;
         }
         item.treatment_id = parseInt(treatment_id);
