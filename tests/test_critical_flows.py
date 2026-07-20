@@ -485,6 +485,16 @@ def test_party_type_filter(client, app):
         ).scalars().all()
         assert all(p.party_type == PartyType.PATIENT for p in parties)
 
+    response = client.get("/parties/")
+    html = response.get_data(as_text=True)
+    assert "Müşteriler" in html
+    with app.app_context():
+        active_count = db.session.scalar(
+            db.select(db.func.count(Party.id)).where(Party.is_active == True)
+        )
+    assert html.count('title="Görüntüle"') == active_count
+    assert html.count('title="Düzenle"') == active_count
+
 
 def test_invoice_flexible_items(client, app):
     """Farkli item_type'larla fatura olusturma testi."""
@@ -726,7 +736,7 @@ def test_party_invoice_link_and_debt_calculation(client, app):
 
 
 def test_reports_aging_report(client, app):
-    """Yaslandirma raporu (0-30, 31-60, 61+) testi."""
+    """Açık alacakların anlaşılır vade aralıklarıyla gösterilmesi."""
     login(client, "admin", "admin-pass")
 
     with app.app_context():
@@ -759,10 +769,12 @@ def test_reports_aging_report(client, app):
     # Reports sayfasi
     response = client.get("/reports/")
     assert response.status_code == 200
-
-    # Yaslandirma verisi donmeli (template'de gosterilirse)
-    # Bu test template render edildiginde gecerli olur
-    assert b"Raporlar" in response.data
+    html = response.get_data(as_text=True)
+    assert "Vadesine göre açık alacaklar" in html
+    assert "Vadesi henüz gelmedi" in html
+    assert "1–30 gün gecikmiş" in html
+    assert "31–60 gün gecikmiş" in html
+    assert "61+ gün gecikmiş" in html
 
 
 def test_party_treatment_invoice_compatibility(client, app):

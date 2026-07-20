@@ -96,7 +96,7 @@
 
 <div class="row g-4">
     <div class="col-lg-4">
-        <section class="card h-100" aria-labelledby="aging-title"><div class="card-header"><h2 class="h5 mb-0" id="aging-title"><i class="bi bi-hourglass-split"></i> Alacak yaşlandırma</h2></div><div class="card-body">
+        <section class="card h-100" aria-labelledby="aging-title"><div class="card-header"><span class="page-eyebrow mb-1">Ödeme takibi</span><h2 class="h5 mb-0" id="aging-title"><i class="bi bi-calendar2-week"></i> Vadesine göre açık alacaklar</h2></div><div class="card-body">
             {% for row in aging_rows %}<div class="aging-row"><div><span>{{ row.label }}</span><small>{{ row.count }} fatura</small></div><strong>€{{ "{:,.2f}".format(row.amount) }}</strong><div class="aging-bar"><span style="width: {{ (row.amount / max_aging_amount * 100)|round(1) }}%"></span></div></div>{% endfor %}
         </div></section>
     </div>

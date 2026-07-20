@@ -9,7 +9,7 @@
         <p>Hasta hareketlerini, açık faturaları ve tahsilat görünümünü tek bakışta izleyin.</p>
         <div class="d-flex flex-wrap gap-2">
             <a href="{{ url_for('invoices.add_invoice') }}" class="btn btn-light"><i class="bi bi-plus-lg"></i>Yeni fatura</a>
-            <a href="{{ url_for('parties.add_party') }}" class="btn btn-outline-light"><i class="bi bi-person-plus"></i>Yeni kişi</a>
+            <a href="{{ url_for('parties.add_party') }}" class="btn btn-outline-light"><i class="bi bi-person-plus"></i>Yeni müşteri</a>
         </div>
         {% if current_rate %}
         <div class="hero-meta"><span><i class="bi bi-currency-exchange me-1"></i>1 EUR = ₺{{ "{:,.4f}".format(current_rate.eur_to_try) }}</span><span>{{ current_rate.rate_date.strftime('%d.%m.%Y') }} kuru</span></div>
@@ -50,7 +50,7 @@
             <div class="card-body p-0">
                 <div class="table-responsive">
                     <table class="table table-hover align-middle">
-                        <thead><tr><th>Fatura</th><th>Kişi</th><th>Tutar</th><th>Durum</th></tr></thead>
+                        <thead><tr><th>Fatura</th><th>Müşteri</th><th>Tutar</th><th>Durum</th></tr></thead>
                         <tbody>
                         {% for inv in recent_invoices %}
                             <tr>

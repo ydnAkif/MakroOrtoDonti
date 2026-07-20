@@ -107,7 +107,7 @@ def create_app(config_class=Config) -> Flask:
                 "patient": "Hastalar",
                 "dentist_customer": "Diş Hekimi Müşterileri",
                 "company_customer": "Kurumsal Müşteriler",
-                "": "Kişiler",
+                "": "Müşteriler",
             },
         }
 

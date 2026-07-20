@@ -1,17 +1,17 @@
 {% extends "base.html" %}
-{% block title %}{{ party_type_labels.get(selected_type, 'Kişiler') }} - {{ clinic_name }}{% endblock %}
+{% block title %}{{ party_type_labels.get(selected_type, 'Müşteriler') }} - {{ clinic_name }}{% endblock %}
 
 {% block content %}
 <header class="page-header">
-    <div><span class="page-eyebrow">Kişi yönetimi</span><h1>
-        {% if selected_type == 'patient' %}Hastalar{% elif selected_type == 'dentist_customer' %}Diş hekimi müşterileri{% elif selected_type == 'company_customer' %}Kurumsal müşteriler{% else %}Kişiler{% endif %}
+    <div><span class="page-eyebrow">Müşteri yönetimi</span><h1>
+        {% if selected_type == 'patient' %}Hastalar{% elif selected_type == 'dentist_customer' %}Diş hekimi müşterileri{% elif selected_type == 'company_customer' %}Kurumsal müşteriler{% else %}Müşteriler{% endif %}
     </h1><p class="page-description">İletişim, tedavi ve faturalandırma bağlantılarını tek kayıtta yönetin.</p></div>
     <a href="{{ url_for('parties.add_party') }}" class="btn btn-primary">
-        <i class="bi bi-plus-lg"></i> {% if selected_type == 'patient' %}Yeni hasta{% elif selected_type == 'dentist_customer' %}Yeni diş hekimi{% elif selected_type == 'company_customer' %}Yeni kurum{% else %}Yeni kişi{% endif %}
+        <i class="bi bi-plus-lg"></i> {% if selected_type == 'patient' %}Yeni hasta{% elif selected_type == 'dentist_customer' %}Yeni diş hekimi{% elif selected_type == 'company_customer' %}Yeni kurum{% else %}Yeni müşteri{% endif %}
     </a>
 </header>
 
-<nav class="nav nav-tabs mb-4" aria-label="Kişi türü filtresi">
+<nav class="nav nav-tabs mb-4" aria-label="Müşteri türü filtresi">
     <a class="nav-link {% if selected_type == 'patient' %}active{% endif %}"
        href="{{ url_for('parties.list_parties', type='patient') }}"
        {% if selected_type == 'patient' %}aria-current="page"{% endif %}>
@@ -42,7 +42,7 @@
             <div class="input-group">
                 <span class="input-group-text"><i class="bi bi-search" aria-hidden="true"></i></span>
                 <input type="text" class="form-control js-table-filter" data-target="tbody tr" name="search" value="{{ search }}" 
-                       placeholder="Ad, telefon veya e-posta ile ara..." aria-label="Kişilerde ara">
+                       placeholder="Ad, telefon veya e-posta ile ara..." aria-label="Müşterilerde ara">
                 <button type="submit" class="btn btn-primary">Ara</button>
                 {% if search %}
                 <a href="{{ url_for('parties.list_parties', type=selected_type) }}" class="btn btn-outline-secondary">Temizle</a>
@@ -93,14 +93,12 @@
                         </td>
                         <td class="party-tax-cell" data-label="Vergi No">{{ p.tax_id or '-' }}</td>
                         <td class="text-end party-actions-cell" data-label="İşlem">
-                            <a href="{{ url_for('parties.edit_party', party_id=p.id) }}" class="btn btn-sm btn-outline-primary" aria-label="{{ p.display_name }} kaydını düzenle">
-                                <i class="bi bi-pencil" aria-hidden="true"></i>
-                            </a>
-                            {% if p.party_type.value == 'patient' %}
-                            <a href="{{ url_for('parties.detail_party', party_id=p.id) }}" class="btn btn-sm btn-outline-secondary" aria-label="{{ p.display_name }} ayrıntılarını gör">
+                            <a href="{{ url_for('parties.detail_party', party_id=p.id) }}" class="btn btn-sm btn-outline-secondary" title="Görüntüle" aria-label="{{ p.display_name }} ayrıntılarını görüntüle">
                                 <i class="bi bi-eye" aria-hidden="true"></i>
                             </a>
-                            {% endif %}
+                            <a href="{{ url_for('parties.edit_party', party_id=p.id) }}" class="btn btn-sm btn-outline-primary" title="Düzenle" aria-label="{{ p.display_name }} kaydını düzenle">
+                                <i class="bi bi-pencil" aria-hidden="true"></i>
+                            </a>
                         </td>
                     </tr>
                     {% else %}

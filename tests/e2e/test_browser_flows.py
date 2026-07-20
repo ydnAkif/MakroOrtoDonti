@@ -48,7 +48,7 @@ def test_primary_navigation_and_security_headers(authenticated_page, live_server
     assert response.headers["x-content-type-options"] == "nosniff"
     assert response.headers["content-security-policy"].startswith("default-src 'self'")
     assert response.headers["x-request-id"]
-    assert page.get_by_role("heading", name="Kişiler").is_visible()
+    assert page.get_by_role("heading", name="Müşteriler").is_visible()
 
 
 def test_person_invoice_and_payment_critical_flow(authenticated_page, live_server_url):

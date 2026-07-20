@@ -160,10 +160,10 @@ def index():
     outstanding_try = Decimal("0.00")
     overdue_eur = Decimal("0.00")
     aging = {
-        "not_due": {"label": "Vadesi gelmedi", "count": 0, "amount": Decimal("0.00")},
-        "days_0_30": {"label": "0-30 gün", "count": 0, "amount": Decimal("0.00")},
-        "days_31_60": {"label": "31-60 gün", "count": 0, "amount": Decimal("0.00")},
-        "days_61_plus": {"label": "61+ gün", "count": 0, "amount": Decimal("0.00")},
+        "not_due": {"label": "Vadesi henüz gelmedi", "count": 0, "amount": Decimal("0.00")},
+        "days_0_30": {"label": "1–30 gün gecikmiş", "count": 0, "amount": Decimal("0.00")},
+        "days_31_60": {"label": "31–60 gün gecikmiş", "count": 0, "amount": Decimal("0.00")},
+        "days_61_plus": {"label": "61+ gün gecikmiş", "count": 0, "amount": Decimal("0.00")},
     }
     receivable_count = 0
     for invoice in receivable_invoices:
@@ -185,7 +185,7 @@ def index():
         outstanding_try += remaining_try
         due_reference = invoice.due_date or invoice.invoice_date
         age_days = (end_date - due_reference).days
-        if age_days < 0:
+        if age_days <= 0:
             bucket = "not_due"
         elif age_days <= 30:
             bucket = "days_0_30"

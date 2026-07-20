@@ -32,6 +32,8 @@
     --amber-500: #d8a03b;
     --success-500: #176a4a;
     --danger-500: #cf5b62;
+    --report-invoice: #39758c;
+    --report-collected: #278468;
     --sidebar-width: 248px;
     --topbar-height: 76px;
     --radius-sm: 10px;
@@ -60,6 +62,8 @@
     --aqua-700: #5bd2c7;
     --aqua-600: #47c7bd;
     --aqua-100: #173f40;
+    --report-invoice: #69b6cc;
+    --report-collected: #58c3a2;
     --shadow-sm: 0 10px 25px rgba(0, 0, 0, .16);
     --shadow-md: 0 22px 55px rgba(0, 0, 0, .28);
     --bs-body-color: var(--ink-950);
@@ -378,13 +382,13 @@ h1, h2, h3, h4, h5, h6, .navbar-brand, .display-font {
 .report-legend { display: flex; gap: 1rem; color: var(--ink-600); font-size: .72rem; font-weight: 700; }
 .report-legend span { display: flex; align-items: center; gap: .35rem; }
 .report-legend i { width: 9px; height: 9px; border-radius: 3px; }
-.report-legend .issued, .report-trend-bars .issued { background: var(--sky-500); }
-.report-legend .collected, .report-trend-bars .collected { background: var(--aqua-500); }
+.report-legend .issued, .report-trend-bars .issued { background: var(--report-invoice); }
+.report-legend .collected, .report-trend-bars .collected { background: var(--report-collected); }
 .report-trend-row { display: grid; grid-template-columns: 62px 1fr 80px; align-items: center; gap: .85rem; min-height: 48px; border-bottom: 1px solid var(--line); }
 .report-trend-row:last-child { border-bottom: 0; }
 .report-trend-label { color: var(--ink-600); font-size: .7rem; font-weight: 750; }
 .report-trend-bars { display: grid; gap: 5px; }
-.report-trend-bars > div { height: 6px; overflow: hidden; border-radius: 999px; background: var(--surface-raised); }
+.report-trend-bars > div { height: 7px; overflow: hidden; border-radius: 999px; background: var(--line); }
 .report-trend-bars span { display: block; min-width: 2px; height: 100%; border-radius: inherit; }
 .report-trend-value { color: var(--ink-800); font-family: "Familjen Grotesk", sans-serif; font-size: .78rem; font-weight: 700; text-align: right; }
 .report-category-row { margin-bottom: 1.15rem; }
