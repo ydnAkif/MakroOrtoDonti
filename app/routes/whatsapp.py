@@ -76,7 +76,7 @@ def send_invoice(invoice_id):
     invoice = db.get_or_404(Invoice, invoice_id)
     result = WhatsAppService.send_invoice_message(invoice)
     flash(result["message"], "success" if result["success"] else "danger")
-    return redirect(url_for("invoices.detail_invoice", invoice_id=invoice.id))
+    return redirect(url_for("makbuzlar.list_makbuzlar"))
 
 
 @whatsapp_bp.route("/send-bulk", methods=["POST"])

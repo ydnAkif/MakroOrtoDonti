@@ -199,6 +199,9 @@ def add_payment():
         current_rate=db.session.execute(
             db.select(ExchangeRate).order_by(ExchangeRate.rate_date.desc()).limit(1)
         ).scalar_one_or_none(),
+        current_usd_rate=db.session.execute(
+            db.select(ExchangeRate.usd_to_try).order_by(ExchangeRate.rate_date.desc()).limit(1)
+        ).scalar_one_or_none(),
     )
 
 

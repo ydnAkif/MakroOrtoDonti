@@ -101,13 +101,17 @@
             <div class="card-body">
                 <form method="POST" action="{{ url_for('settings.add_exchange_rate') }}" class="mb-3">
                     <div class="row g-3 align-items-end">
-                        <div class="col-md-5">
+                        <div class="col-md-3">
                             <label class="form-label">Tarih</label>
                             <input type="date" class="form-control" name="rate_date" value="{{ today|default('') }}" required>
                         </div>
-                        <div class="col-md-5">
+                        <div class="col-md-3">
                             <label class="form-label">EUR/TRY Kuru</label>
                             <input type="number" step="0.0001" class="form-control" name="eur_try_rate" placeholder="0.0000" required>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">USD/TRY Kuru</label>
+                            <input type="number" step="0.0001" class="form-control" name="usd_try_rate" placeholder="0.0000">
                         </div>
                         <div class="col-md-2">
                             <button type="submit" class="btn btn-primary w-100">Ekle</button>
@@ -121,6 +125,7 @@
                             <tr>
                                 <th>Tarih</th>
                                 <th class="text-end">EUR/TRY</th>
+                                <th class="text-end">USD/TRY</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -128,9 +133,10 @@
                             <tr>
                                 <td>{{ rate.rate_date.strftime('%d.%m.%Y') }}</td>
                                 <td class="text-end">₺{{ "{:,.4f}".format(rate.eur_to_try) }}</td>
+                                <td class="text-end">{{ "₺{:,.4f}".format(rate.usd_to_try) if rate.usd_to_try else "-" }}</td>
                             </tr>
                             {% else %}
-                            <tr><td colspan="2" class="text-center text-muted">Henüz kur eklenmemiş.</td></tr>
+                            <tr><td colspan="3" class="text-center text-muted">Henüz kur eklenmemiş.</td></tr>
                             {% endfor %}
                         </tbody>
                     </table>

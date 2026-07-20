@@ -72,9 +72,7 @@
                             {% set balance = inv.total_eur - paid_amount %}
                             <tr>
                                 <td>
-                                    <a href="{{ url_for('invoices.detail_invoice', invoice_id=inv.id) }}" class="fw-bold">
-                                        {{ inv.invoice_number }}
-                                    </a>
+                                    <span class="fw-bold">{{ inv.invoice_number }}</span>
                                 </td>
                                 <td>{{ inv.party.display_name if inv.party else inv.patient.full_name }}</td>
                                 <td>{{ inv.invoice_date.strftime('%d.%m.%Y') }}</td>
@@ -168,9 +166,7 @@
                             <tr>
                                 <td>{{ p.payment_date.strftime('%d.%m.%Y') }}</td>
                                 <td>
-                                    <a href="{{ url_for('invoices.detail_invoice', invoice_id=p.invoice_id) }}" class="fw-bold">
-                                        {{ p.invoice.invoice_number }}
-                                    </a>
+                                    <span class="fw-bold">{{ p.invoice.invoice_number }}</span>
                                 </td>
                                 <td>{{ p.invoice.party.display_name if p.invoice.party else p.invoice.patient.full_name }}</td>
                                 <td class="fw-bold">€{{ "{:,.2f}".format(p.amount_eur) }}</td>

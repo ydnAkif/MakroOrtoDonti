@@ -109,8 +109,8 @@
         </div></section>
     </div>
     <div class="col-lg-4">
-        <section class="card h-100" aria-labelledby="rates-title"><div class="card-header"><h2 class="h5 mb-0" id="rates-title"><i class="bi bi-currency-exchange"></i> EUR/TRY kur geçmişi</h2></div><div class="card-body p-0"><div class="table-responsive report-rate-table"><table class="table"><thead><tr><th>Tarih</th><th class="text-end">Kur</th></tr></thead><tbody>
-            {% for rate in exchange_rates %}<tr><td>{{ rate.rate_date.strftime('%d.%m.%Y') }}</td><td class="text-end fw-bold">₺{{ "{:,.4f}".format(rate.eur_to_try) }}</td></tr>{% else %}<tr><td colspan="2" class="empty-state text-muted">Kur kaydı yok.</td></tr>{% endfor %}
+        <section class="card h-100" aria-labelledby="rates-title"><div class="card-header"><h2 class="h5 mb-0" id="rates-title"><i class="bi bi-currency-exchange"></i> Döviz kurları</h2></div><div class="card-body p-0"><div class="table-responsive report-rate-table"><table class="table"><thead><tr><th>Tarih</th><th class="text-end">EUR/TRY</th><th class="text-end">USD/TRY</th></tr></thead><tbody>
+            {% for rate in exchange_rates %}<tr><td>{{ rate.rate_date.strftime('%d.%m.%Y') }}</td><td class="text-end fw-bold">₺{{ "{:,.4f}".format(rate.eur_to_try) }}</td><td class="text-end">{{ "₺{:,.4f}".format(rate.usd_to_try) if rate.usd_to_try else "—" }}</td></tr>{% else %}<tr><td colspan="3" class="empty-state text-muted">Kur kaydı yok.</td></tr>{% endfor %}
         </tbody></table></div></div></section>
     </div>
 </div>

@@ -6,13 +6,13 @@
     <div class="dashboard-hero-content">
         <span class="page-eyebrow text-white-50">Klinik özeti</span>
         <h1 id="dashboard-title">Bugünün akışına<br>hakim olun.</h1>
-        <p>Diş hekimi hareketlerini, açık faturaları ve tahsilat görünümünü tek bakışta izleyin.</p>
+        <p>Diş hekimi hareketlerini, aylık iş emirlerini ve makbuz görünümünü tek bakışta izleyin.</p>
         <div class="d-flex flex-wrap gap-2">
-            <a href="{{ url_for('invoices.add_invoice') }}" class="btn btn-light"><i class="bi bi-plus-lg"></i>Yeni fatura</a>
+            <a href="{{ url_for('makbuzlar.list_makbuzlar') }}" class="btn btn-light"><i class="bi bi-receipt"></i>Makbuzlar</a>
             <a href="{{ url_for('parties.add_party') }}" class="btn btn-outline-light"><i class="bi bi-person-plus"></i>Yeni diş hekimi</a>
         </div>
         {% if current_rate %}
-        <div class="hero-meta"><span><i class="bi bi-currency-exchange me-1"></i>1 EUR = ₺{{ "{:,.4f}".format(current_rate.eur_to_try) }}</span><span>{{ current_rate.rate_date.strftime('%d.%m.%Y') }} kuru</span></div>
+        <div class="hero-meta"><span><i class="bi bi-currency-exchange me-1"></i>1 EUR = ₺{{ "{:,.4f}".format(current_rate.eur_to_try) }}</span><span>1 USD = ₺{{ "{:,.4f}".format(current_usd_rate) if current_usd_rate else '—' }}</span><span>{{ current_rate.rate_date.strftime('%d.%m.%Y') }} kuru</span></div>
         {% endif %}
     </div>
 </section>
@@ -25,42 +25,43 @@
     </div>
     <div class="col-6 col-xl-3">
         <article class="card metric-card h-100" style="--metric-color: var(--amber-500); --metric-tint: rgba(216,160,59,.13);">
-            <div class="card-body"><span class="metric-icon"><i class="bi bi-hourglass-split"></i></span><div class="metric-label">Bekleyen fatura</div><p class="metric-value">{{ pending_invoices }}</p></div>
+            <div class="card-body"><span class="metric-icon"><i class="bi bi-receipt"></i></span><div class="metric-label">Bu ayki iş emri</div><p class="metric-value">{{ monthly_work_orders }}</p></div>
         </article>
     </div>
     <div class="col-6 col-xl-3">
         <article class="card metric-card h-100" style="--metric-color: var(--success-500); --metric-tint: rgba(45,155,115,.13);">
-            <div class="card-body"><span class="metric-icon"><i class="bi bi-currency-euro"></i></span><div class="metric-label">Toplam gelir · EUR</div><p class="metric-value">€{{ "{:,.2f}".format(total_revenue_eur) }}</p></div>
+            <div class="card-body"><span class="metric-icon"><i class="bi bi-currency-euro"></i></span><div class="metric-label">Bu ayki toplam</div><p class="metric-value">€{{ "{:,.2f}".format(monthly_total_eur) }}</p></div>
         </article>
     </div>
     <div class="col-6 col-xl-3">
         <article class="card metric-card h-100" style="--metric-color: var(--sky-500); --metric-tint: rgba(53,175,208,.13);">
-            <div class="card-body"><span class="metric-icon"><i class="bi bi-cash-stack"></i></span><div class="metric-label">Toplam gelir · TRY</div><p class="metric-value">₺{{ "{:,.2f}".format(total_revenue_try) }}</p></div>
+            <div class="card-body"><span class="metric-icon"><i class="bi bi-cash-stack"></i></span><div class="metric-label">Toplam iş emri</div><p class="metric-value">{{ total_work_orders_all }}</p></div>
         </article>
     </div>
 </div>
 
 <div class="row g-4">
     <div class="col-xl-7">
-        <section class="card h-100" aria-labelledby="recent-invoices-title">
+        <section class="card h-100" aria-labelledby="recent-workorders-title">
             <div class="card-header d-flex justify-content-between align-items-center">
-                <div><span class="page-eyebrow mb-1">Finans hareketi</span><h2 class="h5 mb-0" id="recent-invoices-title">Son faturalar</h2></div>
-                <a href="{{ url_for('invoices.list_invoices') }}" class="btn btn-sm btn-outline-primary">Tümünü gör<i class="bi bi-arrow-right"></i></a>
+                <div><span class="page-eyebrow mb-1">Son hareketler</span><h2 class="h5 mb-0" id="recent-workorders-title">Son iş emirleri</h2></div>
+                <a href="{{ url_for('makbuzlar.list_makbuzlar') }}" class="btn btn-sm btn-outline-primary">Tümünü gör<i class="bi bi-arrow-right"></i></a>
             </div>
             <div class="card-body p-0">
                 <div class="table-responsive">
                     <table class="table table-hover align-middle">
-                        <thead><tr><th>Fatura</th><th>Müşteri</th><th>Tutar</th><th>Durum</th></tr></thead>
+                        <thead><tr><th>Tarih</th><th>Doktor</th><th>Hasta</th><th>Aparat</th><th>Tutar</th></tr></thead>
                         <tbody>
-                        {% for inv in recent_invoices %}
+                        {% for wo in recent_work_orders %}
                             <tr>
-                                <td><a href="{{ url_for('invoices.detail_invoice', invoice_id=inv.id) }}">{{ inv.invoice_number }}</a></td>
-                                <td>{{ inv.party.display_name if inv.party else '-' }}</td>
-                                <td><strong>€{{ "{:,.2f}".format(inv.total_eur) }}</strong><br><small class="text-muted">₺{{ "{:,.2f}".format(inv.total_try) }}</small></td>
-                                <td>{% if inv.status == 'pending' %}<span class="badge bg-warning table-pill table-pill--status">Bekliyor</span>{% elif inv.status == 'paid' %}<span class="badge bg-success table-pill table-pill--status">Ödendi</span>{% elif inv.status == 'overdue' %}<span class="badge bg-danger table-pill table-pill--status">Gecikmiş</span>{% else %}<span class="badge bg-secondary table-pill table-pill--status">İptal</span>{% endif %}</td>
+                                <td>{{ wo.work_date.strftime('%d.%m.%Y') }}</td>
+                                <td><a href="{{ url_for('makbuzlar.detail_makbuz', party_id=wo.party_id) }}">{{ wo.party.name if wo.party else '-' }}</a></td>
+                                <td>{{ wo.patient_name }}</td>
+                                <td>{{ wo.apparatus_type }}</td>
+                                <td><strong>€{{ "{:,.2f}".format(wo.total_price) }}</strong></td>
                             </tr>
                         {% else %}
-                            <tr><td colspan="4" class="empty-state text-muted"><i class="bi bi-receipt"></i>Henüz fatura bulunmuyor.<br><a href="{{ url_for('invoices.add_invoice') }}">İlk faturayı oluşturun</a></td></tr>
+                            <tr><td colspan="5" class="empty-state text-muted"><i class="bi bi-receipt"></i>Henüz iş emri bulunmuyor.<br><a href="{{ url_for('parties.list_parties') }}">Diş hekimlerini görüntüleyin</a></td></tr>
                         {% endfor %}
                         </tbody>
                     </table>

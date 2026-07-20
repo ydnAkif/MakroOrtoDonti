@@ -163,7 +163,7 @@ document.addEventListener('DOMContentLoaded', function() {
     paymentDate.addEventListener('change', async function() {
         if (!this.value) return;
         try {
-            const response = await fetch(`/invoices/api/exchange-rate?date=${encodeURIComponent(this.value)}`);
+            const response = await fetch(`/makbuzlar/api/exchange-rate?date=${encodeURIComponent(this.value)}`);
             if (!response.ok) throw new Error('rate unavailable');
             const data = await response.json();
             currentRate = Number(data.rate);

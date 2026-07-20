@@ -73,15 +73,17 @@ def update_settings():
 @permissions_required("settings.manage")
 def add_exchange_rate():
     rate_date_str = request.form.get("rate_date", "")
-    rate_value = request.form.get("eur_try_rate", "")
+    eur_try_rate_str = request.form.get("eur_try_rate", "")
+    usd_try_rate_str = request.form.get("usd_try_rate", "")
 
-    if not rate_date_str or not rate_value:
-        flash("Tarih ve kur değeri zorunludur.", "danger")
+    if not rate_date_str or not eur_try_rate_str:
+        flash("Tarih ve EUR/TRY kur değeri zorunludur.", "danger")
         return redirect(url_for("settings.index"))
 
     from app.services.validation_service import parse_date, parse_decimal
     rate_date = parse_date(rate_date_str)
-    eur_try_rate = parse_decimal(rate_value, "0.0001")
+    eur_try_rate = parse_decimal(eur_try_rate_str, "0.0001")
+    usd_try_rate = parse_decimal(usd_try_rate_str, "0.0001") if usd_try_rate_str else None
 
     if not rate_date or eur_try_rate is None or eur_try_rate <= 0:
         flash("Geçersiz tarih veya kur değeri girildi.", "danger")
@@ -96,10 +98,13 @@ def add_exchange_rate():
 
     if existing:
         existing.eur_to_try = eur_try_rate
+        if usd_try_rate is not None and usd_try_rate > 0:
+            existing.usd_to_try = usd_try_rate
     else:
         db.session.add(ExchangeRate(
             rate_date=rate_date,
             eur_to_try=eur_try_rate,
+            usd_to_try=usd_try_rate,
             source="ecb",
         ))
 

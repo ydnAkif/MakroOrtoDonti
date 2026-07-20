@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+{% block title %}Makbuzlar - {{ clinic_name }}{% endblock %}
+
+{% block content %}
+<header class="page-header">
+    <div><span class="page-eyebrow">Finans</span><h1>Makbuzlar</h1><p class="page-description">Doktorlara göre aylık iş emri toplamlarını görüntüleyin.</p></div>
+</header>
+
+<!-- Month/Year Filter -->
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body">
+        <form method="GET" action="{{ url_for('makbuzlar.list_makbuzlar') }}" class="row g-3 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label">Yıl</label>
+                <select name="year" class="form-select" onchange="this.form.submit()">
+                    {% for y in range(2024, 2031) %}
+                    <option value="{{ y }}" {% if y == year %}selected{% endif %}>{{ y }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Ay</label>
+                <select name="month" class="form-select" onchange="this.form.submit()">
+                    {% for m_num, m_name in months %}
+                    <option value="{{ m_num }}" {% if m_num == month %}selected{% endif %}>{{ m_name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-primary w-100"><i class="bi bi-funnel"></i> Filtrele</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Grand Totals -->
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+        <article class="card metric-card h-100">
+            <div class="card-body">
+                <span class="metric-icon"><i class="bi bi-receipt"></i></span>
+                <div class="metric-label">Toplam İş Emri</div>
+                <p class="metric-value">{{ grand_total_count }}</p>
+            </div>
+        </article>
+    </div>
+    <div class="col-6 col-md-3">
+        <article class="card metric-card h-100" style="--metric-color: var(--amber-500); --metric-tint: rgba(216,160,59,.13);">
+            <div class="card-body">
+                <span class="metric-icon"><i class="bi bi-gear"></i></span>
+                <div class="metric-label">Aparat Toplamı</div>
+                <p class="metric-value">€{{ "{:,.2f}".format(grand_total_apparatus) }}</p>
+            </div>
+        </article>
+    </div>
+    <div class="col-6 col-md-3">
+        <article class="card metric-card h-100" style="--metric-color: var(--success-500); --metric-tint: rgba(45,155,115,.13);">
+            <div class="card-body">
+                <span class="metric-icon"><i class="bi bi-plus-circle"></i></span>
+                <div class="metric-label">Ekstra Toplam</div>
+                <p class="metric-value">€{{ "{:,.2f}".format(grand_total_extra) }}</p>
+            </div>
+        </article>
+    </div>
+    <div class="col-6 col-md-3">
+        <article class="card metric-card h-100" style="--metric-color: var(--sky-500); --metric-tint: rgba(53,175,208,.13);">
+            <div class="card-body">
+                <span class="metric-icon"><i class="bi bi-currency-euro"></i></span>
+                <div class="metric-label">Genel Toplam</div>
+                <p class="metric-value">€{{ "{:,.2f}".format(grand_total_price) }}</p>
+            </div>
+        </article>
+    </div>
+</div>
+
+<!-- Doctor List -->
+<div class="card border-0 shadow-sm">
+    <div class="card-header bg-white">
+        <h5 class="mb-0"><i class="bi bi-people"></i> {{ months[month - 1][1] }} {{ year }} - Doktor Bazlı Toplamlar</h5>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Doktor</th>
+                        <th class="text-center">İş Emri Sayısı</th>
+                        <th class="text-end">Aparat (EUR)</th>
+                        <th class="text-end">Ekstra (EUR)</th>
+                        <th class="text-end">Toplam (EUR)</th>
+                        <th class="text-end">İşlem</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for d in doctors %}
+                    <tr>
+                        <td>
+                            <div class="d-flex align-items-center">
+                                <div class="avatar-circle me-2 bg-success bg-opacity-10 text-success fw-bold rounded-circle d-flex align-items-center justify-content-center" style="width:38px;height:38px;font-size:0.85rem;">
+                                    {{ (d.party.name[:2] if d.party else 'DH')|upper }}
+                                </div>
+                                <div>
+                                    <a href="{{ url_for('makbuzlar.detail_makbuz', party_id=d.party_id, year=year, month=month) }}" class="fw-bold text-decoration-none">{{ d.party.name if d.party else '-' }}</a>
+                                    {% if d.party and d.party.phone %}<br><small class="text-muted">{{ d.party.phone }}</small>{% endif %}
+                                </div>
+                            </div>
+                        </td>
+                        <td class="text-center"><span class="badge bg-primary">{{ d.count }}</span></td>
+                        <td class="text-end">€{{ "{:,.2f}".format(d.total_apparatus) }}</td>
+                        <td class="text-end">€{{ "{:,.2f}".format(d.total_extra) }}</td>
+                        <td class="text-end fw-bold">€{{ "{:,.2f}".format(d.total_price) }}</td>
+                        <td class="text-end">
+                            <a href="{{ url_for('makbuzlar.detail_makbuz', party_id=d.party_id, year=year, month=month) }}" class="btn btn-sm btn-outline-primary">
+                                <i class="bi bi-eye"></i> Detay
+                            </a>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6" class="empty-state text-muted">
+                            <i class="bi bi-receipt"></i>
+                            Bu ay için iş emri bulunmamaktadır.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                {% if doctors %}
+                <tfoot class="table-light">
+                    <tr>
+                        <td class="fw-bold">TOPLAM</td>
+                        <td class="text-center fw-bold">{{ grand_total_count }}</td>
+                        <td class="text-end fw-bold">€{{ "{:,.2f}".format(grand_total_apparatus) }}</td>
+                        <td class="text-end fw-bold">€{{ "{:,.2f}".format(grand_total_extra) }}</td>
+                        <td class="text-end fw-bold fs-5">€{{ "{:,.2f}".format(grand_total_price) }}</td>
+                        <td></td>
+                    </tr>
+                </tfoot>
+                {% endif %}
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

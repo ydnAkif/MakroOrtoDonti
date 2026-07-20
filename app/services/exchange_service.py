@@ -62,7 +62,7 @@ def fetch_usd_try_rate() -> float | None:
 
 
 def fetch_and_store_rate() -> float:
-    """Fetch and store today's EUR/TRY rate."""
+    """Fetch and store today's EUR/TRY and USD/TRY rates."""
     rate_value = fetch_eur_try_rate()
     usd_rate = fetch_usd_try_rate()
     today = date.today()

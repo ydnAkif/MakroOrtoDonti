@@ -62,12 +62,23 @@ def create_app(config_class=Config) -> Flask:
     from .services.observability import init_observability
     init_observability(app)
 
+    # Auto-fetch exchange rates on first request (non-blocking background)
+    @app.before_request
+    def _auto_fetch_rates():
+        if not hasattr(app, '_rates_fetched'):
+            app._rates_fetched = True
+            try:
+                from .services.exchange_service import ensure_daily_rate
+                ensure_daily_rate(max_age_days=2)
+            except Exception:
+                logger.debug("Auto-fetch exchange rates failed", exc_info=True)
+
     from .routes.auth import auth_bp
     from .routes.dashboard import dashboard_bp
     from .routes.patients import patients_bp
     from .routes.parties import parties_bp
     from .routes.treatments import treatments_bp
-    from .routes.invoices import invoices_bp
+    from .routes.makbuzlar import makbuzlar_bp
     from .routes.payments import payments_bp
     from .routes.settings import settings_bp
     from .routes.whatsapp import whatsapp_bp
@@ -80,7 +91,7 @@ def create_app(config_class=Config) -> Flask:
     app.register_blueprint(patients_bp, url_prefix="/patients")
     app.register_blueprint(parties_bp, url_prefix="/parties")
     app.register_blueprint(treatments_bp, url_prefix="/treatments")
-    app.register_blueprint(invoices_bp, url_prefix="/invoices")
+    app.register_blueprint(makbuzlar_bp, url_prefix="/makbuzlar")
     app.register_blueprint(payments_bp, url_prefix="/payments")
     app.register_blueprint(settings_bp, url_prefix="/settings")
     app.register_blueprint(whatsapp_bp, url_prefix="/whatsapp")
