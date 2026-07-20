@@ -4,6 +4,7 @@ import argparse
 import json
 import sqlite3
 import threading
+from contextlib import closing
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date
 
@@ -101,9 +102,10 @@ def test_permission_matrix_separates_staff_duties():
 
 def test_encrypted_backup_supports_key_rotation(tmp_path, monkeypatch):
     database = tmp_path / "active.db"
-    with sqlite3.connect(database) as conn:
+    with closing(sqlite3.connect(database)) as conn:
         conn.execute("CREATE TABLE sample (value TEXT)")
         conn.execute("INSERT INTO sample VALUES ('secret')")
+        conn.commit()
     monkeypatch.setenv("DATABASE_URL", f"sqlite:///{database}")
     monkeypatch.setenv("BACKUP_ENCRYPTION_KEYS", "current-key-that-is-longer-than-thirty-two-characters")
 
@@ -138,14 +140,15 @@ def test_deployment_preflight_is_fail_closed():
 
 def test_anonymized_production_drill_creates_verified_manifest(tmp_path):
     source = tmp_path / "production-copy.db"
-    with sqlite3.connect(source) as conn:
+    with closing(sqlite3.connect(source)) as conn:
         conn.execute("CREATE TABLE parties (id INTEGER PRIMARY KEY, name TEXT, first_name TEXT, last_name TEXT, phone TEXT, email TEXT, address TEXT, tax_id TEXT, notes TEXT, date_of_birth TEXT, contact_person TEXT, contact_phone TEXT)")
         conn.execute("INSERT INTO parties VALUES (1, 'Ayşe Yılmaz', 'Ayşe', 'Yılmaz', '555', 'a@example.com', 'Adres', '123', 'Not', '1990-01-01', NULL, NULL)")
+        conn.commit()
 
     artifact, manifest_path = create_drill(source, tmp_path / "drill")
     manifest = json.loads(manifest_path.read_text())
     assert manifest["pii_anonymized"] is True
     assert manifest["integrity_check"] == "ok"
-    with sqlite3.connect(artifact) as conn:
+    with closing(sqlite3.connect(artifact)) as conn:
         row = conn.execute("SELECT name, phone, email FROM parties").fetchone()
     assert row == ("ANON-1", None, None)
