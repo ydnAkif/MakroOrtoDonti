@@ -1,106 +1,159 @@
-# Makro Ortodonti — Teknik Roadmap
+# Makro Ortodonti — Doğrulanmış Teknik Roadmap
 
-Son güncelleme: 19 Temmuz 2026
+Son güncelleme: 20 Temmuz 2026
 
-Bu belge, `PLAN.md` içindeki ürün vizyonunu değiştirmeden mevcut kodun gerçek teknik durumunu ve sonraki güvenli adımları gösterir.
+Bu belge yalnızca mevcut koddan, çalışan testlerden ve production kontrol zincirinden doğrulanmış işleri içerir. Öznel `92/100` benzeri skorlar kaldırılmıştır; sürüm kararı tamamlanma kanıtlarına göre verilir.
 
-## Güncel skor: 92/100
+## Güncel doğrulama özeti
 
-Skor; çalışan kod, 420 otomatik test, branch coverage, masaüstü ve 400×765 mobil tarayıcı incelemesi, production başlatma modeli ve yedek/geri yükleme zinciri üzerinden verilmiştir. Bu proje güçlü bir klinik iç kullanım sürümüdür. Kuruma ait secret store, uzak yedek hedefi ve staging altyapısı doğrulanmadan 100/100 demek gerçekçi olmaz.
+| Kontrol | Sonuç |
+| --- | --- |
+| Test keşfi | 421 test öğesi: 416 Python/Flask + parametrizasyonla 5 Playwright |
+| Python/Flask paketi | 416 geçti (`Python 3.14.6`, 276,53 sn) |
+| Playwright paketi | 5 geçti (Chromium; mobil ve masaüstü axe dâhil) |
+| Branch-aware coverage | %95,82; kapı %90 |
+| CI matrisi | Python 3.13 ve 3.14 |
+| Çalışma ağacı | İnceleme başında temiz |
 
-| Alan | Ağırlık | Skor | Kısa değerlendirme |
-| --- | ---: | ---: | --- |
-| Görsel UI | %10 | 93 | Özgün klinik kimliği, tutarlı tasarım sistemi, başarılı responsive yapı |
-| UX ve erişilebilirlik | %10 | 88 | Semantik gezinme, görünür odaklar, mobil kişi kartları; otomatik axe taraması henüz yok |
-| Fonksiyonel kapsam | %12 | 94 | Kişi, tedavi, fatura, tahsilat, PDF, rapor, SMTP ve WhatsApp akışları geniş |
-| Mimari | %12 | 80 | Blueprint/service ayrımı iyi; legacy `Patient` uyumluluk katmanı ve bazı geniş route'lar borç |
-| Kod kalitesi | %10 | 86 | Savunmacı doğrulama ve hata akışları güçlendi; transaction sınırları daha da sadeleşebilir |
-| Veri bütünlüğü | %14 | 84 | Finansal invariantlar, fazla ödeme ve FK koruması var; para alanları hâlâ `Float` |
-| Güvenlik ve mahremiyet | %16 | 88 | CSRF, bcrypt, rol kontrolü, kilit, ayrı Fernet anahtarı ve fail-closed production ayarı var |
-| Test ve kalite güvence | %10 | 97 | 420 test, %95,75 toplam coverage, %89,87 branch coverage, %90 CI kapısı ve gerçek Chromium E2E |
-| Operasyon ve performans | %6 | 86 | Gunicorn, health check, doğrulamalı atomik backup/restore ve SQLite korumaları hazır |
-| **Toplam** | **%100** | **88** | **Üretime yakın, kalan yapısal işler açıkça sınırlandırılmış durumda** |
+Coverage yüksek olsa da test sayısı ve coverage tek başına production hazırlığı anlamına gelmez. Aşağıdaki operasyonel kapılar ile güvenlik ve eşzamanlılık işleri ayrıca tamamlanmalıdır.
 
-Ek kalibrasyon:
+## Sürüm kapısı — kurum ve altyapı tarafından doğrulanacak
 
-- Klinik iç kullanım hazırlığı: **96/100**
-- Kontrollü HTTPS production hazırlığı: **86/100**
-- Çok sunuculu / yüksek eşzamanlı kullanım: **72/100**
+- [ ] `SECRET_KEY`, `ENCRYPTION_KEY` ve güncel backup anahtarı farklı, kalıcı değerler olarak secret store'da tanımlı.
+- [ ] `SESSION_COOKIE_SECURE=true`, `FORCE_HSTS=true` ve gerekiyorsa `TRUST_PROXY`/`FORWARDED_ALLOW_IPS` staging üzerinde gerçek TLS zinciriyle doğrulandı.
+- [ ] Aktif SQLite dosyasının bulunduğu disk/volume şifreli; dosya ve uygulama loglarına erişim yalnız yetkili hesaplarla sınırlı.
+- [ ] Şifreli yedek farklı fiziksel hedefe kopyalandı, doğrulandı ve başka bir makinede restore tatbikatı geçti.
+- [ ] Günlük kur yenileme ile audit purge komutları scheduler'a bağlandı ve başarısızlıkları için alarm tanımlandı.
+- [ ] KVKK veri sorumlusu, yetki onaylayan kişi, saklama süresi sahibi ve olay müdahale sorumlusu belirlendi.
+- [ ] Neonize/WhatsApp kullanımı, SMTP gönderimi ve hasta iletişim izinleri kurum politikası ile hukuken onaylandı.
 
-## Bu turda tamamlananlar
+## P1 — Güvenlik ve çalışma zamanı güvenilirliği
 
-- [x] 14 başlangıç regresyonu giderildi; tüm suite yeşil
-- [x] Fatura satırlarında miktar, fiyat, KDV, iskonto, enum ve referans doğrulaması
-- [x] Fazla tahsilat, silinmiş/iptal fatura ve ödeme sonrası durum korumaları
-- [x] Geçmiş alacakların dönem sonu raporuna doğru taşınması ve fatura kuru bazlı TRY hesabı
-- [x] SMTP secret için XOR/Base64 yerine Fernet ve ayrı `ENCRYPTION_KEY`
-- [x] Production'da zayıf/örnek secret değerlerinde fail-closed başlangıç
-- [x] Proxy/IP güven sınırı, secure cookie seçenekleri ve SQLite foreign key/busy timeout
-- [x] DOM XSS yüzeylerinin `textContent`/DOM API ile kapatılması
-- [x] `/health` veritabanı readiness kontrolü
-- [x] Online SQLite backup, rotation, integrity check ve onaylı atomik restore
-- [x] Gunicorn production giriş noktası ve production/dev bağımlılık ayrımı
-- [x] GitHub Actions üzerinde Python 3.13/3.14, compile, test ve %90 branch-aware coverage kapısı
-- [x] Mobil kişi listesinin yatay kaydırmasız kart görünümü
-- [x] Navigasyon semantiği, `aria-current`, ikon ve flash erişilebilirlik temizliği
-- [x] Geçersiz kişi türü ile 500 hatasının ve hasta→kurum dönüşümündeki legacy kayıt tutarsızlığının giderilmesi
-- [x] Tedavi adı, kategori ve fiyat doğrulaması
-- [x] Güncel kurulum, production, güvenlik, test ve felaket kurtarma talimatlarını içeren `README.md`
+### Taze production bootstrap akışı ekle
 
-## Doğrulanan kalite kapısı
+- [ ] Örnek hasta/kurum/kur ve tedavi kayıtlarını oluşturmadan yalnız zorunlu `Settings` satırlarını ve ilk admini idempotent oluşturan CLI komutu ekle.
+- [ ] İlk admin parolasını secret store/güvenli tek kullanımlık kanal üzerinden al; normal uygulama loguna yazma.
+- [ ] Boş veritabanında `db upgrade -> bootstrap -> login -> ilk fatura` E2E testi ekle.
 
-```text
-420 passed (416 Python/entegrasyon + 4 Chromium E2E)
-Branch coverage: %89,87 (toplam branch-aware coverage: %95,75)
-Coverage alt sınırı: %90
-Python compileall: geçti
-pip check: geçti
-400×765 mobil görsel kontrol: geçti
-```
+Bugün `init_db.py` development/demo verisi seed eder; yalnız `flask db upgrade` ise admin ve `invoice_next_number` oluşturmaz. Bu nedenle yeni production kurulumu için belgelenebilir, demosuz bir bootstrap komutu mevcut değildir.
 
-## P1 — Production verisi taşınmadan önce
+### Giriş denemesi sınırlandırmasını yeniden tasarla
 
-- [x] Flask-Migrate/Alembic ekle; `create_all` ve elle `ALTER TABLE` akışını sürümlü migrationlara taşı
-- [x] Migrationları mevcut veritabanı kopyasında ve boş veritabanında test et
-- [x] Para/kur kolonlarını `Float` yerine `Decimal` + SQL `Numeric` yapısına kontrollü migration ile taşı
-- [x] `Party`yi operasyonel tek doğruluk kaynağı yap; legacy `Patient` tablosunu yalnızca migration uyumluluğuna indir
-- [x] Fatura numarası sayacını atomik veritabanı artışı ve eşzamanlı iki transaction testiyle güvenceye al
-- [x] Tedavi formu, JSON API ve XLSX içe aktarmayı tek doğrulama yaklaşımında birleştir
+- [ ] `IP OR username` ile tek sayaç yerine IP ve hesap için bağımsız limitler, ayrı eşikler ve artan bekleme süresi uygula.
+- [ ] Tek bir hesaba farklı IP'lerden yanlış parola gönderilerek kalıcı hizmet engelleme oluşmamasını test et.
+- [ ] Aynı IP'den farklı kullanıcı adlarıyla credential-stuffing yapılmasını engelleyen test ekle.
+- [ ] Eski `login_attempts` kayıtları için saklama/purge politikası ekle.
 
-## P2 — İnternete açık dağıtım öncesi
+Mevcut `OR` sorgusu hem IP'yi hem hedef hesabı 5 hata/15 dakika eşiğine bağlar. Bunu doğrudan `AND` yapmak doğru çözüm değildir; iki saldırı ekseni ayrı izlenmelidir.
 
-- [x] HSTS, CSP, `X-Content-Type-Options`, Referrer ve Permissions Policy güvenlik başlıklarını uygula
-- [x] Bootstrap/font/ikon kaynaklarını self-host et
-- [x] Döviz kuru yenilemeyi request içindeki background thread yerine scheduler-safe CLI job'a taşı
-- [x] Yapılandırılmış log, request ID ve opsiyonel Sentry hata izleme ekle
-- [x] Gerçek Chromium Playwright E2E altyapısı ekle
-- [x] axe-core ile 400 px mobil ve 1280 px masaüstü WCAG kalite kapısı kur
+### WhatsApp gönderimini worker-safe ve asenkron yap
 
-## P3 — Sağlık verisi yönetişimi ve ölçek
+- [ ] Toplu gönderimdeki kişi başına `time.sleep(3)` ve senkron WSGI döngüsünü kalıcı job kuyruğuna taşı.
+- [ ] Job durumu, kısmi hata, yeniden deneme, idempotency ve gönderim sonucunu veri tabanında sakla.
+- [ ] `WhatsAppService._client/_connected` process-local durumunu Gunicorn çoklu worker modeliyle uyumlu hâle getir veya WhatsApp'ı tek ayrı worker servisine ayır.
+- [ ] Telefon normalizasyonu, gönderim kotası ve hasta iletişim izni kontrolünü merkezileştir.
 
-- [x] Kişi, finans ve ayar değişiklikleri için aktör/zaman/eski-yeni değer audit logu
-- [x] Klinik, finans, rapor, mesajlaşma, ayar ve KVKK izinlerinden oluşan merkezi rol matrisi
-- [x] KVKK saklama, korumalı anonimleştirme ve dışa aktarma teknik akışları
-- [x] Şifreli yedek, çoklu anahtarla rotasyon ve aktif veritabanı için disk şifreleme preflight kontrolü
-- [x] Liste sayfalarında sunucu taraflı pagination ve raporlarda SQL aggregate sorguları
-- [ ] Eşzamanlı kullanıcı/yazma eşiği aşılırsa PostgreSQL geçiş planı
+Mevcut akışta 50 alıcı en az 150 saniye request süresi üretir. Ayrıca bir worker'da kurulan bağlantı başka worker tarafından görülmez.
 
-## Sürüm yayınlama kapısı
+### Dış servis hatalarını kullanıcıdan ayır
 
-- [ ] Production `SECRET_KEY` ve `ENCRYPTION_KEY` ayrı secret store değerleri olarak tanımlı
-- [ ] HTTPS, secure cookie ve güvenilir proxy ayarları staging ortamında doğrulandı
-- [ ] Son backup doğrulandı ve restore tatbikatı farklı bir makinede geçti
-- [x] Migration anonimleştirilmiş gerçek veri kopyasında geçti; atomik restore/geri dönüş aracı hazır
-- [x] Kritik E2E ve erişilebilirlik kontrolleri geçti
-- [x] Otomatik kontrollerde açık kritik/yüksek güvenlik bulgusu yok
-- [ ] KVKK yetki, saklama ve olay müdahale sorumluları belirlendi
+- [ ] SMTP, WhatsApp, kur yenileme ve XLSX import exception metinlerini yalnız server loguna yaz; kullanıcıya sabit, eyleme dönük hata kodu ve request ID göster.
+- [ ] SMTP bağlantısına açık timeout ve güvenli kapanış (`with`/`quit` fallback) ekle.
+- [ ] SMTP TLS sertifika doğrulaması ve desteklenen port/TLS modu için production testi ekle.
 
-## Standart doğrulama komutları
+Şu anda bazı `str(exc)` değerleri flash mesajına dönüyor; DNS, sunucu veya bağlantı ayrıntısı açığa çıkabilir.
 
-```bash
-pytest
-pytest --cov=app --cov-branch --cov-report=term-missing --cov-fail-under=90
-python -m compileall -q app tests backup.py deployment_check.py production_drill.py run.py run_production.py
-python -m pip check
-git diff --check
-```
+### CSP'yi sıkılaştır
+
+- [ ] Şablonlardaki inline `<script>`, `onclick` ve `onchange` kodlarını `app/static/js/` altına taşı veya request başına nonce kullan.
+- [ ] `script-src 'unsafe-inline'` kaldırıldıktan sonra CSP regresyon testi ekle.
+- [ ] Inline `style` ihtiyacını azaltıp mümkünse `style-src 'unsafe-inline'` için de nonce/hash planla.
+
+Mevcut CSP yararlı bir temel oluşturur; ancak `unsafe-inline` nedeniyle güçlü bir script allowlist sağlamaz. Bu ifade tek başına kanıtlanmış XSS açığı değildir.
+
+### Hassas veri erişim audit kapsamını kararlaştır
+
+- [ ] Hasta detay görüntüleme, KVKK export ve anonimleştirme gibi hassas endpoint'ler için erişim olayı kaydedilip kaydedilmeyeceğini kurum politikasıyla belirle.
+- [ ] Erişim kaydı tutulacaksa veri içeriğini loglamadan aktör, amaç/işlem, kişi ID, zaman ve request ID kaydet.
+- [ ] Audit loglarının kendisine erişimi ve export işlemlerini ayrıca denetle.
+
+Mevcut transactional audit yalnız ORM create/update/delete değişikliklerini kaydeder; salt-okuma erişimleri kapsam dışıdır.
+
+## P2 — Veri bütünlüğü ve mimari bakım
+
+### Finansal transaction sınırlarını sadeleştir
+
+- [ ] `InvoiceService.create_invoice*()` içindeki `session.commit()` çağrılarını üst katmana taşı; servis `flush()` edip hatayı çağırana bırakmalı.
+- [ ] `get_exchange_rate()` dönüş tipini `Decimal` yap ve fatura kodundaki `diff > 0.01` karşılaştırmasını `Decimal("0.01")` ile değiştir.
+- [ ] Tutar iskontosu satır toplamlarını `money()` ile iki haneye normalize et.
+- [ ] Fatura tarihi/son ödeme tarihi ve ödeme tarihi için kurumun izin verdiği tarih invariantlarını açıkça tanımlayıp test et.
+
+### Party ve form doğrulamasını merkezileştir
+
+- [ ] Hasta, kişi ve kurum ekleme/düzenleme route'larında ad, telefon, e-posta, vergi/kimlik numarası ve alan uzunluklarını ortak doğrulayıcıyla kontrol et.
+- [ ] Unique constraint/`IntegrityError` durumlarını rollback edip kullanıcı dostu 409/validasyon mesajına çevir.
+- [ ] `referred_by_id` için aktif diş hekimi türü doğrulaması yap; rastgele Party ID kabul etme.
+
+### Model ve zaman semantiğini temizle
+
+- [ ] `PatientTreatment.patient` ilişkisinin iki kez tanımlanmasını kaldır.
+- [ ] Audit ve WhatsApp zaman alanlarında tek UTC stratejisi belirle; kolon, Python değeri ve JSON gösterimini timezone uyumlu yap.
+- [ ] Legacy `Patient` modelinin ne zaman kaldırılacağını migration ve rollback planıyla belirle.
+
+### Ölü ve tekrarlanan kodu azalt
+
+- [ ] Kullanılmayan `auto_rate_error` context/template yolunu kaldır veya gerçek hata durumuna bağla.
+- [ ] Artık production akışında çağrılmayan `ensure_daily_rate()` background-thread yolunu ve testlerini kaldır.
+- [ ] `InvoiceService` dosyasını `app/models/` yerine `app/services/` altına taşı.
+- [ ] `Config.SMTP_*` ile veritabanındaki SMTP ayarlarından hangisinin tek kaynak olduğunu belirle; kullanılmayan config yolunu kaldır.
+- [ ] Tedavi kategori etiketlerini tek sabitte topla; kullanılmayan importları temizle.
+- [ ] `clinic_name` ve kur sağlık context sorgularını ölç; gerekirse request-scope veya kısa TTL cache kullan.
+
+### Dosya içe aktarma sözleşmesini düzelt
+
+- [ ] OpenPyXL kullanılan akışta yalnız `.xlsx` kabul et veya gerçek `.xls` parser'ı ekle; bugün uzantı kontrolü `.xls` kabul ettiği hâlde okuyucu bu biçimi desteklemez.
+- [ ] Satır bazlı hata raporu üret; geçersiz satırları yalnız sayaçla sessizce atlama.
+- [ ] Workbook kapanışını hata durumunda da garanti et ve import işlemini açık transaction sınırında çalıştır.
+
+### Liste ve rapor ölçek sınırlarını tamamla
+
+- [ ] `/patients/` listesini diğer listeler gibi server-side pagination'a geçir.
+- [ ] Büyük veri setinde rapor sorgularını ve eager-load davranışını ölç; hedef veri hacmi ve kabul edilen p95 süreyi yaz.
+- [ ] SQLite eşzamanlı yazma eşiğini gerçek yük testiyle belirle; eşik aşılırsa PostgreSQL geçiş runbook'unu uygula.
+
+## P2 — Test ve CI kalitesi
+
+- [ ] Coverage-boost dosyalarındaki mükerrer senaryoları davranış matrisi çıkararak birleştir; coverage yüzdesini korumak tek amaç olmasın.
+- [ ] Yalnız `302` kontrol eden testlerde hedef `Location`, flash mesajı ve kalıcı veri etkisini doğrula.
+- [ ] Authz endpoint matrisi ekle: anonymous, staff ve admin için view/edit/delete/settings/privacy sınırları.
+- [ ] Login DoS, multi-worker WhatsApp durumu, SMTP timeout/hata redaksiyonu ve salt-okuma audit kararını regresyon testlerine bağla.
+- [ ] Türkçe metinleri PDF, SMTP subject/body, XLSX import ve arama/case-folding düzeyinde uçtan uca test et.
+- [ ] CI'a lint/format kontrolü ve dependency vulnerability taraması ekle; job timeout ile concurrency cancellation tanımla.
+- [ ] Yavaş testleri `pytest --durations` ile ölç; hızlı unit paketi ile tam entegrasyon/E2E paketini ayır.
+
+## P3 — Ürün ve operasyon ölçeği
+
+- [ ] Randevu, çoklu şube, stok ve haricî API taleplerini doğrulanmış klinik ihtiyacına göre ayrı ürün kararlarına dönüştür.
+- [ ] PostgreSQL geçişinde enum, SQLite batch migration, invoice counter ve backup araçlarının uyumluluk planını hazırla.
+- [ ] Merkezi log/metric/alert hedeflerini tanımla: 5xx oranı, SMTP/WhatsApp başarısızlığı, eski kur, backup yaşı, job kuyruğu ve DB kilit süresi.
+- [ ] Audit logu için uygulama dışı değişmezlik/erişim kontrolü ve periyodik bütünlük doğrulaması değerlendir.
+
+## Tamamlanmış temel yetenekler
+
+- [x] App factory, blueprint yapısı, SQLAlchemy 2 ve Alembic migration zinciri.
+- [x] `Party` operasyonel tek kaynak; legacy `Patient` kontrollü uyumluluk katmanı.
+- [x] `Numeric`/`Decimal` finans kolonları, sabit fatura kuru, ödeme ve fazla tahsilat koruması.
+- [x] Merkezi admin/staff izin matrisi; staff için kişi/fatura/ödeme silme, ayar ve KVKK yetkileri kapalı.
+- [x] CSRF, bcrypt, Fernet SMTP şifreleme ve production secret fail-closed kontrolü.
+- [x] Transactional değişiklik audit'i, KVKK export/anonimleştirme ve saklama CLI komutu.
+- [x] Self-hosted frontend varlıkları, güvenlik başlıkları, request ID ve opsiyonel Sentry.
+- [x] Doğrulamalı/şifreli SQLite backup, anahtar rotasyonu ve atomik restore.
+- [x] Python 3.13/3.14 CI, %90 branch-aware coverage kapısı ve gerçek Chromium E2E/axe taraması.
+
+## İncelemelerde görülen ancak hata olmayan iddialar
+
+- `json.loads()` için ayrı `JSONDecodeError` bloğu zorunlu değildir; `JSONDecodeError`, mevcut `ValueError` bloğu tarafından yakalanır.
+- Staff'ın `settings.manage` ve `privacy.*` alamaması mevcut least-privilege politikasının bilinçli parçasıdır.
+- `billing.delete` staff'a verilmez; fatura ve ödeme silme admin-only'dir.
+- Modern `fpdf2` SVG destekler; marka SVG'si PDF içinde kullanılmaktadır.
+- `Migrate(compare_type=True)` mevcut Flask-Migrate/Alembic yapılandırmasında geçerli bir parametredir.
