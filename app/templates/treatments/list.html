@@ -16,7 +16,7 @@
 
 <div class="toolbar-panel catalog-toolbar">
         <form method="GET" action="{{ url_for('treatments.list_treatments') }}" class="d-flex gap-2">
-                <div>
+                <div class="catalog-toolbar__category">
                     <label class="visually-hidden" for="catalog-category">Kategori</label>
                     <select id="catalog-category" name="category" class="form-select" onchange="this.form.submit()">
                         <option value="">Tüm Kategoriler</option>
@@ -25,7 +25,7 @@
                         {% endfor %}
                     </select>
                 </div>
-                <div class="flex-grow-1">
+                <div class="catalog-toolbar__search flex-grow-1">
                     <label class="visually-hidden" for="catalog-search">İşlem ara</label>
                     <input id="catalog-search" type="text" class="form-control" name="search" value="{{ search }}" placeholder="İşlem adıyla ara" autocomplete="off">
                 </div>
@@ -36,7 +36,7 @@
 <div class="work-panel">
     <div class="work-panel__header"><div><h2>Fiyat listesi</h2><p>Ad, kategori ve fiyatı satır üzerinden güncelleyebilirsiniz.</p></div></div>
         <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0" id="treatmentsTable">
+            <table class="table table-hover align-middle mb-0 catalog-table" id="treatmentsTable">
                 <thead class="table-light">
                     <tr>
                         <th style="width:30%">İşlem</th>
@@ -50,16 +50,16 @@
                     <tr data-id="{{ treatment.id }}">
                         <td class="fw-bold editable" data-field="name" contenteditable="true">{{ treatment.name }}</td>
                         <td>
-                            <select class="form-select form-select-sm editable-select" data-field="category" style="min-width:120px">
+                            <select class="form-select form-select-sm editable-select catalog-category-control" data-field="category">
                                 {% for cat in categories %}
                                 <option value="{{ cat }}" {% if treatment.category == cat %}selected{% endif %}>{{ category_labels.get(cat, cat) }}</option>
                                 {% endfor %}
                             </select>
                         </td>
                         <td class="text-end">
-                            <div class="d-flex align-items-center justify-content-end gap-1">
-                                <input type="number" step="0.01" min="0" class="form-control form-control-sm text-end editable-input" data-field="price_eur" value="{{ treatment.price_eur }}" style="width:90px">
-                                <select class="form-select form-select-sm editable-select" data-field="currency" style="width:60px">
+                            <div class="d-flex align-items-center justify-content-end gap-1 catalog-price-group">
+                                <input type="number" step="0.01" min="0" class="form-control form-control-sm text-end editable-input catalog-price-control" data-field="price_eur" value="{{ treatment.price_eur }}">
+                                <select class="form-select form-select-sm editable-select catalog-currency-control" data-field="currency">
                                     <option value="TL" {% if treatment.currency == 'TL' %}selected{% endif %}>₺</option>
                                     <option value="EUR" {% if treatment.currency == 'EUR' %}selected{% endif %}>€</option>
                                     <option value="USD" {% if treatment.currency == 'USD' %}selected{% endif %}>$</option>
