@@ -230,12 +230,17 @@ def test_send_and_mark_paid_flow(client, app):
     with app.app_context():
         assert db.session.get(Makbuz, makbuz_id).status == Makbuz.STATUS_SENT
 
+    payments_html = client.get("/payments/").get_data(as_text=True)
+    assert "Dr. Paid Flow" in payments_html
+    assert "Ödeme Bekleyen Makbuzlar" in payments_html
+
     response = client.post(
         f"/payments/{makbuz_id}/mark-paid",
         data={"paid_at": date.today().isoformat(), "paid_amount": "2000.00", "payment_method": "cash"},
         follow_redirects=False,
     )
     assert response.status_code == 302
+    assert "tab=paid" in response.location
 
     with app.app_context():
         makbuz = db.session.get(Makbuz, makbuz_id)
@@ -244,7 +249,10 @@ def test_send_and_mark_paid_flow(client, app):
 
     response = client.get("/payments/")
     assert response.status_code == 200
-    assert "Dr. Paid Flow" in response.get_data(as_text=True)
+    paid_html = response.get_data(as_text=True)
+    assert "Dr. Paid Flow" in paid_html
+    assert "Tahsil edilenler" in paid_html
+    assert f"/payments/{makbuz_id}/unmark-paid" in paid_html
 
     response = client.post(f"/payments/{makbuz_id}/unmark-paid", follow_redirects=False)
     assert response.status_code == 302
@@ -307,6 +315,39 @@ def test_bulk_generate_creates_drafts_without_sending(client, app):
     assert "checked" not in p2_vat_control
     assert f'name="vat_{p1}_vat_rate" value="10.00"' in list_html
     assert "₺3,100.00" in list_html
+    assert "WhatsApp'tan gönder" in list_html
+
+
+def test_makbuz_list_send_returns_to_list_and_exposes_collection_action(client, app):
+    login(client, "admin", "admin-pass")
+    party_id = _make_doctor(app, name="Dr. List Send", phone="+905551110033")
+    _add_work_order(app, party_id, date(2026, 6, 7), 1200)
+    client.post(
+        f"/makbuzlar/{party_id}/generate",
+        data={"year": 2026, "month": 6},
+        follow_redirects=False,
+    )
+
+    with app.app_context():
+        makbuz_id = db.session.execute(
+            db.select(Makbuz.id).where(Makbuz.party_id == party_id)
+        ).scalar_one()
+
+    with patch(
+        "app.services.whatsapp_service.WhatsAppService.send_makbuz_message",
+        return_value={"success": True, "message": "ok"},
+    ):
+        response = client.post(
+            f"/makbuzlar/{makbuz_id}/send",
+            data={"return_to": "list"},
+            follow_redirects=False,
+        )
+
+    assert response.status_code == 302
+    assert "/makbuzlar/?year=2026&month=6" in response.location
+    html = client.get(response.location).get_data(as_text=True)
+    assert "Tahsilat bekliyor" in html
+    assert f"/payments/{makbuz_id}/mark-paid" in html
 
 
 def test_scheduler_generates_previous_month_drafts_once(app):

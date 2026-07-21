@@ -12,13 +12,19 @@
 <!-- Section Tabs -->
 <ul class="nav nav-tabs mb-4" id="paymentsTab" role="tablist">
     <li class="nav-item" role="presentation">
-        <button class="nav-link active fw-bold py-2 px-3" id="pending-tab" data-bs-toggle="tab" data-bs-target="#pending-pane" type="button" role="tab">
+        <button class="nav-link {% if active_tab == 'pending' %}active{% endif %} fw-bold py-2 px-3" id="pending-tab" data-bs-toggle="tab" data-bs-target="#pending-pane" type="button" role="tab" aria-selected="{{ 'true' if active_tab == 'pending' else 'false' }}">
             <i class="bi bi-clock-history text-warning me-1"></i> Ödeme Bekleyen Makbuzlar
             <span class="badge bg-warning text-dark ms-1">{{ pending_makbuzlar|length }}</span>
         </button>
     </li>
     <li class="nav-item" role="presentation">
-        <button class="nav-link fw-bold py-2 px-3" id="history-tab" data-bs-toggle="tab" data-bs-target="#history-pane" type="button" role="tab">
+        <button class="nav-link {% if active_tab == 'paid' %}active{% endif %} fw-bold py-2 px-3" id="paid-tab" data-bs-toggle="tab" data-bs-target="#paid-pane" type="button" role="tab" aria-selected="{{ 'true' if active_tab == 'paid' else 'false' }}">
+            <i class="bi bi-check-circle me-1"></i> Tahsil edilenler
+            <span class="badge bg-success ms-1">{{ paid_makbuzlar|length }}</span>
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link {% if active_tab == 'summary' %}active{% endif %} fw-bold py-2 px-3" id="history-tab" data-bs-toggle="tab" data-bs-target="#history-pane" type="button" role="tab" aria-selected="{{ 'true' if active_tab == 'summary' else 'false' }}">
             <i class="bi bi-people me-1"></i> Doktor Bazlı Özet
             <span class="badge bg-primary ms-1">{{ rows|length }}</span>
         </button>
@@ -27,7 +33,7 @@
 
 <div class="tab-content" id="paymentsTabContent">
     <!-- Pending Makbuzlar Tab Pane -->
-    <div class="tab-pane fade show active" id="pending-pane" role="tabpanel">
+    <div class="tab-pane fade {% if active_tab == 'pending' %}show active{% endif %}" id="pending-pane" role="tabpanel">
         <div class="work-panel">
             <div class="work-panel__header">
                 <div><h2>Ödeme bekleyenler</h2><p>Ödemeyi aldığınızda kaydı tamamlayın.</p></div>
@@ -72,8 +78,39 @@
         </div>
     </div>
 
+    <div class="tab-pane fade {% if active_tab == 'paid' %}show active{% endif %}" id="paid-pane" role="tabpanel">
+        <div class="work-panel">
+            <div class="work-panel__header">
+                <div><h2>Tahsil edilenler</h2><p>Ödeme kayıtlarını kontrol edin veya yanlış kaydı geri alın.</p></div>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead><tr><th>Doktor</th><th>Dönem</th><th>Ödeme tarihi</th><th>Yöntem</th><th class="text-end">Tahsil edilen</th><th class="text-end">İşlem</th></tr></thead>
+                    <tbody>
+                        {% for m in paid_makbuzlar %}
+                        <tr>
+                            <td><strong>{{ m.party.display_name if m.party else '-' }}</strong></td>
+                            <td>{{ '%02d'|format(m.month) }}/{{ m.year }}</td>
+                            <td>{{ m.paid_at.strftime('%d.%m.%Y') if m.paid_at else '-' }}</td>
+                            <td>{{ method_labels.get(m.payment_method, m.payment_method or '-') }}</td>
+                            <td class="text-end fw-bold">₺{{ "{:,.2f}".format(m.paid_amount or 0) }}</td>
+                            <td class="text-end">
+                                <form method="POST" action="{{ url_for('payments.unmark_paid', makbuz_id=m.id) }}" class="d-inline" onsubmit="return confirm('Bu ödeme kaydı geri alınsın ve makbuz yeniden tahsilat bekliyor durumuna geçsin mi?');">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-arrow-counterclockwise"></i> Ödenmedi olarak işaretle</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="6" class="empty-state">Bu filtrelerde tahsil edilmiş makbuz yok.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
     <!-- Doctor Summary Tab Pane -->
-    <div class="tab-pane fade" id="history-pane" role="tabpanel">
+    <div class="tab-pane fade {% if active_tab == 'summary' %}show active{% endif %}" id="history-pane" role="tabpanel">
         <div class="card border-0 shadow-sm mb-4">
             <div class="card-body">
                 <form method="GET" action="{{ url_for('payments.list_payments') }}" class="row g-3">

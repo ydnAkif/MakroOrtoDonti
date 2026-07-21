@@ -27,10 +27,11 @@
         </form>
 </div>
 
-<div class="summary-line">
+<div class="summary-line summary-line--four">
     <div><span>İş emri</span><strong>{{ grand_total_count }}</strong></div>
     <div><span>Dönem toplamı</span><strong>₺{{ "{:,.2f}".format(grand_total_price) }}</strong></div>
     <div><span>Taslak</span><strong>{{ draft_count }} makbuz</strong></div>
+    <div><span>Tahsilat bekliyor</span><strong>{{ awaiting_payment_count }} makbuz</strong></div>
 </div>
 
 <!-- Doctor List -->
@@ -40,7 +41,7 @@
     <div class="work-panel">
         <div class="work-panel__header">
             <div><h2>{{ months[month - 1][1] }} {{ year }}</h2><p>Doktor bazlı makbuz durumu</p></div>
-            {% if draft_count %}
+            {% if preparation_count %}
             <button type="submit" class="btn btn-primary btn-sm">
                 <i class="bi bi-file-earmark-plus" aria-hidden="true"></i> Seçilenler için taslak oluştur
             </button>
@@ -111,6 +112,19 @@
                                 <a href="{{ url_for('makbuzlar.detail_makbuz', party_id=d.party_id, year=year, month=month) }}" class="btn btn-sm btn-outline-primary">
                                     <i class="bi bi-eye"></i> Detay
                                 </a>
+                                {% if m and m.status == 'draft' %}
+                                <button type="submit" class="btn btn-sm btn-success" name="return_to" value="list" formmethod="post" formaction="{{ url_for('makbuzlar.send_makbuz', makbuz_id=m.id) }}" onclick="return confirm('{{ d.party.display_name }} makbuzu WhatsApp üzerinden gönderilsin mi?');" {% if not d.party.phone %}disabled title="Doktorun telefon numarası yok"{% endif %}>
+                                    <i class="bi bi-whatsapp"></i> WhatsApp'tan gönder
+                                </button>
+                                {% elif m and m.status == 'sent' %}
+                                <a href="{{ url_for('payments.mark_paid', makbuz_id=m.id) }}" class="btn btn-sm btn-primary">
+                                    <i class="bi bi-cash-coin"></i> Tahsilat kaydet
+                                </a>
+                                {% elif m and m.status == 'paid' %}
+                                <a href="{{ url_for('payments.list_payments', search=d.party.display_name, year=year, tab='paid') }}" class="btn btn-sm btn-outline-success">
+                                    <i class="bi bi-check-circle"></i> Tahsilatlarda gör
+                                </a>
+                                {% endif %}
                             </td>
                         </tr>
                         {% else %}

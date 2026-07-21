@@ -19,7 +19,7 @@ MONTHS = [
 
 STATUS_LABELS = {
     Makbuz.STATUS_DRAFT: "Taslak",
-    Makbuz.STATUS_SENT: "Gönderildi",
+    Makbuz.STATUS_SENT: "Tahsilat bekliyor",
     Makbuz.STATUS_PAID: "Ödendi",
 }
 
@@ -136,7 +136,18 @@ def list_makbuzlar():
         for d in doctors
     )
     grand_total_count = sum(d["count"] for d in doctors)
-    draft_count = sum(1 for d in doctors if d["makbuz"] is None or d["makbuz"].status == Makbuz.STATUS_DRAFT)
+    preparation_count = sum(
+        1 for d in doctors
+        if d["makbuz"] is None or d["makbuz"].status == Makbuz.STATUS_DRAFT
+    )
+    draft_count = sum(
+        1 for d in doctors
+        if d["makbuz"] and d["makbuz"].status == Makbuz.STATUS_DRAFT
+    )
+    awaiting_payment_count = sum(
+        1 for d in doctors
+        if d["makbuz"] and d["makbuz"].status == Makbuz.STATUS_SENT
+    )
 
     return render_template(
         "makbuzlar/list.html",
@@ -145,7 +156,9 @@ def list_makbuzlar():
         month=month,
         months=MONTHS,
         status_labels=STATUS_LABELS,
+        preparation_count=preparation_count,
         draft_count=draft_count,
+        awaiting_payment_count=awaiting_payment_count,
         grand_total_apparatus=grand_total_apparatus,
         grand_total_extra=grand_total_extra,
         grand_total_price=grand_total_price,
@@ -233,6 +246,12 @@ def send_makbuz(makbuz_id):
     makbuz = db.get_or_404(Makbuz, makbuz_id)
     success, message = _send_makbuz(makbuz)
     flash(message, "success" if success else "danger")
+    if request.form.get("return_to") == "list":
+        return redirect(url_for(
+            "makbuzlar.list_makbuzlar",
+            year=makbuz.year,
+            month=makbuz.month,
+        ))
     return redirect(url_for("makbuzlar.detail_makbuz", party_id=makbuz.party_id, year=makbuz.year, month=makbuz.month))
 
 

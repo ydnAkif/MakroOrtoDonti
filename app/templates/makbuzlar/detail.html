@@ -129,7 +129,7 @@
                     </a>
                 </div>
                 <form method="POST" action="{{ url_for('makbuzlar.send_makbuz', makbuz_id=makbuz.id) }}" onsubmit="return confirm('Makbuz WhatsApp üzerinden gönderilsin mi?');">
-                    <button type="submit" class="btn btn-success"><i class="bi bi-whatsapp"></i> {% if makbuz.status == 'draft' %}Onayla ve Gönder{% else %}Yeniden Gönder{% endif %}</button>
+                    <button type="submit" class="btn btn-success"><i class="bi bi-whatsapp"></i> {% if makbuz.status == 'draft' %}WhatsApp'tan gönder{% else %}Yeniden gönder{% endif %}</button>
                 </form>
                 {% if makbuz.status == 'sent' %}
                 <a href="{{ url_for('payments.mark_paid', makbuz_id=makbuz.id) }}" class="btn btn-primary"><i class="bi bi-cash-coin"></i> Ödeme Kaydet</a>

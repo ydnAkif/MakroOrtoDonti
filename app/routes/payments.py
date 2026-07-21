@@ -24,6 +24,9 @@ METHOD_LABELS = {
 def list_payments():
     search = request.args.get("search", "").strip()
     year = request.args.get("year", type=int)
+    active_tab = request.args.get("tab", "pending")
+    if active_tab not in {"pending", "paid", "summary"}:
+        active_tab = "pending"
 
     doctors_query = db.select(Party).where(
         Party.party_type == PartyType.DENTIST, Party.is_active == True
@@ -70,9 +73,21 @@ def list_payments():
     grand_paid = money(sum((r["paid"] for r in rows), Decimal("0.00")))
     grand_outstanding = money(sum((r["outstanding"] for r in rows), Decimal("0.00")))
 
+    visible_party_ids = {party.id for party in doctors}
     pending_makbuzlar = sorted(
-        (m for m in all_makbuzlar if m.status == Makbuz.STATUS_SENT),
+        (
+            m for m in all_makbuzlar
+            if m.status == Makbuz.STATUS_SENT and m.party_id in visible_party_ids
+        ),
         key=lambda m: (m.year, m.month),
+        reverse=True,
+    )
+    paid_makbuzlar = sorted(
+        (
+            m for m in all_makbuzlar
+            if m.status == Makbuz.STATUS_PAID and m.party_id in visible_party_ids
+        ),
+        key=lambda m: (m.paid_at or date.min, m.year, m.month),
         reverse=True,
     )
 
@@ -82,12 +97,15 @@ def list_payments():
         "payments/list.html",
         rows=rows,
         pending_makbuzlar=pending_makbuzlar,
+        paid_makbuzlar=paid_makbuzlar,
+        method_labels=METHOD_LABELS,
         grand_billed=grand_billed,
         grand_paid=grand_paid,
         grand_outstanding=grand_outstanding,
         search=search,
         year=year,
         years=years,
+        active_tab=active_tab,
     )
 
 
@@ -116,7 +134,7 @@ def mark_paid(makbuz_id):
         makbuz.status = Makbuz.STATUS_PAID
         db.session.commit()
         flash(f"Ödeme kaydedildi: ₺{paid_amount:,.2f}", "success")
-        return redirect(url_for("payments.list_payments"))
+        return redirect(url_for("payments.list_payments", tab="paid"))
 
     return render_template(
         "payments/form.html",
