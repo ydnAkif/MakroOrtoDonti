@@ -149,7 +149,7 @@ def mark_paid(makbuz_id):
 @permissions_required("billing.edit")
 def unmark_paid(makbuz_id):
     makbuz = db.get_or_404(Makbuz, makbuz_id)
-    makbuz.status = Makbuz.STATUS_SENT
+    makbuz.status = Makbuz.STATUS_SENT if makbuz.sent_at else Makbuz.STATUS_DRAFT
     makbuz.paid_at = None
     makbuz.paid_amount = None
     makbuz.payment_method = None

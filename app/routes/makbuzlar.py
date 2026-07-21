@@ -127,6 +127,18 @@ def list_makbuzlar():
         d["total_extra"] += wo.extra_price
         d["total_price"] += wo.total_price
 
+    for pid, makbuz in makbuz_by_party.items():
+        if pid not in doctor_data and makbuz.party and makbuz.party.is_active:
+            doctor_data[pid] = {
+                "party": makbuz.party,
+                "party_id": pid,
+                "count": makbuz.work_order_count or 0,
+                "total_apparatus": Decimal("0.00"),
+                "total_extra": Decimal("0.00"),
+                "total_price": makbuz.subtotal or Decimal("0.00"),
+                "makbuz": makbuz,
+            }
+
     doctors = sorted(doctor_data.values(), key=lambda x: x["total_price"], reverse=True)
 
     grand_total_apparatus = sum(d["total_apparatus"] for d in doctors)

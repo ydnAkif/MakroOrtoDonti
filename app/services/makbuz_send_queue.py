@@ -262,7 +262,8 @@ def send_makbuz_via_whatsapp(makbuz_id: int) -> tuple[bool, str]:
     pdf_bytes = generate_makbuz_pdf(makbuz, work_orders)
     result = WhatsAppService.send_makbuz_message(makbuz, pdf_bytes)
     if result["success"]:
-        makbuz.status = Makbuz.STATUS_SENT
+        if makbuz.status != Makbuz.STATUS_PAID:
+            makbuz.status = Makbuz.STATUS_SENT
         makbuz.sent_at = datetime.now().astimezone()
         db.session.commit()
     return result["success"], result["message"]
