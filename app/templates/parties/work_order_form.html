@@ -108,9 +108,9 @@
                         <a href="{{ url_for('parties.detail_party', party_id=party.id, year=request.args.get('return_year'), month=request.args.get('return_month'), search=request.args.get('return_search')) }}" class="btn btn-outline-secondary">
                         {% elif request.args.get('return_to') == 'work_orders' %}
                         {% if request.args.get('return_view') == 'month' %}
-                        <a href="{{ url_for('parties.list_work_orders', view='month', year=request.args.get('return_year'), month=request.args.get('return_month')) }}" class="btn btn-outline-secondary">
+                        <a href="{{ url_for('parties.list_work_orders', view='month', year=request.args.get('return_year'), month=request.args.get('return_month'), search=request.args.get('return_search')) }}" class="btn btn-outline-secondary">
                         {% else %}
-                        <a href="{{ url_for('parties.list_work_orders', view='day', date=request.args.get('return_date')) }}" class="btn btn-outline-secondary">
+                        <a href="{{ url_for('parties.list_work_orders', view='day', date=request.args.get('return_date'), search=request.args.get('return_search')) }}" class="btn btn-outline-secondary">
                         {% endif %}
                         {% else %}
                         <a href="{{ url_for('parties.detail_party', party_id=party.id) }}" class="btn btn-outline-secondary">

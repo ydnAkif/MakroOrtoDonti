@@ -839,6 +839,13 @@ def test_work_order_ledger_filters_by_day_and_month(client, app):
     assert "₺800.00" in day_html
     assert f"/work-orders/{today_order_id}/edit" in day_html
 
+    search_html = client.get(
+        f"/parties/work-orders?view=day&date={today.isoformat()}&search=test+ekstra"
+    ).get_data(as_text=True)
+    assert "Bugünkü Hasta" in search_html
+    assert "Test Ekstra İşlemi" in search_html
+    assert "için 1 sonuç" in search_html
+
     edit_response = client.post(
         f"/parties/{party_id}/work-orders/{today_order_id}/edit",
         data={
@@ -850,17 +857,22 @@ def test_work_order_ledger_filters_by_day_and_month(client, app):
             "return_to": "work_orders",
             "return_view": "day",
             "return_date": today.isoformat(),
+            "return_search": "Bugünkü Hasta",
         },
         follow_redirects=False,
     )
     assert edit_response.status_code == 302
     assert "/parties/work-orders?" in edit_response.location
+    assert "search=Bug%C3%BCnk%C3%BC+Hasta" in edit_response.location
 
     month_html = client.get(
         f"/parties/work-orders?view=month&year={previous_month_date.year}&month={previous_month_date.month}"
     ).get_data(as_text=True)
     assert "Önceki Ay Hastası" in month_html
     assert "Bugünkü Hasta" not in month_html
+    previous_row = month_html.split("Önceki Ay Hastası", 1)[1].split("</tr>", 1)[0]
+    assert "workorder-line-group--extra" in previous_row
+    assert ">Yok<" in previous_row
 
 
 def test_work_order_delete_returns_to_ledger(client, app):

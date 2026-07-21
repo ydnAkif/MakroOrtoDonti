@@ -84,10 +84,12 @@ def list_parties():
 @permissions_required("clinical.view")
 def list_work_orders():
     """Daily/monthly operational ledger for all doctors' work orders."""
+    from app.services.search_service import tr_contains
     from app.services.validation_service import parse_date
 
     today = date.today()
     view = request.args.get("view", "day")
+    search = request.args.get("search", "").strip()
     if view == "month":
         year = request.args.get("year", today.year, type=int)
         month = request.args.get("month", today.month, type=int)
@@ -107,7 +109,7 @@ def list_work_orders():
         year, month = selected_date.year, selected_date.month
         period_label = selected_date.strftime("%d.%m.%Y")
 
-    work_orders = db.session.execute(
+    query = (
         db.select(WorkOrder)
         .join(Party, WorkOrder.party_id == Party.id)
         .where(
@@ -115,7 +117,18 @@ def list_work_orders():
             WorkOrder.work_date < period_end,
             Party.is_active == True,
         )
-        .order_by(WorkOrder.work_date.desc(), WorkOrder.id.desc())
+    )
+    if search:
+        query = query.where(db.or_(
+            tr_contains(Party.name, search),
+            tr_contains(WorkOrder.patient_name, search),
+            tr_contains(WorkOrder.apparatus_type, search),
+            tr_contains(WorkOrder.extra_addons, search),
+            tr_contains(WorkOrder.notes, search),
+        ))
+
+    work_orders = db.session.execute(
+        query.order_by(WorkOrder.work_date.desc(), WorkOrder.id.desc())
     ).scalars().all()
 
     return render_template(
@@ -128,6 +141,7 @@ def list_work_orders():
         months=MONTHS,
         years=range(today.year - 3, today.year + 2),
         period_label=period_label,
+        search=search,
         doctor_count=len({wo.party_id for wo in work_orders}),
         period_total=sum((wo.total_price for wo in work_orders), Decimal("0.00")),
         today=today,
@@ -456,10 +470,12 @@ def edit_work_order(party_id, wo_id):
                     "parties.list_work_orders", view="month",
                     year=request.form.get("return_year", type=int),
                     month=request.form.get("return_month", type=int),
+                    search=request.form.get("return_search", ""),
                 ))
             return redirect(url_for(
                 "parties.list_work_orders", view="day",
                 date=request.form.get("return_date", ""),
+                search=request.form.get("return_search", ""),
             ))
         if request.form.get("return_to") == "party_detail":
             return redirect(url_for(
@@ -499,11 +515,13 @@ def delete_work_order(party_id, wo_id):
                 view="month",
                 year=request.form.get("return_year", type=int),
                 month=request.form.get("return_month", type=int),
+                search=request.form.get("return_search", ""),
             ))
         return redirect(url_for(
             "parties.list_work_orders",
             view="day",
             date=request.form.get("return_date", ""),
+            search=request.form.get("return_search", ""),
         ))
     if request.form.get("return_to") == "party_detail":
         return redirect(url_for(

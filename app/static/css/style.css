@@ -642,9 +642,12 @@ textarea.form-control { min-height: 92px; }
 .period-switch { display:inline-grid; grid-template-columns:repeat(2,1fr); padding:.25rem; border-radius:10px; background:var(--surface-raised); }
 .period-switch a { min-width:72px; padding:.48rem .75rem; border-radius:8px; color:var(--ink-600); font-size:.76rem; font-weight:750; text-align:center; text-decoration:none; }
 .period-switch a.active { background:var(--surface); color:var(--aqua-700); box-shadow:0 1px 5px rgba(16,46,58,.1); }
-.workorder-period-form { display:flex; align-items:center; gap:.5rem; }
+.workorder-period-form { display:flex; min-width:0; flex:1; align-items:center; justify-content:flex-end; gap:.5rem; }
 .workorder-period-form .form-control { width:10.5rem; }
 .workorder-period-form .form-select { width:9rem; }
+.workorder-search { position:relative; min-width:230px; max-width:360px; flex:1; }
+.workorder-search>i { position:absolute; z-index:2; top:50%; left:.8rem; color:var(--ink-400); transform:translateY(-50%); pointer-events:none; }
+.workorder-period-form .workorder-search>.form-control { width:100%; padding-left:2.3rem; background:var(--surface); }
 .workorder-summary { grid-template-columns:1.2fr repeat(3,minmax(0,1fr)); }
 .workorder-ledger { min-width:1040px; }
 .workorder-ledger tbody td { vertical-align:top; }
@@ -658,6 +661,7 @@ textarea.form-control { min-height: 92px; }
 .workorder-line-list { display:grid; gap:.28rem; }
 .workorder-line-item { display:flex; min-width:0; align-items:baseline; justify-content:space-between; gap:1rem; }
 .workorder-line-item strong { overflow:hidden; color:var(--ink-800); font-size:.77rem; font-weight:700; text-overflow:ellipsis; white-space:nowrap; }
+.workorder-line-item--empty strong { color:var(--ink-400); font-weight:600; }
 .workorder-line-item small { color:var(--ink-600); font-size:.67rem; font-variant-numeric:tabular-nums; white-space:nowrap; }
 .workorder-note { display:flex; gap:.4rem; margin-top:.7rem; padding:.45rem .55rem; border-radius:8px; background:var(--surface-raised); color:var(--ink-600); font-size:.68rem; line-height:1.4; }
 .workorder-note i { color:var(--aqua-700); }
@@ -678,5 +682,5 @@ textarea.form-control { min-height: 92px; }
     .workflow-strip a,.workflow-strip a:nth-child(2){border-right:0;border-bottom:1px solid var(--line)}.workflow-strip a:last-child{border-bottom:0}
     .summary-line,.summary-line--four{grid-template-columns:1fr}.summary-line>div{border-right:0;border-bottom:1px solid var(--line)}.summary-line>div:last-child{border-bottom:0}
     .toolbar-panel{align-items:stretch;flex-direction:column}.toolbar-panel form,.toolbar-panel>.btn{width:100%}.notice-strip{align-items:flex-start;flex-wrap:wrap}
-    .report-toolbar>div{width:100%}.report-toolbar>.btn{width:100%}.compact-form{grid-template-columns:1fr}.catalog-toolbar form{flex-direction:column}.catalog-toolbar__category,.catalog-toolbar__search{width:100%;min-width:0;flex:1 1 auto}.workorder-period-bar{align-items:stretch;flex-direction:column}.workorder-period-form{width:100%}.workorder-period-form .form-control,.workorder-period-form .form-select{flex:1;width:auto}.doctor-workorder-toolbar{grid-template-columns:44px 1fr 1fr 44px}.doctor-workorder-search{grid-column:1 / -1;grid-row:2}.doctor-workorder-toolbar>button[type="submit"]{grid-column:1 / 3}.doctor-workorder-toolbar>a:not(:first-child):not(:last-child){grid-column:3 / 5}.disclosure-content{padding:.9rem}
+    .report-toolbar>div{width:100%}.report-toolbar>.btn{width:100%}.compact-form{grid-template-columns:1fr}.catalog-toolbar form{flex-direction:column}.catalog-toolbar__category,.catalog-toolbar__search{width:100%;min-width:0;flex:1 1 auto}.workorder-period-bar{align-items:stretch;flex-direction:column}.workorder-period-form{width:100%;flex-wrap:wrap;justify-content:flex-start}.workorder-period-form .form-control,.workorder-period-form .form-select{flex:1;width:auto}.workorder-search{max-width:none;flex-basis:100%}.doctor-workorder-toolbar{grid-template-columns:44px 1fr 1fr 44px}.doctor-workorder-search{grid-column:1 / -1;grid-row:2}.doctor-workorder-toolbar>button[type="submit"]{grid-column:1 / 3}.doctor-workorder-toolbar>a:not(:first-child):not(:last-child){grid-column:3 / 5}.disclosure-content{padding:.9rem}
 }

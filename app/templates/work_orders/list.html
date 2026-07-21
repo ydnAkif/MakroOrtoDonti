@@ -11,15 +11,21 @@
 
 <div class="workorder-period-bar">
     <nav class="period-switch" aria-label="İş emri dönemi">
-        <a href="{{ url_for('parties.list_work_orders', view='day', date=today.isoformat()) }}" class="{% if view == 'day' %}active{% endif %}">Gün</a>
-        <a href="{{ url_for('parties.list_work_orders', view='month', year=today.year, month=today.month) }}" class="{% if view == 'month' %}active{% endif %}">Ay</a>
+        <a href="{{ url_for('parties.list_work_orders', view='day', date=today.isoformat(), search=search) }}" class="{% if view == 'day' %}active{% endif %}">Gün</a>
+        <a href="{{ url_for('parties.list_work_orders', view='month', year=today.year, month=today.month, search=search) }}" class="{% if view == 'month' %}active{% endif %}">Ay</a>
     </nav>
     {% if view == 'day' %}
     <form method="GET" action="{{ url_for('parties.list_work_orders') }}" class="workorder-period-form">
         <input type="hidden" name="view" value="day">
         <label class="visually-hidden" for="workorder-date">Tarih</label>
         <input class="form-control" type="date" id="workorder-date" name="date" value="{{ selected_date.isoformat() }}" onchange="this.form.submit()">
-        {% if selected_date != today %}<a href="{{ url_for('parties.list_work_orders') }}" class="btn btn-sm btn-outline-secondary">Bugün</a>{% endif %}
+        <div class="workorder-search">
+            <i class="bi bi-search" aria-hidden="true"></i>
+            <label class="visually-hidden" for="workorder-search-day">İş emirlerinde ara</label>
+            <input class="form-control" type="search" id="workorder-search-day" name="search" value="{{ search }}" placeholder="Doktor, hasta veya işlem ara">
+        </div>
+        <button type="submit" class="btn btn-sm btn-primary">Ara</button>
+        {% if search %}<a href="{{ url_for('parties.list_work_orders', view='day', date=selected_date.isoformat()) }}" class="btn btn-sm btn-outline-secondary">Temizle</a>{% elif selected_date != today %}<a href="{{ url_for('parties.list_work_orders') }}" class="btn btn-sm btn-outline-secondary">Bugün</a>{% endif %}
     </form>
     {% else %}
     <form method="GET" action="{{ url_for('parties.list_work_orders') }}" class="workorder-period-form">
@@ -32,6 +38,13 @@
         <select class="form-select" id="workorder-year" name="year" onchange="this.form.submit()">
             {% for option_year in years %}<option value="{{ option_year }}" {% if option_year == year %}selected{% endif %}>{{ option_year }}</option>{% endfor %}
         </select>
+        <div class="workorder-search">
+            <i class="bi bi-search" aria-hidden="true"></i>
+            <label class="visually-hidden" for="workorder-search-month">İş emirlerinde ara</label>
+            <input class="form-control" type="search" id="workorder-search-month" name="search" value="{{ search }}" placeholder="Doktor, hasta veya işlem ara">
+        </div>
+        <button type="submit" class="btn btn-sm btn-primary">Ara</button>
+        {% if search %}<a href="{{ url_for('parties.list_work_orders', view='month', year=year, month=month) }}" class="btn btn-sm btn-outline-secondary">Temizle</a>{% endif %}
     </form>
     {% endif %}
 </div>
@@ -45,7 +58,7 @@
 
 <section class="work-panel" aria-labelledby="workorder-ledger-title">
     <div class="work-panel__header">
-        <div><h2 id="workorder-ledger-title">{{ period_label }}</h2><p>{{ 'Günlük' if view == 'day' else 'Aylık' }} iş emri defteri</p></div>
+        <div><h2 id="workorder-ledger-title">{{ period_label }}</h2><p>{{ 'Günlük' if view == 'day' else 'Aylık' }} iş emri defteri{% if search %} · “{{ search }}” için {{ work_orders|length }} sonuç{% endif %}</p></div>
     </div>
     <div class="table-responsive">
         <table class="table table-hover align-middle workorder-ledger">
@@ -74,7 +87,6 @@
                         {% else %}<div class="workorder-line-item"><strong>{{ wo.apparatus_type }}</strong></div>{% endif %}
                             </div>
                         </div>
-                        {% if wo.extra_addons %}
                         {% set extras = wo.extra_addons|fromjson %}
                         <div class="workorder-line-group workorder-line-group--extra">
                             <span class="workorder-line-label">Ekstra</span>
@@ -86,10 +98,10 @@
                                         {% if extra is mapping %}<small>{{ "{:,.2f}".format(extra.price|float) }} {{ extra.currency|currency_symbol }}</small>{% endif %}
                                     </div>
                                     {% endfor %}
-                                {% else %}<div class="workorder-line-item"><strong>{{ wo.extra_addons }}</strong></div>{% endif %}
+                                {% elif wo.extra_addons %}<div class="workorder-line-item"><strong>{{ wo.extra_addons }}</strong></div>
+                                {% else %}<div class="workorder-line-item workorder-line-item--empty"><strong>Yok</strong></div>{% endif %}
                             </div>
                         </div>
-                        {% endif %}
                         {% if wo.notes %}<div class="workorder-note"><i class="bi bi-journal-text" aria-hidden="true"></i><span>{{ wo.notes }}</span></div>{% endif %}
                     </td>
                     <td class="text-end">
@@ -100,17 +112,18 @@
                         </div>
                     </td>
                     <td class="text-end workorder-row-actions">
-                        <a href="{{ url_for('parties.edit_work_order', party_id=wo.party_id, wo_id=wo.id, return_to='work_orders', return_view=view, return_date=(selected_date.isoformat() if selected_date else none), return_year=(year if view == 'month' else none), return_month=(month if view == 'month' else none)) }}" class="btn btn-sm btn-outline-secondary" title="İş emrini düzenle" aria-label="{{ wo.patient_name }} iş emrini düzenle"><i class="bi bi-pencil" aria-hidden="true"></i></a>
+                        <a href="{{ url_for('parties.edit_work_order', party_id=wo.party_id, wo_id=wo.id, return_to='work_orders', return_view=view, return_date=(selected_date.isoformat() if selected_date else none), return_year=(year if view == 'month' else none), return_month=(month if view == 'month' else none), return_search=search) }}" class="btn btn-sm btn-outline-secondary" title="İş emrini düzenle" aria-label="{{ wo.patient_name }} iş emrini düzenle"><i class="bi bi-pencil" aria-hidden="true"></i></a>
                         <form method="POST" action="{{ url_for('parties.delete_work_order', party_id=wo.party_id, wo_id=wo.id) }}" class="d-inline" onsubmit="return confirm('Bu iş emrini silmek istediğinize emin misiniz?');">
                             <input type="hidden" name="return_to" value="work_orders">
                             <input type="hidden" name="return_view" value="{{ view }}">
+                            <input type="hidden" name="return_search" value="{{ search }}">
                             {% if view == 'day' %}<input type="hidden" name="return_date" value="{{ selected_date.isoformat() }}">{% else %}<input type="hidden" name="return_year" value="{{ year }}"><input type="hidden" name="return_month" value="{{ month }}">{% endif %}
                             <button type="submit" class="btn btn-sm btn-outline-danger" title="İş emrini sil" aria-label="{{ wo.patient_name }} iş emrini sil"><i class="bi bi-trash" aria-hidden="true"></i></button>
                         </form>
                     </td>
                 </tr>
                 {% else %}
-                <tr><td colspan="6" class="empty-state"><strong>Bu dönemde iş emri yok.</strong><br><a href="{{ url_for('parties.list_parties') }}">Doktor seçerek ilk iş emrini girin.</a></td></tr>
+                <tr><td colspan="6" class="empty-state"><strong>{% if search %}“{{ search }}” için bu dönemde iş emri bulunamadı.{% else %}Bu dönemde iş emri yok.{% endif %}</strong>{% if not search %}<br><a href="{{ url_for('parties.list_parties') }}">Doktor seçerek ilk iş emrini girin.</a>{% endif %}</td></tr>
                 {% endfor %}
             </tbody>
         </table>
