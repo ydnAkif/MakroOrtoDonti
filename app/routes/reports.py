@@ -14,8 +14,6 @@ from app.models.models import (
     Invoice,
     InvoiceItem,
     InvoiceItemType,
-    Party,
-    PartyType,
     Payment,
     invoice_item_category_key,
 )
@@ -31,15 +29,6 @@ STATUS_LABELS = {
     Invoice.STATUS_OVERDUE: "Gecikmiş",
     Invoice.STATUS_CANCELLED: "İptal",
 }
-PATIENT_STATUS_LABELS = {
-    "active": "Aktif tedavi",
-    "completed": "Tamamlandı",
-    "planned": "Planlandı",
-    "on_hold": "Beklemede",
-    "inactive": "Pasif",
-}
-
-
 def _resolve_period(today: date) -> tuple[date, date, str]:
     period = request.args.get("period", "this_month")
     explicit_start = parse_date(request.args.get("start_date", ""))
@@ -236,32 +225,12 @@ def index():
         for status in (Invoice.STATUS_PAID, Invoice.STATUS_PENDING, Invoice.STATUS_OVERDUE)
     ]
 
-    patient_status_rows = db.session.execute(
-        db.select(Party.treatment_status, db.func.count(Party.id).label("count"))
-        .where(Party.party_type == PartyType.DENTIST, Party.is_active == True)
-        .group_by(Party.treatment_status)
-    ).all()
-    patient_stats = [
-        {
-            "status": row.treatment_status or "active",
-            "label": PATIENT_STATUS_LABELS.get(row.treatment_status or "active", row.treatment_status or "active"),
-            "count": row.count,
-        }
-        for row in patient_status_rows
-    ]
-
-    exchange_rates = db.session.execute(
+    current_rate = db.session.execute(
         db.select(ExchangeRate)
         .where(ExchangeRate.rate_date <= end_date)
         .order_by(ExchangeRate.rate_date.desc())
-        .limit(12)
-    ).scalars().all()
-    current_rate = exchange_rates[0] if exchange_rates else None
-    previous_rate = exchange_rates[1] if len(exchange_rates) > 1 else None
-    rate_delta = (
-        current_rate.eur_to_try - previous_rate.eur_to_try
-        if current_rate and previous_rate else None
-    )
+        .limit(1)
+    ).scalar_one_or_none()
 
     trend_rows = _trend_rows(start_date, end_date, invoices, payments)
     max_trend_value = max(
@@ -291,11 +260,8 @@ def index():
         category_stats=category_stats,
         category_labels=INVOICE_CATEGORY_LABELS,
         invoice_statuses=invoice_statuses,
-        patient_stats=patient_stats,
         aging_rows=list(aging.values()),
-        exchange_rates=exchange_rates,
         current_rate=current_rate,
-        rate_delta=rate_delta,
         trend_rows=trend_rows,
         max_trend_value=max_trend_value,
         max_category_amount=max_category_amount,

@@ -3,115 +3,79 @@
 
 {% block content %}
 <header class="workspace-header">
-    <div><h1>Raporlar</h1><p>Dönem hareketleri ve alacak durumu.</p></div>
+    <div><h1>Raporlar</h1><p>Faturalandırma, tahsilat ve açık bakiye görünümü.</p></div>
 </header>
 
-<form method="GET" class="card report-filter mb-4" aria-label="Rapor dönemi">
-    <div class="card-body">
-        <div class="row g-3 align-items-end">
-            <div class="col-lg-3 col-md-4">
-                <label class="form-label" for="period">Hazır dönem</label>
-                <select class="form-select" id="period" name="period">
-                    <option value="this_month" {% if selected_period == 'this_month' %}selected{% endif %}>Bu ay</option>
-                    <option value="last_30" {% if selected_period == 'last_30' %}selected{% endif %}>Son 30 gün</option>
-                    <option value="this_year" {% if selected_period == 'this_year' %}selected{% endif %}>Bu yıl</option>
-                    <option value="last_year" {% if selected_period == 'last_year' %}selected{% endif %}>Geçen yıl</option>
-                    <option value="custom" {% if selected_period == 'custom' %}selected{% endif %}>Özel tarih</option>
-                </select>
-            </div>
-            <div class="col-lg-3 col-md-3">
-                <label class="form-label" for="start_date">Başlangıç</label>
-                <input class="form-control" type="date" id="start_date" name="start_date" value="{{ start_date.isoformat() }}">
-            </div>
-            <div class="col-lg-3 col-md-3">
-                <label class="form-label" for="end_date">Bitiş</label>
-                <input class="form-control" type="date" id="end_date" name="end_date" value="{{ end_date.isoformat() }}">
-            </div>
-            <div class="col-lg-3 col-md-2"><button class="btn btn-primary w-100" type="submit"><i class="bi bi-arrow-repeat"></i>Raporu güncelle</button></div>
-        </div>
+<form method="GET" class="toolbar-panel report-toolbar" aria-label="Rapor dönemi">
+    <div>
+        <label class="form-label" for="period">Dönem</label>
+        <select class="form-select" id="period" name="period">
+            <option value="this_month" {% if selected_period == 'this_month' %}selected{% endif %}>Bu ay</option>
+            <option value="last_30" {% if selected_period == 'last_30' %}selected{% endif %}>Son 30 gün</option>
+            <option value="this_year" {% if selected_period == 'this_year' %}selected{% endif %}>Bu yıl</option>
+            <option value="last_year" {% if selected_period == 'last_year' %}selected{% endif %}>Geçen yıl</option>
+            <option value="custom" {% if selected_period == 'custom' %}selected{% endif %}>Özel tarih</option>
+        </select>
     </div>
+    <div><label class="form-label" for="start_date">Başlangıç</label><input class="form-control" type="date" id="start_date" name="start_date" value="{{ start_date.isoformat() }}"></div>
+    <div><label class="form-label" for="end_date">Bitiş</label><input class="form-control" type="date" id="end_date" name="end_date" value="{{ end_date.isoformat() }}"></div>
+    <button class="btn btn-primary" type="submit">Güncelle</button>
 </form>
 
-<section class="report-pulse mb-4" aria-labelledby="pulse-title">
-    <div class="report-pulse-heading">
-        <div><span class="page-eyebrow text-white-50">{{ start_date.strftime('%d.%m.%Y') }} - {{ end_date.strftime('%d.%m.%Y') }}</span><h2 id="pulse-title">Dönemin finansal nabzı</h2></div>
-        <div class="report-ratio"><span>Tahsilat / fatura</span><strong>%{{ "{:.1f}".format(collection_ratio) }}</strong></div>
-    </div>
-    <div class="report-pulse-grid">
-        <div><span>Faturalandırılan</span><strong>€{{ "{:,.2f}".format(issued_eur) }}</strong><small>₺{{ "{:,.2f}".format(issued_try) }} · {{ invoice_count }} fatura</small></div>
-        <div><span>Gerçek tahsilat</span><strong>€{{ "{:,.2f}".format(collected_eur) }}</strong><small>₺{{ "{:,.2f}".format(collected_try) }} · {{ payment_count }} hareket</small></div>
-        <div><span>Dönem sonu açık bakiye</span><strong>€{{ "{:,.2f}".format(outstanding_eur) }}</strong><small>₺{{ "{:,.2f}".format(outstanding_try) }} · {{ receivable_count }} açık fatura</small></div>
-    </div>
-    <div class="report-ratio-track"><span style="width: {{ [collection_ratio, 100]|min }}%"></span></div>
-</section>
-
-<div class="row g-3 mb-4">
-    <div class="col-md-4">
-        <article class="card metric-card h-100" style="--metric-color: var(--danger-500); --metric-tint: rgba(207,91,98,.12);"><div class="card-body"><span class="metric-icon"><i class="bi bi-calendar2-x"></i></span><div class="metric-label">Vadesi geçen</div><p class="metric-value">€{{ "{:,.2f}".format(overdue_eur) }}</p></div></article>
-    </div>
-    <div class="col-md-4">
-        <article class="card metric-card h-100"><div class="card-body"><span class="metric-icon"><i class="bi bi-receipt-cutoff"></i></span><div class="metric-label">Dönem faturası</div><p class="metric-value">{{ invoice_count }}</p></div></article>
-    </div>
-    <div class="col-md-4">
-        <article class="card metric-card h-100" style="--metric-color: var(--sky-500); --metric-tint: rgba(53,175,208,.13);"><div class="card-body"><span class="metric-icon"><i class="bi bi-currency-exchange"></i></span><div class="metric-label">Dönem sonu EUR/TRY</div><p class="metric-value">{% if current_rate %}₺{{ "{:,.4f}".format(current_rate.eur_to_try) }}{% else %}-{% endif %}</p>{% if rate_delta is not none %}<small class="text-muted">Önceki kura göre {{ '+' if rate_delta >= 0 else '' }}{{ "{:.4f}".format(rate_delta) }}</small>{% endif %}</div></article>
-    </div>
+<div class="summary-line summary-line--four" aria-label="Dönem özeti">
+    <div><span>Faturalandırılan</span><strong>€{{ "{:,.2f}".format(issued_eur) }}</strong><small>₺{{ "{:,.2f}".format(issued_try) }}</small></div>
+    <div><span>Gerçek tahsilat</span><strong>€{{ "{:,.2f}".format(collected_eur) }}</strong><small>₺{{ "{:,.2f}".format(collected_try) }}</small></div>
+    <div><span>Açık bakiye</span><strong>€{{ "{:,.2f}".format(outstanding_eur) }}</strong><small>₺{{ "{:,.2f}".format(outstanding_try) }} · {{ receivable_count }} açık fatura</small></div>
+    <div><span>Tahsilat oranı</span><strong>%{{ "{:.1f}".format(collection_ratio) }}</strong><small>{{ payment_count }} ödeme hareketi</small></div>
 </div>
 
-<section class="card mb-4" aria-labelledby="trend-title">
-    <div class="card-header d-flex justify-content-between align-items-center"><div><span class="page-eyebrow mb-1">Dönem akışı</span><h2 class="h5 mb-0" id="trend-title">Fatura ve tahsilat ritmi</h2></div><div class="report-legend"><span><i class="issued"></i>Fatura</span><span><i class="collected"></i>Tahsilat</span></div></div>
+<section class="work-panel mb-4" aria-labelledby="trend-title">
+    <div class="work-panel__header">
+        <div><h2 id="trend-title">Dönem hareketi</h2><p>{{ start_date.strftime('%d.%m.%Y') }} – {{ end_date.strftime('%d.%m.%Y') }}</p></div>
+        <div class="report-legend"><span><i class="issued"></i>Fatura</span><span><i class="collected"></i>Tahsilat</span></div>
+    </div>
     <div class="card-body">
         {% for row in trend_rows %}
         <div class="report-trend-row">
             <span class="report-trend-label">{{ row.label }}</span>
-            <div class="report-trend-bars">
-                <div title="Fatura: €{{ '{:,.2f}'.format(row.issued) }}"><span class="issued" style="width: {{ (row.issued / max_trend_value * 100)|round(1) }}%"></span></div>
-                <div title="Tahsilat: €{{ '{:,.2f}'.format(row.collected) }}"><span class="collected" style="width: {{ (row.collected / max_trend_value * 100)|round(1) }}%"></span></div>
-            </div>
+            <div class="report-trend-bars"><div title="Fatura: €{{ '{:,.2f}'.format(row.issued) }}"><span class="issued" style="width: {{ (row.issued / max_trend_value * 100)|round(1) }}%"></span></div><div title="Tahsilat: €{{ '{:,.2f}'.format(row.collected) }}"><span class="collected" style="width: {{ (row.collected / max_trend_value * 100)|round(1) }}%"></span></div></div>
             <span class="report-trend-value">€{{ "{:,.0f}".format(row.collected) }}</span>
         </div>
-        {% else %}<div class="empty-state text-muted"><i class="bi bi-activity"></i>Bu dönemde finans hareketi yok.</div>{% endfor %}
+        {% else %}<div class="empty-state">Bu dönemde finans hareketi yok.</div>{% endfor %}
     </div>
 </section>
 
 <div class="row g-4 mb-4">
     <div class="col-xl-7">
-        <section class="card h-100" aria-labelledby="treatment-title">
-            <div class="card-header"><span class="page-eyebrow mb-1">Klinik üretim</span><h2 class="h5 mb-0" id="treatment-title">En çok faturalanan işlemler</h2></div>
-            <div class="card-body p-0"><div class="table-responsive"><table class="table table-hover"><thead><tr><th>İşlem</th><th>Kategori</th><th class="text-end">Adet</th><th class="text-end">Tutar</th></tr></thead><tbody>
-                {% for stat in treatment_stats %}<tr><td><strong>{{ stat.name }}</strong></td><td><span class="invoice-category-badge">{{ category_labels.get(stat.category, stat.category) }}</span></td><td class="text-end">{{ stat.count }}</td><td class="text-end fw-bold">₺{{ "{:,.2f}".format(stat.amount_eur) }}</td></tr>
-                {% else %}<tr><td colspan="4" class="empty-state text-muted"><i class="bi bi-clipboard2-pulse"></i>Bu dönemde faturalanmış işlem yok.</td></tr>{% endfor %}
-            </tbody></table></div></div>
+        <section class="work-panel h-100" aria-labelledby="treatment-title">
+            <div class="work-panel__header"><div><h2 id="treatment-title">En çok faturalanan işlemler</h2><p>Dönemin üretim dağılımı</p></div></div>
+            <div class="table-responsive"><table class="table table-hover"><thead><tr><th>İşlem</th><th>Kategori</th><th class="text-end">Adet</th><th class="text-end">Tutar</th></tr></thead><tbody>
+                {% for stat in treatment_stats %}<tr><td><strong>{{ stat.name }}</strong></td><td>{{ category_labels.get(stat.category, stat.category) }}</td><td class="text-end">{{ stat.count }}</td><td class="text-end fw-bold">₺{{ "{:,.2f}".format(stat.amount_eur) }}</td></tr>
+                {% else %}<tr><td colspan="4" class="empty-state">Bu dönemde faturalanmış işlem yok.</td></tr>{% endfor %}
+            </tbody></table></div>
         </section>
     </div>
     <div class="col-xl-5">
-        <section class="card h-100" aria-labelledby="category-title">
-            <div class="card-header"><span class="page-eyebrow mb-1">Gelir bileşimi</span><h2 class="h5 mb-0" id="category-title">Fatura kategorileri</h2></div>
+        <section class="work-panel h-100" aria-labelledby="category-title">
+            <div class="work-panel__header"><div><h2 id="category-title">Kategori dağılımı</h2><p>Fatura tutarına göre</p></div></div>
             <div class="card-body">
                 {% for stat in category_stats %}<div class="report-category-row"><div><span>{{ category_labels.get(stat.category, stat.category) }}</span><strong>€{{ "{:,.2f}".format(stat.amount_eur) }}</strong></div><div class="progress"><span style="width: {{ (stat.amount_eur / max_category_amount * 100)|round(1) }}%"></span></div><small>{{ stat.count }} kalem</small></div>
-                {% else %}<div class="empty-state text-muted"><i class="bi bi-tags"></i>Kategori verisi oluşmadı.</div>{% endfor %}
+                {% else %}<div class="empty-state">Kategori verisi yok.</div>{% endfor %}
             </div>
         </section>
     </div>
 </div>
 
 <div class="row g-4">
-    <div class="col-lg-4">
-        <section class="card h-100" aria-labelledby="aging-title"><div class="card-header"><span class="page-eyebrow mb-1">Ödeme takibi</span><h2 class="h5 mb-0" id="aging-title"><i class="bi bi-calendar2-week"></i> Vadesine göre açık alacaklar</h2></div><div class="card-body">
+    <div class="col-lg-7">
+        <section class="work-panel h-100" aria-labelledby="aging-title"><div class="work-panel__header"><div><h2 id="aging-title">Vadesine göre açık alacaklar</h2><p>Toplam gecikmiş: €{{ "{:,.2f}".format(overdue_eur) }}</p></div></div><div class="card-body">
             {% for row in aging_rows %}<div class="aging-row"><div><span>{{ row.label }}</span><small>{{ row.count }} fatura</small></div><strong>€{{ "{:,.2f}".format(row.amount) }}</strong><div class="aging-bar"><span style="width: {{ (row.amount / max_aging_amount * 100)|round(1) }}%"></span></div></div>{% endfor %}
         </div></section>
     </div>
-    <div class="col-lg-4">
-        <section class="card h-100" aria-labelledby="status-title"><div class="card-header"><h2 class="h5 mb-0" id="status-title"><i class="bi bi-pie-chart"></i> Fatura durumları</h2></div><div class="card-body">
+    <div class="col-lg-5">
+        <section class="work-panel h-100" aria-labelledby="status-title"><div class="work-panel__header"><div><h2 id="status-title">Fatura durumları</h2><p>{{ invoice_count }} dönem faturası{% if current_rate %} · EUR/TRY ₺{{ "{:,.4f}".format(current_rate.eur_to_try) }}{% endif %}</p></div></div><div class="card-body">
             {% for row in invoice_statuses %}<div class="status-count-row"><span>{{ row.label }}</span><strong>{{ row.count }}</strong></div>{% endfor %}
-            <hr>
-            <h3 class="h6 mb-3">Hasta durumları</h3>
-            {% for row in patient_stats %}<div class="status-count-row"><span>{{ row.label }}</span><strong>{{ row.count }}</strong></div>{% else %}<p class="text-muted small">Aktif hasta kaydı yok.</p>{% endfor %}
         </div></section>
-    </div>
-    <div class="col-lg-4">
-        <section class="card h-100" aria-labelledby="rates-title"><div class="card-header"><h2 class="h5 mb-0" id="rates-title"><i class="bi bi-currency-exchange"></i> Döviz kurları</h2></div><div class="card-body p-0"><div class="table-responsive report-rate-table"><table class="table"><thead><tr><th>Tarih</th><th class="text-end">EUR/TRY</th><th class="text-end">USD/TRY</th></tr></thead><tbody>
-            {% for rate in exchange_rates %}<tr><td>{{ rate.rate_date.strftime('%d.%m.%Y') }}</td><td class="text-end fw-bold">₺{{ "{:,.4f}".format(rate.eur_to_try) }}</td><td class="text-end">{{ "₺{:,.4f}".format(rate.usd_to_try) if rate.usd_to_try else "—" }}</td></tr>{% else %}<tr><td colspan="3" class="empty-state text-muted">Kur kaydı yok.</td></tr>{% endfor %}
-        </tbody></table></div></div></section>
     </div>
 </div>
 {% endblock %}

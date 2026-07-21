@@ -4,9 +4,9 @@
 {% block content %}
 <header class="workspace-header">
     <div><h1>İşlem kataloğu</h1><p>İşlem adları, kategoriler ve fiyatlar.</p></div>
-    <div class="d-flex gap-2">
-        <a href="{{ url_for('treatments.import_treatments') }}" class="btn btn-outline-success">
-            <i class="bi bi-upload"></i> XLS içe aktar
+    <div class="workspace-actions">
+        <a href="{{ url_for('treatments.import_treatments') }}" class="btn btn-outline-secondary">
+            <i class="bi bi-upload"></i> İçe aktar
         </a>
         <a href="{{ url_for('treatments.add_treatment') }}" class="btn btn-primary">
             <i class="bi bi-plus-lg"></i> Yeni işlem
@@ -14,35 +14,27 @@
     </div>
 </header>
 
-<!-- Filters -->
-<div class="card border-0 shadow-sm mb-4">
-    <div class="card-body">
-        <form method="GET" action="{{ url_for('treatments.list_treatments') }}">
-            <div class="row g-3 align-items-end">
-                <div class="col-md-5">
-                    <label class="form-label">Kategori</label>
-                    <select name="category" class="form-select" onchange="this.form.submit()">
+<div class="toolbar-panel catalog-toolbar">
+        <form method="GET" action="{{ url_for('treatments.list_treatments') }}" class="d-flex gap-2">
+                <div>
+                    <label class="visually-hidden" for="catalog-category">Kategori</label>
+                    <select id="catalog-category" name="category" class="form-select" onchange="this.form.submit()">
                         <option value="">Tüm Kategoriler</option>
                         {% for cat in categories %}
                         <option value="{{ cat }}" {% if selected_category == cat %}selected{% endif %}>{{ category_labels.get(cat, cat) }}</option>
                         {% endfor %}
                     </select>
                 </div>
-                <div class="col-md-5">
-                    <label class="form-label">Ara</label>
-                    <input type="text" class="form-control" name="search" value="{{ search }}" placeholder="İşlem adı ile ara... (Enter)" autocomplete="off">
+                <div class="flex-grow-1">
+                    <label class="visually-hidden" for="catalog-search">İşlem ara</label>
+                    <input id="catalog-search" type="text" class="form-control" name="search" value="{{ search }}" placeholder="İşlem adıyla ara" autocomplete="off">
                 </div>
-                <div class="col-md-2">
-                    <button type="submit" class="btn btn-primary w-100">Ara</button>
-                </div>
-            </div>
+                <button type="submit" class="btn btn-outline-secondary">Ara</button>
         </form>
-    </div>
 </div>
 
-<!-- Treatment List -->
-<div class="card border-0 shadow-sm">
-    <div class="card-body p-0">
+<div class="work-panel">
+    <div class="work-panel__header"><div><h2>Fiyat listesi</h2><p>Ad, kategori ve fiyatı satır üzerinden güncelleyebilirsiniz.</p></div></div>
         <div class="table-responsive">
             <table class="table table-hover align-middle mb-0" id="treatmentsTable">
                 <thead class="table-light">
@@ -50,7 +42,7 @@
                         <th style="width:30%">İşlem</th>
                         <th style="width:15%">Kategori</th>
                         <th style="width:20%" class="text-end">Fiyat</th>
-                        <th style="width:20%" class="text-end">İşlem</th>
+                        <th style="width:20%" class="text-end">Eylem</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -78,7 +70,7 @@
                             <button class="btn btn-sm btn-success save-row d-none" title="Kaydet" aria-label="Satırdaki değişiklikleri kaydet">
                                 <i class="bi bi-check-lg"></i>
                             </button>
-                            <a href="{{ url_for('treatments.edit_treatment', treatment_id=treatment.id) }}" class="btn btn-sm btn-outline-primary" title="Tam Form">
+                            <a href="{{ url_for('treatments.edit_treatment', treatment_id=treatment.id) }}" class="btn btn-sm btn-outline-secondary" title="Ayrıntılı düzenle" aria-label="{{ treatment.name }} ayrıntılarını düzenle">
                                 <i class="bi bi-pencil"></i>
                             </a>
                             <form method="POST" action="{{ url_for('treatments.delete_treatment', treatment_id=treatment.id) }}" class="d-inline" onsubmit="return confirm('Bu işlemi silmek istediğinize emin misiniz?')">
@@ -89,17 +81,16 @@
                         </td>
                     </tr>
                     {% else %}
-                    <tr><td colspan="4" class="text-center text-muted py-4">İşlem bulunamadı.</td></tr>
+                    <tr><td colspan="4" class="empty-state">İşlem bulunamadı.</td></tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
-    </div>
 </div>
+{% include "components/pagination.html" %}
 {% endblock %}
 
 {% block scripts %}
-{% include "components/pagination.html" %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const table = document.getElementById('treatmentsTable');

@@ -3,37 +3,28 @@ endblock %} {% block content %}
 <header class="workspace-header">
   <div>
     <h1>WhatsApp</h1>
-    <p class="page-description">
-      Aylık makbuzları doktorlara toplu gönderin, bağlantıyı yönetin, bireysel
-      veya toplu mesajlar hazırlayın.
-    </p>
+    <p>Bağlantıyı kontrol edin ve aylık makbuzları gönderin.</p>
   </div>
 </header>
 
-<div class="row g-4">
+<div class="row g-3">
   <!-- Connection Status -->
   <div class="col-lg-4">
-    <div class="card border-0 shadow-sm h-100">
-      <div class="card-header bg-white">
-        <h5 class="mb-0"><i class="bi bi-plug"></i> Bağlantı Durumu</h5>
+    <div class="work-panel h-100">
+      <div class="work-panel__header">
+        <div><h2>Bağlantı</h2><p>WhatsApp Web oturumu</p></div>
       </div>
       <div class="card-body">
         {% if status.connected %}
-        <div class="text-center mb-3">
-          <div
-            class="bg-success bg-opacity-10 rounded-circle d-inline-flex p-4 mb-3"
-          >
-            <i class="bi bi-check-circle text-success fs-1"></i>
-          </div>
-          <h5 class="text-success">Bağlı</h5>
+        <div class="connection-state mb-3">
+          <span class="connection-dot connection-dot--online" aria-hidden="true"></span>
+          <div><strong>Bağlı</strong>
           {% if status.phone_number %}
-          <p class="text-muted mb-0">{{ status.phone_number }}</p>
+          <span class="text-muted d-block">{{ status.phone_number }}</span>
           {% endif %} {% if status.connected_at %}
-          <small class="text-muted"
-            >Bağlantı: {{ status.connected_at.strftime('%d.%m.%Y %H:%M')
-            }}</small
-          >
+          <small class="text-muted">{{ status.connected_at.strftime('%d.%m.%Y %H:%M') }}</small>
           {% endif %}
+          </div>
         </div>
         <form method="POST" action="{{ url_for('whatsapp.disconnect') }}">
           <button type="submit" class="btn btn-outline-danger w-100">
@@ -41,16 +32,9 @@ endblock %} {% block content %}
           </button>
         </form>
         {% else %}
-        <div class="text-center mb-3">
-          <div
-            id="wa-idle-icon"
-            class="bg-secondary bg-opacity-10 rounded-circle d-inline-flex p-4 mb-3"
-          >
-            <i class="bi bi-phone text-secondary fs-1"></i>
-          </div>
-          <h5 id="wa-status-title" class="text-secondary">
-            {% if status.connecting %}Bağlanıyor...{% else %}Bağlı Değil{% endif %}
-          </h5>
+        <div class="connection-state mb-3">
+          <span id="wa-idle-icon" class="connection-dot" aria-hidden="true"></span>
+          <strong id="wa-status-title">{% if status.connecting %}Bağlanıyor...{% else %}Bağlı değil{% endif %}</strong>
         </div>
         <div id="wa-qr-area" class="text-center mb-3 d-none">
           <img
@@ -96,11 +80,11 @@ endblock %} {% block content %}
 
   <!-- Makbuz Sending -->
   <div class="col-lg-8">
-    <div class="card border-0 shadow-sm h-100">
+    <div class="work-panel h-100">
       <div
-        class="card-header bg-white d-flex flex-wrap align-items-center justify-content-between gap-2"
+        class="work-panel__header"
       >
-        <h5 class="mb-0"><i class="bi bi-receipt"></i> Makbuz Gönderimi</h5>
+        <div><h2>Makbuz Gönderimi</h2><p>{{ months[month - 1][1] }} {{ year }}</p></div>
         <form method="GET" action="{{ url_for('whatsapp.index') }}" class="d-flex gap-2">
           <select name="month" class="form-select form-select-sm" aria-label="Ay">
             {% for num, name in months %}
@@ -121,17 +105,16 @@ endblock %} {% block content %}
       </div>
       <div class="card-body">
         {% if not status.connected %}
-        <div class="alert alert-warning d-flex align-items-center gap-2 py-2">
+        <div class="notice-strip notice-strip--warning mb-3">
           <i class="bi bi-exclamation-triangle"></i>
           <div>
-            Makbuz göndermek için önce WhatsApp bağlantısını kurun. Soldaki
-            karttan QR kod ile bağlanabilirsiniz.
+            Makbuz göndermek için önce bağlantıyı kurun.
           </div>
         </div>
         {% endif %}
 
         {% if missing_makbuz_count > 0 %}
-        <div class="alert alert-info d-flex align-items-center justify-content-between py-2">
+        <div class="notice-strip mb-3">
           <div>
             <i class="bi bi-info-circle"></i>
             Bu dönemde iş emri olan
@@ -232,7 +215,6 @@ endblock %} {% block content %}
                     />
                   </th>
                   <th>Doktor</th>
-                  <th>Telefon</th>
                   <th class="text-end">Tutar</th>
                   <th>Durum</th>
                   <th>Gönderim</th>
@@ -256,15 +238,8 @@ endblock %} {% block content %}
                     <a
                       href="{{ url_for('makbuzlar.detail_makbuz', party_id=c.party.id, year=year, month=month) }}"
                       class="text-decoration-none"
-                      >{{ c.party.display_name }}</a
-                    >
-                  </td>
-                  <td>
-                    {% if c.has_phone %} {{ c.party.phone }} {% else %}
-                    <span class="badge bg-light text-muted border"
-                      >Telefon yok</span
-                    >
-                    {% endif %}
+                      >{{ c.party.display_name }}</a><br>
+                    {% if c.has_phone %}<small class="text-muted">{{ c.party.phone }}</small>{% else %}<span class="badge bg-light text-muted border">Telefon yok</span>{% endif %}
                   </td>
                   <td class="text-end fw-semibold">
                     ₺{{ "{:,.2f}".format(c.makbuz.grand_total) }}
@@ -327,11 +302,9 @@ endblock %} {% block content %}
               {% if auto_send_on %}checked{% endif %}
             />
             <label class="form-check-label" for="wa-auto-send">
-              <strong>Otomatik gönderim</strong>
+              <strong>Aylık otomatik gönderim</strong>
               <span class="d-block small text-muted">
-                Her ayın 1'inde saat 06:30'da, önceki ayın taslak makbuzları
-                telefonu kayıtlı doktorlara otomatik gönderilir (WhatsApp
-                bağlıysa).
+                Her ayın 1’inde önceki dönemin taslaklarını gönderir.
               </span>
             </label>
           </div>
@@ -412,7 +385,10 @@ endblock %} {% block content %}
   </div>
 </div>
 
-<div class="row g-4 mt-1">
+<details class="disclosure-panel mt-3">
+  <summary><span><i class="bi bi-chat-left-text" aria-hidden="true"></i><strong>Mesaj araçları</strong><small>Tek kişiye veya seçili doktorlara serbest mesaj gönderin</small></span><i class="bi bi-chevron-down disclosure-chevron" aria-hidden="true"></i></summary>
+  <div class="disclosure-content">
+<div class="row g-3">
   <!-- Send Message -->
   <div class="col-lg-6">
     <div class="card border-0 shadow-sm h-100">
@@ -524,6 +500,8 @@ endblock %} {% block content %}
     </div>
   </div>
 </div>
+  </div>
+</details>
 {% endblock %}
 
 {% block scripts %}
