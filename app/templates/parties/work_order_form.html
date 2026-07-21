@@ -35,11 +35,15 @@
                         </div>
                         <div class="col-md-4">
                             <label class="form-label">Aparey Türü <span class="text-danger">*</span></label>
-                            <div id="apparatus-component" style="position:relative;">
-                                <input type="text" class="form-control mb-2" id="apparatus-search"
-                                       placeholder="Aparey ara ve eklemek için tıkla..." autocomplete="off">
-                                <div class="typeahead-list list-group shadow-sm" id="apparatus-dropdown" style="display:none;"></div>
-                                <div id="apparatus-tags" class="d-flex flex-wrap gap-1 mt-2"></div>
+                            <div id="apparatus-component" class="treatment-picker">
+                                <div class="treatment-picker__search">
+                                    <i class="bi bi-search" aria-hidden="true"></i>
+                                    <input type="text" class="form-control" id="apparatus-search"
+                                           placeholder="Aparey ara" autocomplete="off" role="combobox"
+                                           aria-autocomplete="list" aria-controls="apparatus-dropdown" aria-expanded="false">
+                                    <div class="typeahead-list treatment-picker__menu list-group" id="apparatus-dropdown" role="listbox" style="display:none;"></div>
+                                </div>
+                                <div id="apparatus-tags" class="treatment-picker__selection" aria-live="polite"></div>
                                 <input type="hidden" id="apparatus_type" name="apparatus_type" value="{{ work_order.apparatus_type if work_order else '' }}">
                             </div>
                         </div>
@@ -48,11 +52,15 @@
                     <div class="row g-3 mt-2">
                         <div class="col-12">
                             <label class="form-label">Ekstra Eklentiler</label>
-                            <div id="extra-addons-component" style="position:relative;">
-                                <input type="text" class="form-control mb-2" id="extra-addons-search"
-                                       placeholder="Ekstra işlem ara ve eklemek için tıkla..." autocomplete="off">
-                                <div class="typeahead-list list-group shadow-sm" id="extra-addons-dropdown" style="display:none;"></div>
-                                <div id="extra-addons-tags" class="d-flex flex-wrap gap-1 mt-2"></div>
+                            <div id="extra-addons-component" class="treatment-picker">
+                                <div class="treatment-picker__search">
+                                    <i class="bi bi-search" aria-hidden="true"></i>
+                                    <input type="text" class="form-control" id="extra-addons-search"
+                                           placeholder="Ekstra işlem ara" autocomplete="off" role="combobox"
+                                           aria-autocomplete="list" aria-controls="extra-addons-dropdown" aria-expanded="false">
+                                    <div class="typeahead-list treatment-picker__menu list-group" id="extra-addons-dropdown" role="listbox" style="display:none;"></div>
+                                </div>
+                                <div id="extra-addons-tags" class="treatment-picker__selection" aria-live="polite"></div>
                                 <input type="hidden" id="extra_addons" name="extra_addons" value="{{ work_order.extra_addons if work_order else '' }}">
                             </div>
                         </div>
@@ -191,20 +199,23 @@ document.addEventListener('DOMContentLoaded', function() {
             var tl = toTL(item.price, item.currency);
             totalTL += tl;
             const tag = document.createElement('span');
-            tag.className = 'badge bg-primary text-white d-inline-flex align-items-center gap-1';
-            tag.style.fontSize = '0.85em';
-            tag.textContent = item.name + ' (' + formatPrice(item.price, item.currency) + ')';
+            tag.className = 'treatment-token';
+            const name = document.createElement('strong');
+            name.textContent = item.name;
+            const price = document.createElement('small');
+            price.textContent = formatPrice(item.price, item.currency);
             const removeBtn = document.createElement('button');
             removeBtn.type = 'button';
-            removeBtn.className = 'btn-close btn-close-sm';
-            removeBtn.style.fontSize = '0.65em';
-            removeBtn.style.filter = 'brightness(0) invert(1)';
-            removeBtn.setAttribute('aria-label', 'Kaldır');
+            removeBtn.className = 'treatment-token__remove';
+            removeBtn.innerHTML = '<i class="bi bi-x" aria-hidden="true"></i>';
+            removeBtn.setAttribute('aria-label', item.name + ' seçimini kaldır');
             removeBtn.addEventListener('click', function() {
                 selectedApparatus.splice(index, 1);
                 renderApparatusTags();
                 syncApparatusHidden();
             });
+            tag.appendChild(name);
+            tag.appendChild(price);
             tag.appendChild(removeBtn);
             container.appendChild(tag);
         });
@@ -219,37 +230,49 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function renderApparatusDropdown(query) {
         const dropdown = document.getElementById('apparatus-dropdown');
+        const search = document.getElementById('apparatus-search');
         const nq = normalizeText(query);
         const matches = anaTreatments.filter(function(t) {
-            return !nq || normalizeText(t.name).indexOf(nq) !== -1;
-        }).slice(0, 50);
+            const alreadySelected = selectedApparatus.some(function(item) { return item.id === t.id; });
+            return !alreadySelected && (!nq || normalizeText(t.name).indexOf(nq) !== -1);
+        }).slice(0, 30);
 
         dropdown.innerHTML = '';
-        if (!matches.length) { dropdown.style.display = 'none'; return; }
+        if (!matches.length) { dropdown.style.display = 'none'; search.setAttribute('aria-expanded', 'false'); return; }
         matches.forEach(function(t) {
             const btn = document.createElement('button');
             btn.type = 'button';
-            btn.className = 'list-group-item list-group-item-action d-flex justify-content-between align-items-center';
-            btn.innerHTML = '<span>' + t.name + '</span><small class="text-muted">' + formatPrice(t.price, t.currency) + '</small>';
+            btn.className = 'list-group-item list-group-item-action treatment-picker__option';
+            btn.setAttribute('role', 'option');
+            const name = document.createElement('span');
+            name.textContent = t.name;
+            const price = document.createElement('small');
+            price.textContent = formatPrice(t.price, t.currency);
+            btn.appendChild(name);
+            btn.appendChild(price);
             btn.addEventListener('mousedown', function(e) {
                 e.preventDefault();
                 clearTimeout(apparatusBlurTimer);
                 selectedApparatus.push({id: t.id, name: t.name, price: t.price, currency: t.currency});
                 renderApparatusTags();
                 syncApparatusHidden();
-                document.getElementById('apparatus-search').value = '';
-                document.getElementById('apparatus-search').focus();
-                renderApparatusDropdown('');
+                search.value = '';
+                dropdown.style.display = 'none';
+                search.setAttribute('aria-expanded', 'false');
             });
             dropdown.appendChild(btn);
         });
         dropdown.style.display = 'block';
+        search.setAttribute('aria-expanded', 'true');
     }
 
     document.getElementById('apparatus-search').addEventListener('input', function() { renderApparatusDropdown(this.value); });
     document.getElementById('apparatus-search').addEventListener('focus', function() { renderApparatusDropdown(this.value); });
     document.getElementById('apparatus-search').addEventListener('blur', function() {
-        apparatusBlurTimer = setTimeout(function() { document.getElementById('apparatus-dropdown').style.display = 'none'; }, 250);
+        apparatusBlurTimer = setTimeout(function() {
+            document.getElementById('apparatus-dropdown').style.display = 'none';
+            document.getElementById('apparatus-search').setAttribute('aria-expanded', 'false');
+        }, 250);
     });
 
     function renderExtraTags() {
@@ -260,19 +283,23 @@ document.addEventListener('DOMContentLoaded', function() {
             var tl = toTL(item.price, item.currency);
             totalTL += tl;
             const tag = document.createElement('span');
-            tag.className = 'badge bg-info text-dark d-inline-flex align-items-center gap-1';
-            tag.style.fontSize = '0.85em';
-            tag.textContent = item.name + ' (' + formatPrice(item.price, item.currency) + ')';
+            tag.className = 'treatment-token treatment-token--extra';
+            const name = document.createElement('strong');
+            name.textContent = item.name;
+            const price = document.createElement('small');
+            price.textContent = formatPrice(item.price, item.currency);
             const removeBtn = document.createElement('button');
             removeBtn.type = 'button';
-            removeBtn.className = 'btn-close btn-close-sm';
-            removeBtn.style.fontSize = '0.65em';
-            removeBtn.setAttribute('aria-label', 'Kaldır');
+            removeBtn.className = 'treatment-token__remove';
+            removeBtn.innerHTML = '<i class="bi bi-x" aria-hidden="true"></i>';
+            removeBtn.setAttribute('aria-label', item.name + ' seçimini kaldır');
             removeBtn.addEventListener('click', function() {
                 selectedExtras.splice(index, 1);
                 renderExtraTags();
                 syncExtrasHidden();
             });
+            tag.appendChild(name);
+            tag.appendChild(price);
             tag.appendChild(removeBtn);
             container.appendChild(tag);
         });
@@ -287,37 +314,49 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function renderExtraDropdown(query) {
         const dropdown = document.getElementById('extra-addons-dropdown');
+        const search = document.getElementById('extra-addons-search');
         const nq = normalizeText(query);
         const matches = ekstraTreatments.filter(function(t) {
-            return !nq || normalizeText(t.name).indexOf(nq) !== -1;
-        }).slice(0, 50);
+            const alreadySelected = selectedExtras.some(function(item) { return item.id === t.id; });
+            return !alreadySelected && (!nq || normalizeText(t.name).indexOf(nq) !== -1);
+        }).slice(0, 30);
 
         dropdown.innerHTML = '';
-        if (!matches.length) { dropdown.style.display = 'none'; return; }
+        if (!matches.length) { dropdown.style.display = 'none'; search.setAttribute('aria-expanded', 'false'); return; }
         matches.forEach(function(t) {
             const btn = document.createElement('button');
             btn.type = 'button';
-            btn.className = 'list-group-item list-group-item-action d-flex justify-content-between align-items-center';
-            btn.innerHTML = '<span>' + t.name + '</span><small class="text-muted">' + formatPrice(t.price, t.currency) + '</small>';
+            btn.className = 'list-group-item list-group-item-action treatment-picker__option';
+            btn.setAttribute('role', 'option');
+            const name = document.createElement('span');
+            name.textContent = t.name;
+            const price = document.createElement('small');
+            price.textContent = formatPrice(t.price, t.currency);
+            btn.appendChild(name);
+            btn.appendChild(price);
             btn.addEventListener('mousedown', function(e) {
                 e.preventDefault();
                 clearTimeout(extraBlurTimer);
                 selectedExtras.push({id: t.id, name: t.name, price: t.price, currency: t.currency});
                 renderExtraTags();
                 syncExtrasHidden();
-                document.getElementById('extra-addons-search').value = '';
-                document.getElementById('extra-addons-search').focus();
-                renderExtraDropdown('');
+                search.value = '';
+                dropdown.style.display = 'none';
+                search.setAttribute('aria-expanded', 'false');
             });
             dropdown.appendChild(btn);
         });
         dropdown.style.display = 'block';
+        search.setAttribute('aria-expanded', 'true');
     }
 
     document.getElementById('extra-addons-search').addEventListener('input', function() { renderExtraDropdown(this.value); });
     document.getElementById('extra-addons-search').addEventListener('focus', function() { renderExtraDropdown(this.value); });
     document.getElementById('extra-addons-search').addEventListener('blur', function() {
-        extraBlurTimer = setTimeout(function() { document.getElementById('extra-addons-dropdown').style.display = 'none'; }, 250);
+        extraBlurTimer = setTimeout(function() {
+            document.getElementById('extra-addons-dropdown').style.display = 'none';
+            document.getElementById('extra-addons-search').setAttribute('aria-expanded', 'false');
+        }, 250);
     });
 
     function loadExistingItems(existingStr, treatments) {
