@@ -9,7 +9,7 @@ from openpyxl import Workbook
 from app.extensions import db
 from app.models.models import Party, PartyType, Treatment
 from app.services.search_service import tr_collation_key, tr_fold, tr_order
-from app.services.validation_service import normalize_display_name
+from app.services.validation_service import format_tr_phone, normalize_display_name
 
 from conftest import login
 
@@ -36,6 +36,17 @@ class TestNormalizeDisplayName:
 
     def test_preserves_short_organization_abbreviations(self):
         assert normalize_display_name("ABC SAĞLIK A.Ş.") == "ABC Sağlık A.Ş."
+
+
+class TestFormatTrPhone:
+    def test_formats_common_turkish_phone_variants(self):
+        expected = "+90 533 769 44 69"
+        assert format_tr_phone("+905337694469") == expected
+        assert format_tr_phone("0533 769 44 69") == expected
+        assert format_tr_phone("5337694469") == expected
+
+    def test_preserves_non_turkish_or_incomplete_values(self):
+        assert format_tr_phone("444 0 123") == "444 0 123"
 
 
 def _seed_dentist(app, name, phone=None):

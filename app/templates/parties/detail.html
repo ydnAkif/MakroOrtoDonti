@@ -32,7 +32,7 @@
                 <span class="badge bg-success mb-2">Diş Hekimi</span>
                 <hr>
                 {% if party.phone %}
-                <p class="text-muted mb-2"><i class="bi bi-telephone"></i> {{ party.phone }}</p>
+                <p class="text-muted mb-2"><i class="bi bi-telephone"></i> {{ party.phone|phone_display }}</p>
                 {% endif %}
                 {% if party.email %}
                 <p class="text-muted mb-2"><i class="bi bi-envelope"></i> {{ party.email }}</p>
@@ -56,7 +56,9 @@
                 <h6 class="text-primary"><i class="bi bi-calculator"></i> Toplam İş Emri Özeti</h6>
                 <p class="mb-1">Aparey: ₺{{ "{:,.2f}".format(total_apparatus) }}</p>
                 <p class="mb-1">Ekstra: ₺{{ "{:,.2f}".format(total_extra) }}</p>
-                <h4 class="mb-0">₺{{ "{:,.2f}".format(total_overall) }}</h4>
+                <p class="mb-1">Matrah: ₺{{ "{:,.2f}".format(total_overall) }}</p>
+                <p class="mb-2">KDV (makbuzlar): ₺{{ "{:,.2f}".format(total_vat) }}</p>
+                <h4 class="mb-0">₺{{ "{:,.2f}".format(total_with_vat) }}</h4>
             </div>
         </div>
         {% endif %}

@@ -239,7 +239,7 @@ endblock %} {% block content %}
                       href="{{ url_for('makbuzlar.detail_makbuz', party_id=c.party.id, year=year, month=month) }}"
                       class="text-decoration-none"
                       >{{ c.party.display_name }}</a><br>
-                    {% if c.has_phone %}<small class="text-muted">{{ c.party.phone }}</small>{% else %}<span class="badge bg-light text-muted border">Telefon yok</span>{% endif %}
+                    {% if c.has_phone %}<small class="text-muted">{{ c.party.phone|phone_display }}</small>{% else %}<span class="badge bg-light text-muted border">Telefon yok</span>{% endif %}
                   </td>
                   <td class="text-end fw-semibold">
                     ₺{{ "{:,.2f}".format(c.makbuz.grand_total) }}
@@ -408,7 +408,7 @@ endblock %} {% block content %}
               <option value="">Kişi seçiniz...</option>
               {% for p in patients %}
               <option value="{{ p.phone }}">
-                {{ p.display_name }} ({{ p.phone }})
+                {{ p.display_name }} ({{ p.phone|phone_display }})
               </option>
               {% endfor %}
             </select>
@@ -464,7 +464,7 @@ endblock %} {% block content %}
                   id="patient_{{ p.id }}"
                 />
                 <label class="form-check-label" for="patient_{{ p.id }}">
-                  {{ p.display_name }} ({{ p.phone }})
+                  {{ p.display_name }} ({{ p.phone|phone_display }})
                 </label>
               </div>
               {% else %}

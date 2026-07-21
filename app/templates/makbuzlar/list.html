@@ -75,7 +75,7 @@
                                 <div class="d-flex align-items-center">
                                     <div>
                                         <a href="{{ url_for('makbuzlar.detail_makbuz', party_id=d.party_id, year=year, month=month) }}" class="fw-bold text-decoration-none">{{ d.party.name if d.party else '-' }}</a>
-                                        {% if d.party and d.party.phone %}<br><small class="text-muted">{{ d.party.phone }}</small>{% endif %}
+                                        {% if d.party and d.party.phone %}<br><small class="text-muted">{{ d.party.phone|phone_display }}</small>{% endif %}
                                     </div>
                                 </div>
                             </td>

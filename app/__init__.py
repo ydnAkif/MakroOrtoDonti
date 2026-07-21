@@ -57,6 +57,9 @@ def create_app(config_class=Config) -> Flask:
 
     app.jinja_env.filters["currency_symbol"] = _currency_symbol
 
+    from .services.validation_service import format_tr_phone
+    app.jinja_env.filters["phone_display"] = format_tr_phone
+
     # Register transactional audit listeners before handling requests.
     from .services import audit_service  # noqa: F401
     # Registers the Turkish-aware tr_fold() function on SQLite connections.

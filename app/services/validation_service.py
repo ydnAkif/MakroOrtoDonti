@@ -52,6 +52,21 @@ def normalize_display_name(value: object) -> str:
     return " ".join(normalize_token(token) for token in clean.split(" "))
 
 
+def format_tr_phone(value: object) -> str:
+    """Format Turkish mobile numbers for display without changing stored data."""
+    raw = str(value or "").strip()
+    digits = "".join(char for char in raw if char.isdigit())
+    if len(digits) == 12 and digits.startswith("90"):
+        local = digits[2:]
+    elif len(digits) == 11 and digits.startswith("0"):
+        local = digits[1:]
+    elif len(digits) == 10:
+        local = digits
+    else:
+        return raw
+    return f"+90 {local[:3]} {local[3:6]} {local[6:8]} {local[8:]}"
+
+
 def normalize_treatment_fields(name, description, category, price_eur, currency=None):
     """Validate treatment input identically for forms, JSON and spreadsheets."""
     clean_name = str(name or "").strip()

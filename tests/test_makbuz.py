@@ -121,6 +121,24 @@ def test_generate_makbuz_computes_vat(client, app):
         assert makbuz.grand_total == Decimal("1800.00")
 
 
+def test_party_detail_reflects_persisted_receipt_vat_and_formats_phone(client, app):
+    login(client, "admin", "admin-pass")
+    party_id = _make_doctor(
+        app, name="Dr. KDV Özeti", phone="+905337694469"
+    )
+    _add_work_order(app, party_id, date(2026, 6, 10), 1000)
+    client.post(
+        f"/makbuzlar/{party_id}/generate",
+        data={"year": 2026, "month": 6, "vat_applied": "on", "vat_rate": "20"},
+        follow_redirects=False,
+    )
+
+    html = client.get(f"/parties/{party_id}").get_data(as_text=True)
+    assert "+90 533 769 44 69" in html
+    assert "KDV (makbuzlar): ₺200.00" in html
+    assert "₺1,200.00" in html
+
+
 def test_generate_makbuz_without_vat(client, app):
     login(client, "admin", "admin-pass")
     party_id = _make_doctor(app, name="Dr. No VAT")

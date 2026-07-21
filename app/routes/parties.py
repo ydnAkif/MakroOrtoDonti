@@ -4,7 +4,7 @@ from datetime import date, timedelta
 from decimal import Decimal
 
 from app.extensions import db
-from app.models.models import Party, PartyType, WorkOrder, Treatment, TreatmentCategory, ExchangeRate
+from app.models.models import Party, PartyType, WorkOrder, Treatment, TreatmentCategory, ExchangeRate, Makbuz
 from app.authz import permissions_required
 
 parties_bp = Blueprint("parties", __name__)
@@ -254,6 +254,10 @@ def detail_party(party_id):
     total_apparatus = sum(wo.apparatus_price for wo in work_orders)
     total_extra = sum(wo.extra_price for wo in work_orders)
     total_overall = sum(wo.total_price for wo in work_orders)
+    total_vat = sum(db.session.execute(
+        db.select(Makbuz.vat_amount).where(Makbuz.party_id == party_id)
+    ).scalars().all(), Decimal("0.00"))
+    total_with_vat = total_overall + total_vat
 
     return render_template(
         "parties/detail.html",
@@ -262,6 +266,8 @@ def detail_party(party_id):
         total_apparatus=total_apparatus,
         total_extra=total_extra,
         total_overall=total_overall,
+        total_vat=total_vat,
+        total_with_vat=total_with_vat,
     )
 
 

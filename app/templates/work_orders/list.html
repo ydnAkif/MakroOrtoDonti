@@ -56,7 +56,7 @@
                     <td><time class="workorder-date" datetime="{{ wo.work_date.isoformat() }}">{{ wo.work_date.strftime('%d.%m.%Y') }}</time></td>
                     <td>
                         <a href="{{ url_for('parties.detail_party', party_id=wo.party_id) }}">{{ wo.party.display_name if wo.party else '—' }}</a>
-                        {% if wo.party and wo.party.phone %}<small class="workorder-doctor-phone">{{ wo.party.phone }}</small>{% endif %}
+                        {% if wo.party and wo.party.phone %}<small class="workorder-doctor-phone">{{ wo.party.phone|phone_display }}</small>{% endif %}
                     </td>
                     <td>{{ wo.patient_name }}</td>
                     <td class="workorder-detail-cell">
