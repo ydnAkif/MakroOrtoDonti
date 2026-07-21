@@ -75,7 +75,7 @@ def test_dentist_work_order_and_makbuz_payment_critical_flow(authenticated_page,
 
     page.goto(f"{live_server_url}/payments/{makbuz_id}/mark-paid")
     page.get_by_role("button", name="Kaydet").click()
-    page.wait_for_url(f"{live_server_url}/payments/")
+    page.wait_for_url(f"{live_server_url}/payments/?tab=paid")
     assert page.get_by_text("₺100.00").first.is_visible()
 
 
@@ -90,7 +90,8 @@ def test_turkish_search_in_browser_filters(authenticated_page, live_server_url):
 
     # İstemci tarafı: WhatsApp toplu mesaj kişi filtresi
     page.goto(f"{live_server_url}/whatsapp/")
-    filter_input = page.locator("input.js-checkbox-filter")
+    page.locator("details.disclosure-panel > summary").click()
+    filter_input = page.locator("#bulk-patient-filter")
     filter_input.fill("sahin")
     pinar_row = page.locator("#bulk-patient-list .form-check", has_text="Dr. Pınar Şahin")
     other_row = page.locator("#bulk-patient-list .form-check", has_text="Dr. E2E Hekim")
