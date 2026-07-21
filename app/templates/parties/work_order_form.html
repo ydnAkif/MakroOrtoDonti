@@ -5,7 +5,7 @@
 <div class="mb-4">
     <nav aria-label="breadcrumb">
         <ol class="breadcrumb">
-            <li class="breadcrumb-item"><a href="{{ url_for('parties.list_parties') }}">Diş Hekimleri</a></li>
+            <li class="breadcrumb-item"><a href="{{ url_for('parties.list_parties') }}">Doktorlar</a></li>
             <li class="breadcrumb-item"><a href="{{ url_for('parties.detail_party', party_id=party.id) }}">{{ party.display_name }}</a></li>
             <li class="breadcrumb-item active">{% if work_order %}İş Emri Düzenle{% else %}Yeni İş Emri{% endif %}</li>
         </ol>
@@ -24,6 +24,13 @@
             </div>
             <div class="card-body">
                 <form method="POST" action="{{ url_for('parties.edit_work_order', party_id=party.id, wo_id=work_order.id) if work_order else url_for('parties.add_work_order', party_id=party.id) }}">
+                    {% if request.args.get('return_to') == 'work_orders' %}
+                    <input type="hidden" name="return_to" value="work_orders">
+                    <input type="hidden" name="return_view" value="{{ request.args.get('return_view', 'day') }}">
+                    <input type="hidden" name="return_date" value="{{ request.args.get('return_date', '') }}">
+                    <input type="hidden" name="return_year" value="{{ request.args.get('return_year', '') }}">
+                    <input type="hidden" name="return_month" value="{{ request.args.get('return_month', '') }}">
+                    {% endif %}
                     <div class="row g-3">
                         <div class="col-md-4">
                             <label for="work_date" class="form-label">Tarih <span class="text-danger">*</span></label>
@@ -96,7 +103,15 @@
 
                     <hr>
                     <div class="d-flex justify-content-between">
+                        {% if request.args.get('return_to') == 'work_orders' %}
+                        {% if request.args.get('return_view') == 'month' %}
+                        <a href="{{ url_for('parties.list_work_orders', view='month', year=request.args.get('return_year'), month=request.args.get('return_month')) }}" class="btn btn-outline-secondary">
+                        {% else %}
+                        <a href="{{ url_for('parties.list_work_orders', view='day', date=request.args.get('return_date')) }}" class="btn btn-outline-secondary">
+                        {% endif %}
+                        {% else %}
                         <a href="{{ url_for('parties.detail_party', party_id=party.id) }}" class="btn btn-outline-secondary">
+                        {% endif %}
                             <i class="bi bi-arrow-left"></i> İptal
                         </a>
                         <button type="submit" class="btn btn-primary">

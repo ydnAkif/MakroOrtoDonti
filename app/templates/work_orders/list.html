@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}İş Emirleri - {{ clinic_name }}{% endblock %}
+
+{% block content %}
+<header class="workspace-header">
+    <div><h1>İş emirleri</h1><p>Günlük veya aylık laboratuvar hareketlerini tek yerden yönetin.</p></div>
+    <div class="workspace-actions">
+        <a href="{{ url_for('parties.list_parties') }}" class="btn btn-primary"><i class="bi bi-plus-lg" aria-hidden="true"></i>Yeni iş emri</a>
+    </div>
+</header>
+
+<div class="workorder-period-bar">
+    <nav class="period-switch" aria-label="İş emri dönemi">
+        <a href="{{ url_for('parties.list_work_orders', view='day', date=today.isoformat()) }}" class="{% if view == 'day' %}active{% endif %}">Gün</a>
+        <a href="{{ url_for('parties.list_work_orders', view='month', year=today.year, month=today.month) }}" class="{% if view == 'month' %}active{% endif %}">Ay</a>
+    </nav>
+    {% if view == 'day' %}
+    <form method="GET" action="{{ url_for('parties.list_work_orders') }}" class="workorder-period-form">
+        <input type="hidden" name="view" value="day">
+        <label class="visually-hidden" for="workorder-date">Tarih</label>
+        <input class="form-control" type="date" id="workorder-date" name="date" value="{{ selected_date.isoformat() }}" onchange="this.form.submit()">
+        {% if selected_date != today %}<a href="{{ url_for('parties.list_work_orders') }}" class="btn btn-sm btn-outline-secondary">Bugün</a>{% endif %}
+    </form>
+    {% else %}
+    <form method="GET" action="{{ url_for('parties.list_work_orders') }}" class="workorder-period-form">
+        <input type="hidden" name="view" value="month">
+        <label class="visually-hidden" for="workorder-month">Ay</label>
+        <select class="form-select" id="workorder-month" name="month" onchange="this.form.submit()">
+            {% for month_number, month_name in months %}<option value="{{ month_number }}" {% if month_number == month %}selected{% endif %}>{{ month_name }}</option>{% endfor %}
+        </select>
+        <label class="visually-hidden" for="workorder-year">Yıl</label>
+        <select class="form-select" id="workorder-year" name="year" onchange="this.form.submit()">
+            {% for option_year in years %}<option value="{{ option_year }}" {% if option_year == year %}selected{% endif %}>{{ option_year }}</option>{% endfor %}
+        </select>
+    </form>
+    {% endif %}
+</div>
+
+<div class="summary-line workorder-summary" aria-label="{{ period_label }} özeti">
+    <div><span>Dönem</span><strong>{{ period_label }}</strong></div>
+    <div><span>İş emri</span><strong>{{ work_orders|length }}</strong></div>
+    <div><span>Doktor</span><strong>{{ doctor_count }}</strong></div>
+    <div><span>Toplam</span><strong>₺{{ "{:,.2f}".format(period_total) }}</strong></div>
+</div>
+
+<section class="work-panel" aria-labelledby="workorder-ledger-title">
+    <div class="work-panel__header">
+        <div><h2 id="workorder-ledger-title">{{ period_label }}</h2><p>{{ 'Günlük' if view == 'day' else 'Aylık' }} iş emri defteri</p></div>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle workorder-ledger">
+            <thead><tr><th>Tarih</th><th>Doktor</th><th>Hasta</th><th>Aparey</th><th class="text-end">Tutar</th><th class="text-end">İşlem</th></tr></thead>
+            <tbody>
+                {% for wo in work_orders %}
+                <tr>
+                    <td><time class="workorder-date" datetime="{{ wo.work_date.isoformat() }}">{{ wo.work_date.strftime('%d.%m.%Y') }}</time></td>
+                    <td><a href="{{ url_for('parties.detail_party', party_id=wo.party_id) }}">{{ wo.party.display_name if wo.party else '—' }}</a></td>
+                    <td>{{ wo.patient_name }}</td>
+                    <td class="workorder-apparatus">
+                        {% set items = wo.apparatus_type|fromjson %}
+                        {% if items is iterable and items is not string and items|length > 0 %}
+                            <strong>{{ items[0].name if items[0] is mapping else items[0] }}</strong>{% if items|length > 1 %}<small>+{{ items|length - 1 }} kalem</small>{% endif %}
+                        {% else %}<strong>{{ wo.apparatus_type }}</strong>{% endif %}
+                    </td>
+                    <td class="text-end fw-bold">₺{{ "{:,.2f}".format(wo.total_price) }}</td>
+                    <td class="text-end workorder-row-actions">
+                        <a href="{{ url_for('parties.edit_work_order', party_id=wo.party_id, wo_id=wo.id, return_to='work_orders', return_view=view, return_date=(selected_date.isoformat() if selected_date else none), return_year=(year if view == 'month' else none), return_month=(month if view == 'month' else none)) }}" class="btn btn-sm btn-outline-secondary" title="İş emrini düzenle" aria-label="{{ wo.patient_name }} iş emrini düzenle"><i class="bi bi-pencil" aria-hidden="true"></i></a>
+                        <form method="POST" action="{{ url_for('parties.delete_work_order', party_id=wo.party_id, wo_id=wo.id) }}" class="d-inline" onsubmit="return confirm('Bu iş emrini silmek istediğinize emin misiniz?');">
+                            <input type="hidden" name="return_to" value="work_orders">
+                            <input type="hidden" name="return_view" value="{{ view }}">
+                            {% if view == 'day' %}<input type="hidden" name="return_date" value="{{ selected_date.isoformat() }}">{% else %}<input type="hidden" name="return_year" value="{{ year }}"><input type="hidden" name="return_month" value="{{ month }}">{% endif %}
+                            <button type="submit" class="btn btn-sm btn-outline-danger" title="İş emrini sil" aria-label="{{ wo.patient_name }} iş emrini sil"><i class="bi bi-trash" aria-hidden="true"></i></button>
+                        </form>
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="6" class="empty-state"><strong>Bu dönemde iş emri yok.</strong><br><a href="{{ url_for('parties.list_parties') }}">Doktor seçerek ilk iş emrini girin.</a></td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

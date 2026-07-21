@@ -1,8 +1,8 @@
 {% extends "base.html" %}
-{% block title %}Diş Hekimleri - {{ clinic_name }}{% endblock %}
+{% block title %}Doktorlar - {{ clinic_name }}{% endblock %}
 
 {% block content %}
-<header class="workspace-header"><div><h1>Doktorlar ve iş emirleri</h1><p>Doktoru bulun ve iş emrini doğrudan başlatın.</p></div></header>
+<header class="workspace-header"><div><h1>Doktorlar</h1><p>Doktor kayıtlarını bulun ve yönetin.</p></div></header>
 <div class="toolbar-panel">
         <form method="GET" action="{{ url_for('parties.list_parties') }}">
             <div class="input-group">

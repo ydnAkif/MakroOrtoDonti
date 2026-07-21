@@ -1,12 +1,19 @@
 from flask import Blueprint, render_template, redirect, url_for, flash, request
 from flask_login import login_required
-from datetime import date
+from datetime import date, timedelta
+from decimal import Decimal
 
 from app.extensions import db
 from app.models.models import Party, PartyType, WorkOrder, Treatment, TreatmentCategory, ExchangeRate
 from app.authz import permissions_required
 
 parties_bp = Blueprint("parties", __name__)
+
+MONTHS = [
+    (1, "Ocak"), (2, "Şubat"), (3, "Mart"), (4, "Nisan"),
+    (5, "Mayıs"), (6, "Haziran"), (7, "Temmuz"), (8, "Ağustos"),
+    (9, "Eylül"), (10, "Ekim"), (11, "Kasım"), (12, "Aralık"),
+]
 
 
 def _get_treatments_by_category(category):
@@ -69,6 +76,61 @@ def list_parties():
         parties=parties,
         search=search,
         pagination=pagination,
+    )
+
+
+@parties_bp.route("/work-orders")
+@login_required
+@permissions_required("clinical.view")
+def list_work_orders():
+    """Daily/monthly operational ledger for all doctors' work orders."""
+    from app.services.validation_service import parse_date
+
+    today = date.today()
+    view = request.args.get("view", "day")
+    if view == "month":
+        year = request.args.get("year", today.year, type=int)
+        month = request.args.get("month", today.month, type=int)
+        try:
+            period_start = date(year, month, 1)
+        except ValueError:
+            year, month = today.year, today.month
+            period_start = date(year, month, 1)
+        period_end = date(year + (month == 12), month % 12 + 1, 1)
+        period_label = f"{MONTHS[month - 1][1]} {year}"
+        selected_date = None
+    else:
+        view = "day"
+        selected_date = parse_date(request.args.get("date", "")) or today
+        period_start = selected_date
+        period_end = selected_date + timedelta(days=1)
+        year, month = selected_date.year, selected_date.month
+        period_label = selected_date.strftime("%d.%m.%Y")
+
+    work_orders = db.session.execute(
+        db.select(WorkOrder)
+        .join(Party, WorkOrder.party_id == Party.id)
+        .where(
+            WorkOrder.work_date >= period_start,
+            WorkOrder.work_date < period_end,
+            Party.is_active == True,
+        )
+        .order_by(WorkOrder.work_date.desc(), WorkOrder.id.desc())
+    ).scalars().all()
+
+    return render_template(
+        "work_orders/list.html",
+        work_orders=work_orders,
+        view=view,
+        selected_date=selected_date,
+        year=year,
+        month=month,
+        months=MONTHS,
+        years=range(today.year - 3, today.year + 2),
+        period_label=period_label,
+        doctor_count=len({wo.party_id for wo in work_orders}),
+        period_total=sum((wo.total_price for wo in work_orders), Decimal("0.00")),
+        today=today,
     )
 
 
@@ -318,6 +380,18 @@ def edit_work_order(party_id, wo_id):
 
         db.session.commit()
         flash("İş emri güncellendi.", "success")
+        if request.form.get("return_to") == "work_orders":
+            view = request.form.get("return_view", "day")
+            if view == "month":
+                return redirect(url_for(
+                    "parties.list_work_orders", view="month",
+                    year=request.form.get("return_year", type=int),
+                    month=request.form.get("return_month", type=int),
+                ))
+            return redirect(url_for(
+                "parties.list_work_orders", view="day",
+                date=request.form.get("return_date", ""),
+            ))
         return redirect(url_for("parties.detail_party", party_id=party.id))
 
     from app.services.exchange_service import get_latest_rate, get_latest_usd_rate
@@ -341,4 +415,18 @@ def delete_work_order(party_id, wo_id):
     db.session.delete(wo)
     db.session.commit()
     flash("İş emri silindi.", "warning")
+    if request.form.get("return_to") == "work_orders":
+        view = request.form.get("return_view", "day")
+        if view == "month":
+            return redirect(url_for(
+                "parties.list_work_orders",
+                view="month",
+                year=request.form.get("return_year", type=int),
+                month=request.form.get("return_month", type=int),
+            ))
+        return redirect(url_for(
+            "parties.list_work_orders",
+            view="day",
+            date=request.form.get("return_date", ""),
+        ))
     return redirect(url_for("parties.detail_party", party_id=party_id))

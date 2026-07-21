@@ -16,13 +16,13 @@
 </header>
 <nav class="workflow-strip" aria-label="Klinik iş akışı">
     <a href="{{ url_for('parties.list_parties') }}"><span class="workflow-step">1</span><span><small>Doktorlar</small><strong>{{ total_patients }} aktif kayıt</strong></span></a>
-    <a href="{{ url_for('parties.list_parties') }}"><span class="workflow-step">2</span><span><small>Bu ayki iş emirleri</small><strong>{{ monthly_work_orders }} iş · ₺{{ "{:,.2f}".format(monthly_total_eur) }}</strong></span></a>
+    <a href="{{ url_for('parties.list_work_orders', view='month') }}"><span class="workflow-step">2</span><span><small>Bu ayki iş emirleri</small><strong>{{ monthly_work_orders }} iş · ₺{{ "{:,.2f}".format(monthly_total_eur) }}</strong></span></a>
     <a href="{{ url_for('makbuzlar.list_makbuzlar') }}"><span class="workflow-step">3</span><span><small>Makbuzlar</small><strong>{{ monthly_drafts }} taslak</strong></span></a>
     <a href="{{ url_for('payments.list_payments') }}"><span class="workflow-step">4</span><span><small>Tahsilat</small><strong>{{ awaiting_payment }} ödeme bekliyor</strong></span></a>
 </nav>
 {% if current_rate %}<div class="rate-line"><i class="bi bi-currency-exchange" aria-hidden="true"></i><span>Güncel kur</span><strong>1 EUR = ₺{{ "{:,.4f}".format(current_rate.eur_to_try) }}</strong><strong>1 USD = {% if current_usd_rate %}₺{{ "{:,.4f}".format(current_usd_rate) }}{% else %}—{% endif %}</strong><small>{{ current_rate.rate_date.strftime('%d.%m.%Y') }}</small></div>{% endif %}
 <section class="work-panel" aria-labelledby="recent-workorders-title">
-    <div class="work-panel__header"><div><h2 id="recent-workorders-title">Son iş emirleri</h2><p>En son eklenen beş kayıt</p></div><a href="{{ url_for('makbuzlar.list_makbuzlar') }}" class="text-link">Makbuzlara git <i class="bi bi-arrow-right" aria-hidden="true"></i></a></div>
+    <div class="work-panel__header"><div><h2 id="recent-workorders-title">Son iş emirleri</h2><p>En son eklenen beş kayıt</p></div><a href="{{ url_for('parties.list_work_orders', view='month') }}" class="text-link">Tüm iş emirleri <i class="bi bi-arrow-right" aria-hidden="true"></i></a></div>
     <div class="table-responsive"><table class="table table-hover align-middle compact-table">
         <thead><tr><th>Tarih</th><th>Doktor</th><th>Hasta</th><th>İşlem</th><th class="text-end">Tutar</th></tr></thead>
         <tbody>{% for wo in recent_work_orders %}<tr>

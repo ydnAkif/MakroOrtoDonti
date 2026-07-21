@@ -1,7 +1,8 @@
 <nav class="sidebar-nav" aria-label="Uygulama bölümleri">
     <div class="nav-section-label">Çalışma alanı</div>
     <ul class="nav flex-column">
-        <li class="nav-item"><a class="nav-link {% if 'parties' in request.endpoint|default('') %}active{% endif %}" href="{{ url_for('parties.list_parties') }}" {% if 'parties' in request.endpoint|default('') %}aria-current="page"{% endif %}><i class="bi bi-clipboard2-plus" aria-hidden="true"></i><span>Doktorlar ve iş emirleri</span></a></li>
+        <li class="nav-item"><a class="nav-link {% if 'parties' in request.endpoint|default('') and 'work_order' not in request.endpoint|default('') %}active{% endif %}" href="{{ url_for('parties.list_parties') }}" {% if 'parties' in request.endpoint|default('') and 'work_order' not in request.endpoint|default('') %}aria-current="page"{% endif %}><i class="bi bi-person-vcard" aria-hidden="true"></i><span>Doktorlar</span></a></li>
+        <li class="nav-item"><a class="nav-link {% if 'work_order' in request.endpoint|default('') %}active{% endif %}" href="{{ url_for('parties.list_work_orders') }}" {% if 'work_order' in request.endpoint|default('') %}aria-current="page"{% endif %}><i class="bi bi-clipboard2-check" aria-hidden="true"></i><span>İş emirleri</span></a></li>
         <li class="nav-item"><a class="nav-link {% if 'makbuzlar' in request.endpoint|default('') %}active{% endif %}" href="{{ url_for('makbuzlar.list_makbuzlar') }}" {% if 'makbuzlar' in request.endpoint|default('') %}aria-current="page"{% endif %}><i class="bi bi-receipt" aria-hidden="true"></i><span>Makbuzlar</span></a></li>
         <li class="nav-item"><a class="nav-link {% if 'payment' in request.endpoint|default('') %}active{% endif %}" href="{{ url_for('payments.list_payments') }}" {% if 'payment' in request.endpoint|default('') %}aria-current="page"{% endif %}><i class="bi bi-wallet2" aria-hidden="true"></i><span>Tahsilatlar</span></a></li>
     </ul>

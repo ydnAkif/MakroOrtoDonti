@@ -472,7 +472,7 @@ def test_party_list_enum_badges(client, app):
     response = client.get("/parties/")
     assert response.status_code == 200
     html = response.get_data(as_text=True)
-    assert "Diş Hekimleri" in html
+    assert "Doktorlar" in html
     assert "Dr. Badge Test 1" in html
     assert "Dr. Badge Test 2" in html
 
@@ -778,6 +778,89 @@ def test_party_work_order_totals_on_detail(client, app):
     response = client.get(f"/parties/{party_id}")
     assert response.status_code == 200
     assert "600.00" in response.get_data(as_text=True)
+
+
+def test_work_order_ledger_filters_by_day_and_month(client, app):
+    login(client, "admin", "admin-pass")
+    today = date.today()
+    previous_month_date = today.replace(day=1) - timedelta(days=1)
+
+    with app.app_context():
+        party = db.session.execute(
+            db.select(Party).where(Party.party_type == PartyType.DENTIST).limit(1)
+        ).scalar_one()
+        today_order = WorkOrder(
+            party_id=party.id, work_date=today, apparatus_type="Günlük Test Apareyi",
+            patient_name="Bugünkü Hasta", apparatus_price=Decimal("700"),
+            extra_price=Decimal("0"), total_price=Decimal("700"),
+        )
+        previous_order = WorkOrder(
+            party_id=party.id, work_date=previous_month_date,
+            apparatus_type="Aylık Test Apareyi", patient_name="Önceki Ay Hastası",
+            apparatus_price=Decimal("900"), extra_price=Decimal("0"),
+            total_price=Decimal("900"),
+        )
+        db.session.add_all([today_order, previous_order])
+        db.session.commit()
+        party_id, today_order_id = party.id, today_order.id
+
+    day_html = client.get("/parties/work-orders").get_data(as_text=True)
+    assert "Bugünkü Hasta" in day_html
+    assert "Önceki Ay Hastası" not in day_html
+    assert f"/work-orders/{today_order_id}/edit" in day_html
+
+    edit_response = client.post(
+        f"/parties/{party_id}/work-orders/{today_order_id}/edit",
+        data={
+            "work_date": today.isoformat(),
+            "apparatus_type": "Düzenlenen Aparey",
+            "patient_name": "Düzenlenen Hasta",
+            "apparatus_price": "750",
+            "extra_price": "0",
+            "return_to": "work_orders",
+            "return_view": "day",
+            "return_date": today.isoformat(),
+        },
+        follow_redirects=False,
+    )
+    assert edit_response.status_code == 302
+    assert "/parties/work-orders?" in edit_response.location
+
+    month_html = client.get(
+        f"/parties/work-orders?view=month&year={previous_month_date.year}&month={previous_month_date.month}"
+    ).get_data(as_text=True)
+    assert "Önceki Ay Hastası" in month_html
+    assert "Bugünkü Hasta" not in month_html
+
+
+def test_work_order_delete_returns_to_ledger(client, app):
+    login(client, "admin", "admin-pass")
+    with app.app_context():
+        party = db.session.execute(
+            db.select(Party).where(Party.party_type == PartyType.DENTIST).limit(1)
+        ).scalar_one()
+        work_order = WorkOrder(
+            party_id=party.id, work_date=date.today(), apparatus_type="Silinecek",
+            patient_name="Silinecek Hasta", apparatus_price=Decimal("100"),
+            extra_price=Decimal("0"), total_price=Decimal("100"),
+        )
+        db.session.add(work_order)
+        db.session.commit()
+        party_id, work_order_id = party.id, work_order.id
+
+    response = client.post(
+        f"/parties/{party_id}/work-orders/{work_order_id}/delete",
+        data={
+            "return_to": "work_orders",
+            "return_view": "day",
+            "return_date": date.today().isoformat(),
+        },
+        follow_redirects=False,
+    )
+    assert response.status_code == 302
+    assert "/parties/work-orders?" in response.location
+    with app.app_context():
+        assert db.session.get(WorkOrder, work_order_id) is None
 
 
 # ==================== PARTY TESTS ====================
