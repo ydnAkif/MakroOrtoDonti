@@ -34,17 +34,59 @@ def tr_fold(value) -> str:
     return str(value).translate(_FOLD_MAP).lower()
 
 
+# --- Türkçe alfabetik sıralama --------------------------------------------
+# Aramanın aksine sıralama harfleri KATLAMAZ; her harf Türk alfabesindeki
+# gerçek yerine yerleştirilir: ç, c'den SONRA; ı, i'den ÖNCE; ğ>g, ö>o, ş>s,
+# ü>u. Türkçede olmayan q/w/x Latin komşularına eklenir.
+_TR_LOWER = str.maketrans({"İ": "i", "I": "ı"})
+
+# Sıralama önceliği: boşluk < rakam < Türk alfabesi (yabancı q/w/x dahil).
+_TR_ALPHABET = "abcçdefgğhıijklmnoöpqrsştuüvwxyz"
+_SORT_MASTER = " 0123456789" + _TR_ALPHABET
+_SORT_RANK = {ch: idx for idx, ch in enumerate(_SORT_MASTER)}
+# Bilinmeyen karakterler (noktalama, aksanlı harfler) harflerden sonra gelsin.
+_UNKNOWN_RANK = len(_SORT_MASTER)
+
+
+def tr_collation_key(value) -> str:
+    """Metni, ikili (binary) karşılaştırmayla Türk alfabesi sırasını veren bir
+    anahtara dönüştürür. Her karakter, Türkçe sıradaki konumuna göre tek bir
+    ASCII bayta eşlenir; böylece SQLite'ın varsayılan BINARY harmanı doğru
+    Türkçe sırayı üretir."""
+    if value is None:
+        return ""
+    text = str(value).translate(_TR_LOWER).lower()
+    out = []
+    for ch in text:
+        rank = _SORT_RANK.get(ch)
+        if rank is None:
+            out.append(chr(0x30 + _UNKNOWN_RANK))
+            out.append(ch)
+        else:
+            out.append(chr(0x30 + rank))
+    return "".join(out)
+
+
 def _sqlite_tr_fold(value):
     if value is None:
         return None
     return tr_fold(value)
 
 
+def _sqlite_tr_sort_key(value):
+    if value is None:
+        return None
+    return tr_collation_key(value)
+
+
 @event.listens_for(Engine, "connect")
-def _register_sqlite_tr_fold(dbapi_connection, connection_record):
+def _register_sqlite_functions(dbapi_connection, connection_record):
     if isinstance(dbapi_connection, sqlite3.Connection):
         dbapi_connection.create_function(
             "tr_fold", 1, _sqlite_tr_fold, deterministic=True
+        )
+        dbapi_connection.create_function(
+            "tr_sort_key", 1, _sqlite_tr_sort_key, deterministic=True
         )
 
 
@@ -71,14 +113,14 @@ def tr_equals(column, query_text: str):
 
 
 def tr_order(column):
-    """Türkçe-duyarlı ORDER BY ifadesi.
+    """Türkçe alfabetik ORDER BY ifadesi.
 
     SQLite kod noktasına göre sıraladığından Ç/Ö/Ş/Ü/Ğ/İ gibi harfler 'z'den
-    sonra gelir ve liste sonuna yığılır. ASCII iskelete indirgeyerek doğru
-    harmanlama sağlanır (Çağla → "cagla", C'lerin arasına girer). Not: bu
-    katlama ı/i, ö/o gibi harfleri aynı sıraya koyar; klinik listesi için
-    kabul edilebilir bir yaklaşımdır.
+    sonra gelip liste sonuna yığılır. ``tr_sort_key`` her harfi Türk
+    alfabesindeki gerçek konumuna yerleştirir: Canan < Çağla (ç, c'den sonra),
+    Irmak < İpek (ı, i'den önce), o < ö, s < ş, u < ü, g < ğ. SQLite dışı bir
+    veritabanında ``lower()`` tabanlı yaklaşık davranışa düşülür.
     """
     if _is_sqlite():
-        return func.tr_fold(column)
+        return func.tr_sort_key(column)
     return func.lower(column)

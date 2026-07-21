@@ -8,7 +8,7 @@ from openpyxl import Workbook
 
 from app.extensions import db
 from app.models.models import Party, PartyType, Treatment
-from app.services.search_service import tr_fold, tr_order
+from app.services.search_service import tr_collation_key, tr_fold, tr_order
 
 from conftest import login
 
@@ -36,11 +36,32 @@ def _seed_dentist(app, name, phone=None):
         return party.id
 
 
+class TestTurkishCollationKey:
+    def test_c_before_c_cedilla(self):
+        assert tr_collation_key("Canan") < tr_collation_key("Çağla")
+        assert tr_collation_key("Cem") < tr_collation_key("Çınar")
+
+    def test_dotless_i_before_dotted_i(self):
+        # Türk alfabesi: ... h, ı, i, j ... → ı, i'den önce gelir
+        assert tr_collation_key("Irmak") < tr_collation_key("İpek")
+        assert tr_collation_key("Ilgın") < tr_collation_key("İbrahim")
+
+    def test_other_turkish_letters_follow_base(self):
+        assert tr_collation_key("Oya") < tr_collation_key("Ömer")
+        assert tr_collation_key("Sevil") < tr_collation_key("Şeyma")
+        assert tr_collation_key("Ufuk") < tr_collation_key("Ümit")
+        assert tr_collation_key("gokhan") < tr_collation_key("ğ")
+
+    def test_none_and_empty(self):
+        assert tr_collation_key(None) == ""
+        assert tr_collation_key("") == ""
+
+
 class TestTurkishOrdering:
-    def test_turkish_letters_interleave_not_after_z(self, app):
+    def test_db_order_matches_turkish_alphabet(self, app):
         names = [
-            "Büşra", "Çağla", "Canan", "Oya", "Ömer", "Parla", "Sevil",
-            "Şule", "Yusuf", "Zümrüt",
+            "Büşra", "Canan", "Çağla", "Çınar", "Irmak", "İpek", "Oya",
+            "Ömer", "Sevil", "Şule", "Ufuk", "Ümit", "Yusuf", "Zümrüt",
         ]
         with app.app_context():
             for n in names:
@@ -56,14 +77,12 @@ class TestTurkishOrdering:
                 if n in names
             ]
 
-        # DB order must match Python's Turkish-folded sort exactly: Ç inside
-        # the C block, Ö with O, Ş with S — not clustered after Z.
-        assert ordered == sorted(names, key=tr_fold)
-        # Concretely: Ç sits between B and C, not at the end.
-        assert ordered.index("Çağla") < ordered.index("Canan")
-        assert ordered.index("Büşra") < ordered.index("Çağla")
-        # Ö clusters with O; the two O-names are adjacent.
-        assert abs(ordered.index("Ömer") - ordered.index("Oya")) == 1
+        # DB order must match true Turkish alphabetical order.
+        assert ordered == sorted(names, key=tr_collation_key)
+        # Concrete rules the user called out:
+        assert ordered.index("Canan") < ordered.index("Çağla")  # ç, c'den sonra
+        assert ordered.index("Irmak") < ordered.index("İpek")   # ı, i'den önce
+        assert ordered[-1] == "Zümrüt"
 
     def test_list_page_orders_turkish_names_correctly(self, client, app):
         login(client, "admin", "admin-pass")
@@ -72,8 +91,13 @@ class TestTurkishOrdering:
                 db.session.add(Party(party_type=PartyType.DENTIST, name=n))
             db.session.commit()
         html = client.get("/parties/").get_data(as_text=True)
-        # Çağla appears before Canan and before Zümrüt in the rendered order
-        assert html.index("Çağla") < html.index("Canan") < html.index("Zümrüt")
+        # True Turkish order: Ahmet < Canan < Çağla < Zümrüt
+        assert (
+            html.index("Ahmet")
+            < html.index("Canan")
+            < html.index("Çağla")
+            < html.index("Zümrüt")
+        )
 
 
 class TestPartySearch:

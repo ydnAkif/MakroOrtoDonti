@@ -122,7 +122,7 @@ Oturum `data/whatsapp_session.db` dosyasında saklanır; uygulama yeniden başla
 
 Diş hekimi, tahsilat ve işlem kataloğu aramaları ile sayfa içi filtreler Türkçe karakterlere duyarlıdır: sorgu ve kayıt ortak ASCII iskelete indirgenir (İ/ı→i, Ş/ş→s, Ğ/ğ→g, Ü/ü→u, Ö/ö→o, Ç/ç→c). Böylece "pinar" araması "Pınar"ı, "busra" araması "Büşra"yı bulur; telefon aramasında boşluk ve tire yok sayılır. SQLite bağlantılarına `tr_fold` fonksiyonu otomatik kaydedilir (`app/services/search_service.py`). Excel'den doktor içe aktarma da aynı katlamayla **yalnızca isme göre** eşleştirir; aynı telefonu paylaşan farklı isimli kayıtlar (ör. iki şubeli klinik) ayrı satır olarak korunur.
 
-**Sıralama:** Listeler de aynı katlamayla (`tr_order`) sıralanır; SQLite Türkçe harfleri 'z'den sonra sıraladığı için Ç/Ö/Ş/Ü/Ğ/İ ile başlayan isimler son sayfalara yığılmaz, kendi harf bloklarına girer (Çağla, C'lerin arasında).
+**Sıralama:** Listeler gerçek Türk alfabesi sırasına göre sıralanır (`tr_order` → `tr_sort_key`). SQLite Türkçe harfleri 'z'den sonra sıraladığı için son sayfalara yığılmayı önlemenin yanı sıra, her harf doğru konumuna girer: **ç, c'den sonra** (Canan < Çağla), **ı, i'den önce** (Irmak < İpek), o < ö, s < ş, u < ü, g < ğ. Not: arama katlaması (`tr_fold`) ile sıralama anahtarı (`tr_sort_key`) ayrı çalışır — arama harfleri eşitler, sıralama Türk alfabesindeki yerine koyar.
 
 **Sayfalı liste araması:** Diş hekimi, hasta ve işlem kataloğu arama kutuları yazdıkça (kısa gecikmeyle) sunucuya gidip **tüm veritabanında** arama yapar — yalnızca o an görünen sayfayı filtrelemez. Böylece aranan kayıt hangi sayfada olursa olsun bulunur.
 
