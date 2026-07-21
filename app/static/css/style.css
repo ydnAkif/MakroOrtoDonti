@@ -661,3 +661,9 @@ textarea.form-control { min-height: 92px; }
 @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
 }
+
+/* WhatsApp connection indicator (sidebar) */
+.wa-status-dot { display: inline-block; width: .45rem; height: .45rem; margin-left: auto; border-radius: 50%; flex-shrink: 0; background: var(--ink-300, #adb5bd); }
+.wa-status-connected { background: #22a06b; box-shadow: 0 0 0 3px rgba(34, 160, 107, .18); }
+.wa-status-connecting { background: var(--amber-500, #d8a03b); box-shadow: 0 0 0 3px rgba(216, 160, 59, .18); }
+.wa-status-disconnected { background: var(--ink-300, #adb5bd); }

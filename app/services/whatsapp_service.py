@@ -36,6 +36,7 @@ class WhatsAppService:
     _pair_code: Optional[str] = None  # current pair code while pairing
     _state_lock = threading.RLock()
     _send_lock = threading.Lock()
+    _pair_wait_seconds = 30.0  # how long PairPhone waits for pairing mode
     _process_lock_handle = None  # flock handle marking this process as owner
     _session_dir = os.path.join(
         os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
@@ -298,7 +299,7 @@ class WhatsAppService:
     def _request_pair_code(cls, phone: str) -> None:
         # PairPhone needs the socket up; wait until the first QR arrives
         # (pairing mode) or we are already connected.
-        deadline = time.monotonic() + 30
+        deadline = time.monotonic() + cls._pair_wait_seconds
         while time.monotonic() < deadline:
             with cls._state_lock:
                 if cls._connected:
@@ -338,6 +339,16 @@ class WhatsAppService:
             return {"success": True, "message": "WhatsApp bağlantısı kesildi."}
         except Exception as e:
             return {"success": False, "message": f"Hata: {str(e)}"}
+
+    @classmethod
+    def quick_state(cls) -> str:
+        """Cheap in-memory state for UI badges; never touches the DB."""
+        with cls._state_lock:
+            if cls._connected:
+                return "connected"
+            if cls._thread is not None and cls._thread.is_alive():
+                return "connecting"
+            return "disconnected"
 
     @classmethod
     def get_status(cls) -> dict:

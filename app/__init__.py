@@ -125,11 +125,18 @@ def create_app(config_class=Config) -> Flask:
             args["page"] = page
             return url_for(request.endpoint, **(request.view_args or {}), **args)
 
+        try:
+            from .services.whatsapp_service import WhatsAppService
+            whatsapp_state = WhatsAppService.quick_state()
+        except Exception:
+            whatsapp_state = "disconnected"
+
         return {
             "clinic_name": clinic_name,
             "rate_health": rate_health,
             "auto_rate_error": auto_rate_error,
             "page_url": page_url,
+            "whatsapp_state": whatsapp_state,
             "party_type_labels": {
                 "dentist": "Diş Hekimleri",
                 "": "Diş Hekimleri",
@@ -160,5 +167,8 @@ def create_app(config_class=Config) -> Flask:
     # Auto-reconnect WhatsApp in the background if a paired session exists.
     from .services.whatsapp_service import WhatsAppService
     WhatsAppService.init_app(app)
+
+    from .services.makbuz_send_queue import MakbuzSendQueue
+    MakbuzSendQueue.init_app(app)
 
     return app

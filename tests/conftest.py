@@ -40,6 +40,14 @@ def _reset_whatsapp_state(tmp_path_factory, monkeypatch):
     monkeypatch.setattr(WhatsAppService, "_connected", False)
     monkeypatch.setattr(WhatsAppService, "_qr_code", None)
     monkeypatch.setattr(WhatsAppService, "_pair_code", None)
+    monkeypatch.setattr(WhatsAppService, "_pair_wait_seconds", 0.5)
+
+    from app.services.makbuz_send_queue import MakbuzSendQueue
+
+    monkeypatch.setattr(MakbuzSendQueue, "_app", None)
+    monkeypatch.setattr(MakbuzSendQueue, "_job", None)
+    monkeypatch.setattr(MakbuzSendQueue, "_thread", None)
+    monkeypatch.setattr(MakbuzSendQueue, "_delay_seconds", 0)
     yield
     handle = WhatsAppService._process_lock_handle
     if handle is not None:

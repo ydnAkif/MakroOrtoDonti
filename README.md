@@ -108,7 +108,9 @@ WhatsApp gönderimi [Neonize](https://github.com/krypton-byte/neonize) (WhatsApp
 3. Telefonunuzda WhatsApp > Bağlı Cihazlar > Cihaz Bağla ile QR kodu tarayın. (Telefon numarası girerseniz QR yerine eşleştirme kodu gösterilir.)
 4. Tarama sonrası sayfa otomatik olarak "Bağlı" durumuna geçer.
 
-Oturum `data/whatsapp_session.db` dosyasında saklanır; uygulama yeniden başlatıldığında bu dosya varsa arka planda otomatik yeniden bağlanır, tekrar QR taraması gerekmez.
+Oturum `data/whatsapp_session.db` dosyasında saklanır; uygulama yeniden başlatıldığında bu dosya varsa arka planda otomatik yeniden bağlanır, tekrar QR taraması gerekmez. Kenar çubuğundaki WhatsApp menüsünde bağlantı durumu (yeşil/sarı/gri nokta) görünür; bağlantı yokken Genel Bakış sayfası "Bağlan" yönlendirmesi gösterir.
+
+**Makbuz gönderimi (WhatsApp sayfasından):** WhatsApp sayfasındaki "Makbuz Gönderimi" paneli seçilen dönemin makbuzlu doktorlarını listeler. Doktorlar tek tek veya "Gönderilmemişleri Seç" ile toplu seçilir; gönderim arka planda kuyruk olarak çalışır (doktorlar arasında 3 saniye bekleme), ilerleme sayfada canlı izlenir. Her başarılı gönderimde makbuz "Gönderildi" durumuna geçer. Aynı anda tek toplu gönderim çalışır; telefonu olmayan doktorlar seçilemez ve dönemde makbuzu oluşturulmamış doktor varsa panel Makbuzlar sayfasına yönlendirir.
 
 **Tek worker zorunluluğu:** WhatsApp istemcisi süreç içinde tek bir arka plan thread'inde çalışır ve oturum dosyası süreçler arasında paylaşılamaz. Gunicorn **`--workers 1`** ile çalıştırılmalıdır. Yanlışlıkla çok worker başlatılırsa `data/whatsapp.worker.lock` üzerindeki dosya kilidi sayesinde istemciyi yalnız bir worker sahiplenir; diğer worker'lardaki gönderimler açık bir hata mesajıyla reddedilir.
 

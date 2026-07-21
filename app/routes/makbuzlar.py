@@ -84,17 +84,9 @@ def _generate_makbuz(party_id: int, year: int, month: int, vat_applied: bool, va
 
 
 def _send_makbuz(makbuz: Makbuz) -> tuple[bool, str]:
-    from app.services.makbuz_pdf_service import generate_makbuz_pdf
-    from app.services.whatsapp_service import WhatsAppService
+    from app.services.makbuz_send_queue import send_makbuz_via_whatsapp
 
-    work_orders = _work_orders_for_period(makbuz.party_id, makbuz.year, makbuz.month)
-    pdf_bytes = generate_makbuz_pdf(makbuz, work_orders)
-    result = WhatsAppService.send_makbuz_message(makbuz, pdf_bytes)
-    if result["success"]:
-        makbuz.status = Makbuz.STATUS_SENT
-        makbuz.sent_at = datetime.now().astimezone()
-        db.session.commit()
-    return result["success"], result["message"]
+    return send_makbuz_via_whatsapp(makbuz.id)
 
 
 @makbuzlar_bp.route("/")

@@ -8,6 +8,7 @@ from __future__ import annotations
 import os
 import threading
 import time
+from datetime import date
 from unittest.mock import MagicMock, patch
 
 from conftest import login
@@ -221,6 +222,175 @@ class TestConnectFlow:
             assert status["pair_code"] == "ABCD-1234"
 
 
+class TestErrorPaths:
+    def test_init_app_skips_reloader_parent(self, app):
+        with open(WhatsAppService.session_db_path(), "wb") as f:
+            f.write(b"")
+        app.testing = False
+        old_debug = app.debug
+        app.debug = True  # debug without WERKZEUG_RUN_MAIN == reloader parent
+        try:
+            with patch.object(WhatsAppService, "start") as mock_start:
+                WhatsAppService.init_app(app)
+                time.sleep(0.2)
+                assert not mock_start.called
+        finally:
+            app.testing = True
+            app.debug = old_debug
+
+    def test_init_app_respects_auto_connect_config(self, app):
+        with open(WhatsAppService.session_db_path(), "wb") as f:
+            f.write(b"")
+        app.testing = False
+        app.config["WHATSAPP_AUTO_CONNECT"] = False
+        try:
+            with patch.object(WhatsAppService, "start") as mock_start:
+                WhatsAppService.init_app(app)
+                time.sleep(0.2)
+                assert not mock_start.called
+        finally:
+            app.testing = True
+            app.config.pop("WHATSAPP_AUTO_CONNECT")
+
+    def test_process_lock_flock_failure(self, app):
+        with patch("fcntl.flock", side_effect=OSError("locked by other worker")):
+            assert WhatsAppService._acquire_process_lock() is False
+        assert WhatsAppService._process_lock_handle is None
+
+    def test_run_survives_connect_exception(self, app):
+        mock_client = MagicMock()
+        mock_client.connect.side_effect = RuntimeError("socket error")
+        WhatsAppService._app = app
+        with patch.object(WhatsAppService, "get_client", return_value=mock_client):
+            assert WhatsAppService.start() is True
+        assert _wait_until(lambda: WhatsAppService._client is None)
+        assert WhatsAppService._connected is False
+
+    def test_on_pair_status_stores_phone(self, app):
+        WhatsAppService._app = app
+        WhatsAppService._qr_code = "2@qr"
+        event = MagicMock()
+        event.ID.User = "905551112233"
+        WhatsAppService._on_pair_status(MagicMock(), event)
+
+        assert WhatsAppService._qr_code is None
+        with app.app_context():
+            row = db.session.execute(
+                db.select(WhatsAppSession).where(WhatsAppSession.session_id == "default")
+            ).scalar_one()
+            assert row.phone_number == "905551112233"
+
+    def test_on_pair_status_tolerates_bad_event(self, app):
+        WhatsAppService._app = app
+        event = MagicMock()
+        type(event).ID = property(lambda self: (_ for _ in ()).throw(ValueError()))
+        WhatsAppService._on_pair_status(MagicMock(), event)  # must not raise
+
+    def test_on_connected_without_me_info(self, app):
+        WhatsAppService._app = app
+        client = MagicMock()
+        client.me = None
+        WhatsAppService._on_connected(client, None)
+        assert WhatsAppService._connected is True
+        with app.app_context():
+            row = db.session.execute(
+                db.select(WhatsAppSession).where(WhatsAppSession.session_id == "default")
+            ).scalar_one()
+            assert row.status == WhatsAppSession.STATUS_CONNECTED
+            assert row.phone_number is None
+
+    def test_on_connected_me_access_error(self, app):
+        WhatsAppService._app = app
+        client = MagicMock()
+        type(client.me).JID = property(lambda self: (_ for _ in ()).throw(ValueError()))
+        WhatsAppService._on_connected(client, None)
+        assert WhatsAppService._connected is True
+
+    def test_update_session_row_commit_failure_is_logged(self, app):
+        WhatsAppService._app = app
+        with patch("app.services.whatsapp_service.db.session.commit", side_effect=RuntimeError("db gone")):
+            WhatsAppService._update_session_row(status="connecting")  # must not raise
+
+    def test_update_session_row_without_app_context(self):
+        WhatsAppService._app = None
+        WhatsAppService._update_session_row(status="connecting")  # must not raise
+
+    def test_request_pair_code_without_client(self, app):
+        WhatsAppService._client = None
+        WhatsAppService._qr_code = "2@qr"
+        WhatsAppService._request_pair_code("905551234567")
+        assert WhatsAppService._pair_code is None
+
+    def test_request_pair_code_skipped_when_already_connected(self, app):
+        mock_client = MagicMock()
+        WhatsAppService._client = mock_client
+        WhatsAppService._connected = True
+        WhatsAppService._request_pair_code("905551234567")
+        assert not mock_client.PairPhone.called
+
+    def test_request_pair_code_failure_logged(self, app):
+        mock_client = MagicMock()
+        mock_client.PairPhone.side_effect = RuntimeError("pair refused")
+        WhatsAppService._client = mock_client
+        WhatsAppService._qr_code = "2@qr"
+        WhatsAppService._app = app
+        WhatsAppService._request_pair_code("905551234567")
+        assert WhatsAppService._pair_code is None
+
+    def test_disconnect_survives_stop_failure(self, app):
+        mock_client = MagicMock()
+        mock_client.stop.side_effect = RuntimeError("already stopped")
+        WhatsAppService._client = mock_client
+        WhatsAppService._app = app
+        with app.app_context():
+            result = WhatsAppService.disconnect()
+        assert result["success"] is True
+
+    def test_disconnect_reports_unexpected_error(self, app):
+        with patch.object(WhatsAppService, "_update_session_row", side_effect=RuntimeError("boom")):
+            result = WhatsAppService.disconnect()
+        assert result["success"] is False
+
+    def test_get_status_connecting_while_thread_alive(self, app):
+        release = threading.Event()
+        thread = threading.Thread(target=release.wait, args=(5,), daemon=True)
+        thread.start()
+        WhatsAppService._thread = thread
+        try:
+            with app.app_context():
+                status = WhatsAppService.get_status()
+            assert status["connecting"] is True
+            assert status["status"] == "connecting"
+        finally:
+            release.set()
+
+    def test_get_status_qr_image_generation_failure(self, app):
+        WhatsAppService._qr_code = "2@qr"
+        with patch("segno.make_qr", side_effect=RuntimeError("no qr")):
+            with app.app_context():
+                status = WhatsAppService.get_status()
+        assert status["qr"] == "2@qr"
+        assert status["qr_image"] is None
+
+    def test_send_document_not_connected(self, app):
+        result = WhatsAppService.send_document("+905551112233", b"%PDF", "a.pdf")
+        assert result["success"] is False
+
+    def test_send_document_client_none(self, app):
+        WhatsAppService._connected = True
+        with patch.object(WhatsAppService, "get_client", return_value=None):
+            result = WhatsAppService.send_document("+905551112233", b"%PDF", "a.pdf")
+        assert result["success"] is False
+
+    def test_send_document_error(self, app):
+        mock_client = MagicMock()
+        mock_client.send_document.side_effect = RuntimeError("upload failed")
+        WhatsAppService._client = mock_client
+        WhatsAppService._connected = True
+        result = WhatsAppService.send_document("+905551112233", b"%PDF", "a.pdf")
+        assert result["success"] is False
+
+
 class TestSending:
     def test_send_message_serialized_and_uses_jid(self, app):
         mock_client = MagicMock()
@@ -255,3 +425,91 @@ class TestSending:
         doc_kwargs = mock_client.send_document.call_args.kwargs
         assert doc_kwargs["filename"] == "makbuz_2026_06_7.pdf"
         assert doc_kwargs["mimetype"] == "application/pdf"
+
+    def _makbuz_mock(self, vat_applied=False):
+        makbuz = MagicMock()
+        makbuz.party.name = "Dr. Test"
+        makbuz.party.phone = "+905551112233"
+        makbuz.party.id = 7
+        makbuz.month = 6
+        makbuz.year = 2026
+        makbuz.work_order_count = 3
+        makbuz.subtotal = 1000.0
+        makbuz.vat_applied = vat_applied
+        makbuz.vat_rate = 20.0
+        makbuz.vat_amount = 200.0
+        makbuz.grand_total = 1200.0 if vat_applied else 1000.0
+        return makbuz
+
+    def test_send_makbuz_message_with_vat_line(self, app):
+        mock_client = MagicMock()
+        WhatsAppService._client = mock_client
+        WhatsAppService._connected = True
+
+        result = WhatsAppService.send_makbuz_message(self._makbuz_mock(vat_applied=True), b"%PDF")
+        assert result["success"] is True
+        text = mock_client.send_message.call_args.args[1]
+        assert "KDV" in text
+
+    def test_send_makbuz_message_stops_when_text_fails(self, app):
+        mock_client = MagicMock()
+        mock_client.send_message.side_effect = RuntimeError("offline")
+        WhatsAppService._client = mock_client
+        WhatsAppService._connected = True
+
+        result = WhatsAppService.send_makbuz_message(self._makbuz_mock(), b"%PDF")
+        assert result["success"] is False
+        assert not mock_client.send_document.called
+
+    def test_send_invoice_message_legacy_patient_phone(self, app):
+        mock_client = MagicMock()
+        WhatsAppService._client = mock_client
+        WhatsAppService._connected = True
+
+        invoice = MagicMock()
+        invoice.party = None
+        invoice.patient.phone = "+905551112233"
+        invoice.patient.full_name = "Ayşe Yılmaz"
+        invoice.invoice_date = date(2026, 7, 1)
+        invoice.invoice_number = "MKR-1"
+        invoice.total_try = 4000.0
+        invoice.total_eur = 100.0
+        invoice.status = "pending"
+        invoice.due_date = date(2026, 7, 15)
+
+        result = WhatsAppService.send_invoice_message(invoice)
+        assert result["success"] is True
+        text = mock_client.send_message.call_args.args[1]
+        assert "Ayşe Yılmaz" in text
+        assert "Son Ödeme: 15.07.2026" in text
+
+    def test_send_reminder_success(self, app):
+        mock_client = MagicMock()
+        WhatsAppService._client = mock_client
+        WhatsAppService._connected = True
+        patient = MagicMock()
+        patient.phone = "+905551112233"
+        result = WhatsAppService.send_reminder(patient, "Randevu hatırlatması")
+        assert result["success"] is True
+
+
+class TestRoutes:
+    def test_send_bulk_counts_failures(self, client, app):
+        login(client, "admin", "admin-pass")
+        from app.models.models import Party
+
+        with app.app_context():
+            party_id = db.session.execute(db.select(Party.id).limit(1)).scalar_one()
+
+        with patch(
+            "app.services.whatsapp_service.WhatsAppService.send_message",
+            return_value={"success": False, "message": "WhatsApp bağlı değil."},
+        ):
+            with patch("time.sleep"):
+                response = client.post(
+                    "/whatsapp/send-bulk",
+                    data={"message": "test", "patient_ids": [str(party_id), "999999"]},
+                    follow_redirects=True,
+                )
+        assert response.status_code == 200
+        assert "1 başarısız".encode() in response.data

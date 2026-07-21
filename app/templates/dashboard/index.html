@@ -2,6 +2,38 @@
 {% block title %}Genel Bakış - {{ clinic_name }}{% endblock %}
 
 {% block content %}
+{% if whatsapp_state != 'connected' %}
+<div
+  id="wa-connect-banner"
+  class="alert alert-warning alert-dismissible fade show d-none align-items-center mb-4"
+  role="alert"
+>
+  <i class="bi bi-whatsapp me-2"></i>
+  <strong>WhatsApp bağlı değil.</strong>
+  Makbuz ve mesaj gönderebilmek için bağlantıyı kurun.
+  <a href="{{ url_for('whatsapp.index') }}" class="btn btn-sm btn-success ms-2">
+    <i class="bi bi-qr-code-scan"></i> Bağlan
+  </a>
+  <button
+    type="button"
+    class="btn-close"
+    data-bs-dismiss="alert"
+    aria-label="Kapat"
+  ></button>
+</div>
+<script>
+  (function () {
+    var banner = document.getElementById("wa-connect-banner");
+    if (!banner) return;
+    if (!sessionStorage.getItem("waBannerDismissed")) {
+      banner.classList.remove("d-none");
+    }
+    banner.addEventListener("closed.bs.alert", function () {
+      sessionStorage.setItem("waBannerDismissed", "1");
+    });
+  })();
+</script>
+{% endif %}
 <section class="dashboard-hero" aria-labelledby="dashboard-title">
     <div class="dashboard-hero-content">
         <span class="page-eyebrow text-white-50">Klinik özeti</span>

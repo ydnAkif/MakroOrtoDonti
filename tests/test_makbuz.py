@@ -31,6 +31,58 @@ def _add_work_order(app, party_id, work_date, apparatus_price, extra_price=0):
         return wo.id
 
 
+def test_list_makbuzlar_aggregates_per_doctor(client, app):
+    login(client, "admin", "admin-pass")
+    party_id = _make_doctor(app)
+    _add_work_order(app, party_id, date(2026, 6, 10), 1000, extra_price=200)
+    _add_work_order(app, party_id, date(2026, 6, 20), 500)
+
+    response = client.get("/makbuzlar/?year=2026&month=6")
+    assert response.status_code == 200
+    assert "Dr. Test Makbuz".encode() in response.data
+
+    # Doctors without work orders in the period are not listed
+    empty = client.get("/makbuzlar/?year=2020&month=1")
+    assert empty.status_code == 200
+    assert "Dr. Test Makbuz".encode() not in empty.data
+
+
+def test_edit_work_order_route(client, app):
+    login(client, "admin", "admin-pass")
+    party_id = _make_doctor(app, name="Dr. WO Edit", phone="+905551110098")
+    wo_id = _add_work_order(app, party_id, date(2026, 6, 10), 1000)
+
+    response = client.get(f"/parties/{party_id}/work-orders/{wo_id}/edit")
+    assert response.status_code == 200
+
+    response = client.post(
+        f"/parties/{party_id}/work-orders/{wo_id}/edit",
+        data={"work_date": "gecersiz-tarih"},
+        follow_redirects=False,
+    )
+    assert response.status_code == 302
+
+    response = client.post(
+        f"/parties/{party_id}/work-orders/{wo_id}/edit",
+        data={
+            "work_date": "2026-06-15",
+            "apparatus_type": "Hyrax",
+            "patient_name": "Yeni Hasta",
+            "apparatus_price": "1500",
+            "extra_price": "100",
+            "exchange_rate_applied": "40",
+            "notes": "güncellendi",
+        },
+        follow_redirects=False,
+    )
+    assert response.status_code == 302
+    with app.app_context():
+        wo = db.session.get(WorkOrder, wo_id)
+        assert wo.apparatus_type == "Hyrax"
+        assert wo.patient_name == "Yeni Hasta"
+        assert float(wo.total_price) == 1600.0
+
+
 def test_generate_makbuz_computes_vat(client, app):
     login(client, "admin", "admin-pass")
     party_id = _make_doctor(app)
