@@ -19,8 +19,9 @@
         <form method="GET" action="{{ url_for('parties.list_parties') }}">
             <div class="input-group">
                 <span class="input-group-text"><i class="bi bi-search" aria-hidden="true"></i></span>
-                <input type="text" class="form-control js-table-filter" data-target="tbody tr" name="search" value="{{ search }}" 
-                       placeholder="Ad, telefon veya e-posta ile ara..." aria-label="Diş hekimlerinde ara">
+                <input type="text" class="form-control js-table-filter" name="search" value="{{ search }}"
+                       placeholder="Ad, telefon veya e-posta ile ara..." aria-label="Diş hekimlerinde ara"
+                       autocomplete="off">
                 <button type="submit" class="btn btn-primary">Ara</button>
                 {% if search %}
                 <a href="{{ url_for('parties.list_parties') }}" class="btn btn-outline-secondary">Temizle</a>

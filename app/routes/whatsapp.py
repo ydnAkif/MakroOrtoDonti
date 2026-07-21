@@ -14,11 +14,13 @@ whatsapp_bp = Blueprint("whatsapp", __name__)
 
 def _makbuz_candidates(year: int, month: int) -> list[dict]:
     """Doctors that have a makbuz for the period, ready to send over WhatsApp."""
+    from app.services.search_service import tr_order
+
     rows = db.session.execute(
         db.select(Makbuz)
         .join(Party, Makbuz.party_id == Party.id)
         .where(Makbuz.year == year, Makbuz.month == month, Party.is_active == True)
-        .order_by(Party.name)
+        .order_by(tr_order(Party.name))
     ).scalars().all()
 
     return [
@@ -71,12 +73,14 @@ def index():
         db.select(MakbuzSendLog).order_by(MakbuzSendLog.id.desc()).limit(25)
     ).scalars().all()
 
+    from app.services.search_service import tr_order
+
     parties_with_phone = db.session.execute(
         db.select(Party).where(
             Party.is_active == True,
             Party.phone.isnot(None),
             Party.phone != "",
-        ).order_by(Party.name)
+        ).order_by(tr_order(Party.name))
     ).scalars().all()
 
     return render_template(

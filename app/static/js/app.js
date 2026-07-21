@@ -123,21 +123,39 @@ document.addEventListener('DOMContentLoaded', function() {
         select.dataset.searchReady = '1';
     });
 
-    // Generic table row filter
+    // Server-side search for paginated lists: debounced auto-submit.
+    // A client-only row filter can only see the current page's rows, so
+    // typing "ö" would never reveal matches sitting on other pages. Instead
+    // we submit the GET form (Turkish-aware search across the whole table)
+    // shortly after the user stops typing, and restore focus + caret after
+    // the reload so typing continues uninterrupted.
     document.querySelectorAll('input.js-table-filter').forEach(function(input) {
-        var targetSelector = input.getAttribute('data-target');
-        if (!targetSelector) {
+        var form = input.closest('form');
+        if (!form) {
             return;
         }
 
-        var rows = document.querySelectorAll(targetSelector);
+        var delay = parseInt(input.getAttribute('data-autosubmit-delay'), 10) || 400;
+        var timer = null;
         input.addEventListener('input', function() {
-            var q = normalizeText(input.value.trim());
-            rows.forEach(function(row) {
-                var text = normalizeText(row.textContent || '');
-                row.style.display = !q || text.indexOf(q) !== -1 ? '' : 'none';
-            });
+            clearTimeout(timer);
+            timer = setTimeout(function() {
+                if (form.requestSubmit) {
+                    form.requestSubmit();
+                } else {
+                    form.submit();
+                }
+            }, delay);
         });
+
+        // After an auto-submit reload the page comes back with the query in
+        // the box; return focus and place the caret at the end.
+        if (input.value) {
+            input.focus();
+            var value = input.value;
+            input.value = '';
+            input.value = value;
+        }
     });
 
     // Generic checkbox list filter

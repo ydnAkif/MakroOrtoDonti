@@ -40,7 +40,9 @@ def list_treatments():
 
         query = query.where(tr_contains(Treatment.name, search))
 
-    query = query.order_by(Treatment.category, Treatment.name)
+    from app.services.search_service import tr_order
+
+    query = query.order_by(Treatment.category, tr_order(Treatment.name))
     pagination = db.paginate(query, page=max(request.args.get("page", 1, type=int), 1), per_page=30, max_per_page=100, error_out=False)
     treatments = pagination.items
 

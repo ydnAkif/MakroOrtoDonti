@@ -10,10 +10,12 @@ parties_bp = Blueprint("parties", __name__)
 
 
 def _get_treatments_by_category(category):
+    from app.services.search_service import tr_order
+
     treatments = db.session.execute(
         db.select(Treatment)
         .where(Treatment.category == category, Treatment.is_active == True)
-        .order_by(Treatment.name)
+        .order_by(tr_order(Treatment.name))
     ).scalars().all()
     return [{"id": t.id, "name": t.name, "price": float(t.price_eur), "currency": t.currency} for t in treatments]
 
@@ -50,7 +52,9 @@ def list_parties():
             )
         )
 
-    query = query.order_by(Party.name)
+    from app.services.search_service import tr_order
+
+    query = query.order_by(tr_order(Party.name))
     pagination = db.paginate(query, page=max(request.args.get("page", 1, type=int), 1), per_page=25, max_per_page=100, error_out=False)
     parties = pagination.items
 

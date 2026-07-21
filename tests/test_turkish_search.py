@@ -8,7 +8,7 @@ from openpyxl import Workbook
 
 from app.extensions import db
 from app.models.models import Party, PartyType, Treatment
-from app.services.search_service import tr_fold
+from app.services.search_service import tr_fold, tr_order
 
 from conftest import login
 
@@ -34,6 +34,46 @@ def _seed_dentist(app, name, phone=None):
         db.session.add(party)
         db.session.commit()
         return party.id
+
+
+class TestTurkishOrdering:
+    def test_turkish_letters_interleave_not_after_z(self, app):
+        names = [
+            "Büşra", "Çağla", "Canan", "Oya", "Ömer", "Parla", "Sevil",
+            "Şule", "Yusuf", "Zümrüt",
+        ]
+        with app.app_context():
+            for n in names:
+                db.session.add(Party(party_type=PartyType.DENTIST, name=n))
+            db.session.commit()
+
+            ordered = [
+                n for n in db.session.execute(
+                    db.select(Party.name)
+                    .where(Party.party_type == PartyType.DENTIST)
+                    .order_by(tr_order(Party.name))
+                ).scalars().all()
+                if n in names
+            ]
+
+        # DB order must match Python's Turkish-folded sort exactly: Ç inside
+        # the C block, Ö with O, Ş with S — not clustered after Z.
+        assert ordered == sorted(names, key=tr_fold)
+        # Concretely: Ç sits between B and C, not at the end.
+        assert ordered.index("Çağla") < ordered.index("Canan")
+        assert ordered.index("Büşra") < ordered.index("Çağla")
+        # Ö clusters with O; the two O-names are adjacent.
+        assert abs(ordered.index("Ömer") - ordered.index("Oya")) == 1
+
+    def test_list_page_orders_turkish_names_correctly(self, client, app):
+        login(client, "admin", "admin-pass")
+        with app.app_context():
+            for n in ["Zümrüt", "Ahmet", "Çağla", "Canan"]:
+                db.session.add(Party(party_type=PartyType.DENTIST, name=n))
+            db.session.commit()
+        html = client.get("/parties/").get_data(as_text=True)
+        # Çağla appears before Canan and before Zümrüt in the rendered order
+        assert html.index("Çağla") < html.index("Canan") < html.index("Zümrüt")
 
 
 class TestPartySearch:
@@ -67,6 +107,26 @@ class TestPartySearch:
         _seed_dentist(app, "Şahin İşcan")
         response = client.get("/parties/?search=olmayanisim")
         assert "Şahin İşcan".encode() not in response.data
+
+    def test_search_finds_name_that_lives_on_a_later_page(self, client, app):
+        """25/sayfa listede 'Ö' ile başlayan isim son sayfalarda olsa bile
+        arama tüm veritabanını tarayıp bulmalı (istemci-sayfa filtresi değil)."""
+        login(client, "admin", "admin-pass")
+        with app.app_context():
+            # 30 doctor whose names sort before "Ö..." so the Ö one is on page 2+
+            for i in range(30):
+                db.session.add(Party(
+                    party_type=PartyType.DENTIST, name=f"Ahmet {i:02d}"
+                ))
+            db.session.add(Party(party_type=PartyType.DENTIST, name="Ömer Özkan"))
+            db.session.commit()
+
+        # Default first page must NOT contain the Ö name (it paginates later)
+        first_page = client.get("/parties/").get_data(as_text=True)
+        assert "Ömer Özkan" not in first_page
+        # Server-side search finds it regardless of page
+        found = client.get("/parties/?search=omer").get_data(as_text=True)
+        assert "Ömer Özkan" in found
 
 
 class TestOtherSearches:

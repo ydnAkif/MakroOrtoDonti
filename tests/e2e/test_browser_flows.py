@@ -96,3 +96,17 @@ def test_turkish_search_in_browser_filters(authenticated_page, live_server_url):
     other_row = page.locator("#bulk-patient-list .form-check", has_text="Dr. E2E Hekim")
     assert pinar_row.is_visible()
     assert other_row.is_hidden()
+
+
+def test_parties_search_box_autosubmits_to_server(authenticated_page, live_server_url):
+    """Diş hekimi arama kutusuna yazınca (debounce) sunucuya gidip tüm
+    veritabanında Türkçe-duyarlı arama yapmalı; ASCII 'pinar' → 'Pınar'."""
+    page = authenticated_page
+    page.goto(f"{live_server_url}/parties/")
+
+    page.locator("input.js-table-filter").fill("pinar")
+    # Debounced auto-submit navigates with ?search=pinar
+    page.wait_for_url(f"{live_server_url}/parties/?search=pinar", timeout=5000)
+    assert page.get_by_text("Dr. Pınar Şahin").first.is_visible()
+    # Focus + caret restored so typing can continue
+    assert page.evaluate("document.activeElement.name") == "search"

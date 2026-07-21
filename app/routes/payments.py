@@ -32,7 +32,9 @@ def list_payments():
         from app.services.search_service import tr_contains
 
         doctors_query = doctors_query.where(tr_contains(Party.name, search))
-    doctors = db.session.execute(doctors_query.order_by(Party.name)).scalars().all()
+    from app.services.search_service import tr_order
+
+    doctors = db.session.execute(doctors_query.order_by(tr_order(Party.name))).scalars().all()
 
     makbuz_query = db.select(Makbuz)
     if year:

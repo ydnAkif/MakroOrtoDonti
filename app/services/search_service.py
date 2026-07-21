@@ -68,3 +68,17 @@ def tr_equals(column, query_text: str):
     if _is_sqlite():
         return func.tr_fold(column) == folded
     return func.lower(column) == folded
+
+
+def tr_order(column):
+    """Türkçe-duyarlı ORDER BY ifadesi.
+
+    SQLite kod noktasına göre sıraladığından Ç/Ö/Ş/Ü/Ğ/İ gibi harfler 'z'den
+    sonra gelir ve liste sonuna yığılır. ASCII iskelete indirgeyerek doğru
+    harmanlama sağlanır (Çağla → "cagla", C'lerin arasına girer). Not: bu
+    katlama ı/i, ö/o gibi harfleri aynı sıraya koyar; klinik listesi için
+    kabul edilebilir bir yaklaşımdır.
+    """
+    if _is_sqlite():
+        return func.tr_fold(column)
+    return func.lower(column)
