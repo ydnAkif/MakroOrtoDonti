@@ -2,8 +2,8 @@
 
 06:00 — bir önceki ayın makbuz taslaklarını oluşturur (KDV gerektiren
 doktorlar makbuzlar ekranında elle işaretlenir; bu görev göndermez).
-06:30 — "Otomatik gönderim" ayarı açıksa ve WhatsApp bağlıysa, önceki ayın
-taslak makbuzlarını WhatsApp gönderim kuyruğuna verir.
+09:30 — "Otomatik gönderim" ayarı açıksa ve WhatsApp bağlıysa, önceki aya
+ait iş emirlerinden güncellenen makbuzları WhatsApp gönderim kuyruğuna verir.
 """
 
 import logging
@@ -115,7 +115,7 @@ def _generate_monthly_drafts(app) -> None:
 
 
 def _auto_send_monthly_makbuzlar(app) -> None:
-    """Ayın 1'inde önceki ayın taslak makbuzlarını WhatsApp kuyruğuna verir."""
+    """Ayın 1'inde yalnızca önceki aya ait iş emirlerinin makbuzlarını gönderir."""
     with app.app_context():
         today = date.today()
         if today.day != 1:
@@ -133,11 +133,13 @@ def _auto_send_monthly_makbuzlar(app) -> None:
             return
 
         from app.extensions import db
-        from app.models.models import Makbuz, MakbuzSendLog, Party
+        from app.models.models import Makbuz, MakbuzSendLog, Party, WorkOrder
+        from app.routes.makbuzlar import _generate_makbuz
+        from sqlalchemy import extract
 
         year, month = _previous_month(today)
-        makbuz_ids = db.session.execute(
-            db.select(Makbuz.id)
+        makbuzlar = db.session.execute(
+            db.select(Makbuz)
             .join(Party, Makbuz.party_id == Party.id)
             .where(
                 Makbuz.year == year,
@@ -146,11 +148,16 @@ def _auto_send_monthly_makbuzlar(app) -> None:
                 Party.is_active == True,
                 Party.phone.isnot(None),
                 Party.phone != "",
+                db.exists().where(
+                    WorkOrder.party_id == Makbuz.party_id,
+                    extract("year", WorkOrder.work_date) == year,
+                    extract("month", WorkOrder.work_date) == month,
+                ),
             )
         ).scalars().all()
 
-        if not makbuz_ids:
-            logger.info("Otomatik makbuz gönderimi: gönderilecek taslak yok (%s-%02d).", year, month)
+        if not makbuzlar:
+            logger.info("Otomatik makbuz gönderimi: döneme ait iş emri yok (%s-%02d).", year, month)
             return
 
         if not _claim_todays_run(
@@ -158,6 +165,21 @@ def _auto_send_monthly_makbuzlar(app) -> None:
             "Otomatik makbuz gönderiminin en son çalıştığı gün (YYYY-MM-DD)",
         ):
             return
+
+        # 06:00'da oluşturulan taslak, gün içinde değişen iş emirleri nedeniyle
+        # eski kalmış olabilir. Kuyruğa almadan hemen önce yalnızca hedef dönemin
+        # iş emirlerinden yeniden hesapla; kullanıcının KDV tercihini koru.
+        makbuz_ids = []
+        for makbuz in makbuzlar:
+            refreshed = _generate_makbuz(
+                makbuz.party_id,
+                year,
+                month,
+                vat_applied=makbuz.vat_applied,
+                vat_rate=makbuz.vat_rate,
+            )
+            makbuz_ids.append(refreshed.id)
+        db.session.commit()
 
         from app.services.makbuz_send_queue import MakbuzSendQueue
 
@@ -186,6 +208,7 @@ def init_scheduler(app) -> None:
     scheduler.add_job(
         _generate_monthly_drafts,
         trigger="cron",
+        day=1,
         hour=6,
         minute=0,
         args=[app],
@@ -195,7 +218,8 @@ def init_scheduler(app) -> None:
     scheduler.add_job(
         _auto_send_monthly_makbuzlar,
         trigger="cron",
-        hour=6,
+        day=1,
+        hour=9,
         minute=30,
         args=[app],
         id="makbuz_monthly_auto_send",
@@ -205,5 +229,5 @@ def init_scheduler(app) -> None:
     _scheduler = scheduler
     logger.info(
         "Makbuz zamanlayıcısı başlatıldı (ayın 1'i: 06:00 taslaklar, "
-        "06:30 otomatik gönderim — ayar açıksa)."
+        "09:30 otomatik gönderim — ayar açıksa)."
     )

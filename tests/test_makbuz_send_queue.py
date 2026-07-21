@@ -268,6 +268,32 @@ class TestAutoSendScheduler:
             db.session.add(Settings(key=AUTO_SEND_TOGGLE_KEY, value="true"))
             db.session.commit()
 
+    def test_scheduler_registers_auto_send_for_first_day_at_0930(self, app):
+        import app.services.scheduler_service as sched
+
+        original_scheduler = sched._scheduler
+        original_testing = app.testing
+        original_debug = app.debug
+        fake_scheduler = MagicMock()
+        try:
+            sched._scheduler = None
+            app.testing = False
+            app.debug = False
+            with patch.object(sched, "BackgroundScheduler", return_value=fake_scheduler):
+                sched.init_scheduler(app)
+
+            auto_send_call = next(
+                call for call in fake_scheduler.add_job.call_args_list
+                if call.kwargs["id"] == "makbuz_monthly_auto_send"
+            )
+            assert auto_send_call.kwargs["day"] == 1
+            assert auto_send_call.kwargs["hour"] == 9
+            assert auto_send_call.kwargs["minute"] == 30
+        finally:
+            sched._scheduler = original_scheduler
+            app.testing = original_testing
+            app.debug = original_debug
+
     def test_sends_previous_month_drafts(self, app):
         import app.services.scheduler_service as sched
 
@@ -288,6 +314,43 @@ class TestAutoSendScheduler:
             mock_start.assert_called_once_with(
                 [m1], triggered_by=MakbuzSendLog.TRIGGER_SCHEDULER
             )
+        finally:
+            sched.date = original
+
+    def test_refreshes_receipt_from_only_the_target_month_work_orders(self, app):
+        import app.services.scheduler_service as sched
+
+        party_id, makbuz_id = _seed_doctor_with_makbuz(
+            app, name="Dr. Dönem", phone="+905551110026"
+        )
+        with app.app_context():
+            makbuz = db.session.get(Makbuz, makbuz_id)
+            makbuz.work_order_count = 99
+            makbuz.subtotal = money(Decimal("9999"))
+            makbuz.recalculate_totals()
+            db.session.add(WorkOrder(
+                party_id=party_id, work_date=date(2026, 7, 1),
+                apparatus_type="Temmuz plağı", patient_name="Başka ay",
+                apparatus_price=Decimal("2500"), extra_price=Decimal("0"),
+                total_price=Decimal("2500"),
+            ))
+            db.session.commit()
+
+        self._enable_auto_send(app)
+        WhatsAppService._connected = True
+        original = self._fix_today(sched, day=1)
+        try:
+            with patch.object(
+                MakbuzSendQueue, "start_batch", return_value=(True, "başladı")
+            ) as mock_start:
+                sched._auto_send_monthly_makbuzlar(app)
+            mock_start.assert_called_once_with(
+                [makbuz_id], triggered_by=MakbuzSendLog.TRIGGER_SCHEDULER
+            )
+            with app.app_context():
+                refreshed = db.session.get(Makbuz, makbuz_id)
+                assert refreshed.work_order_count == 1
+                assert refreshed.subtotal == money(Decimal("1000"))
         finally:
             sched.date = original
 
@@ -382,6 +445,8 @@ class TestAutoSendToggle:
             "/whatsapp/auto-send-toggle", data={"enabled": "on"}, follow_redirects=True
         )
         assert "açıldı".encode() in response.data
+        assert b"09:30" in response.data
+        assert "yalnızca önceki aya ait iş emirlerinin".encode() in response.data
         with app.app_context():
             assert auto_send_enabled() is True
 

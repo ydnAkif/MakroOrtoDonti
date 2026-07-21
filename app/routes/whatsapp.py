@@ -129,15 +129,15 @@ def auto_send_toggle():
         row = Settings(
             key=AUTO_SEND_TOGGLE_KEY,
             value="false",
-            description="Ayın 1'inde önceki ayın taslak makbuzlarını WhatsApp'tan otomatik gönder",
+            description="Ayın 1'inde önceki aya ait iş emirlerinin makbuzlarını WhatsApp'tan otomatik gönder",
         )
         db.session.add(row)
     row.value = "true" if enabled else "false"
     db.session.commit()
 
     flash(
-        "Otomatik makbuz gönderimi açıldı. Her ayın 1'inde saat 06:30'da, "
-        "önceki ayın taslakları otomatik gönderilecek."
+        "Otomatik makbuz gönderimi açıldı. Her ayın 1'inde saat 09:30'da, "
+        "yalnızca önceki aya ait iş emirlerinin makbuzları otomatik gönderilecek."
         if enabled
         else "Otomatik makbuz gönderimi kapatıldı.",
         "success",
