@@ -34,6 +34,13 @@
     <div><span>Tahsilat bekliyor</span><strong>{{ awaiting_payment_count }} makbuz</strong></div>
 </div>
 
+{% if sending %}
+<div class="notice-strip mb-3" id="makbuz-send-progress" role="status">
+    <i class="bi bi-arrow-repeat" aria-hidden="true"></i>
+    <span>Seçilen makbuzlar gönderiliyor. İşlem tamamlandığında liste yenilenecek.</span>
+</div>
+{% endif %}
+
 <!-- Doctor List -->
 <form method="POST" action="{{ url_for('makbuzlar.bulk_generate_drafts') }}">
     <input type="hidden" name="year" value="{{ year }}">
@@ -41,11 +48,19 @@
     <div class="work-panel">
         <div class="work-panel__header">
             <div><h2>{{ months[month - 1][1] }} {{ year }}</h2><p>Doktor bazlı makbuz durumu</p></div>
-            {% if preparation_count %}
-            <button type="submit" class="btn btn-primary btn-sm">
-                <i class="bi bi-file-earmark-plus" aria-hidden="true"></i> Seçilenler için taslak oluştur
-            </button>
-            {% endif %}
+            <div class="d-flex flex-wrap align-items-center justify-content-end gap-2">
+                <span class="small text-muted" id="makbuz-selected-count">0 doktor seçildi</span>
+                {% if preparation_count %}
+                <button type="submit" class="btn btn-primary btn-sm" id="bulk-generate-button" disabled>
+                    <i class="bi bi-file-earmark-plus" aria-hidden="true"></i> Seçilenler için taslak oluştur
+                </button>
+                {% endif %}
+                {% if draft_count %}
+                <button type="submit" class="btn btn-success btn-sm" id="bulk-send-button" formmethod="post" formaction="{{ url_for('makbuzlar.bulk_send_makbuzlar') }}" onclick="return confirm('Seçili taslaklar WhatsApp üzerinden gönderilsin mi?');" disabled>
+                    <i class="bi bi-whatsapp" aria-hidden="true"></i> Seçilenleri WhatsApp'tan gönder
+                </button>
+                {% endif %}
+            </div>
         </div>
         <div class="card-body p-0">
             <div class="table-responsive">
@@ -58,7 +73,7 @@
                             <th>Doktor</th>
                             <th class="text-center">İş Emri</th>
                             <th class="text-end">Toplam (₺)</th>
-                            <th>Durum</th>
+                            <th>Gönderim</th>
                             <th>KDV</th>
                             <th class="text-end">İşlem</th>
                         </tr>
@@ -83,10 +98,15 @@
                             <td class="text-center"><span class="badge bg-primary">{{ d.count }}</span></td>
                             <td class="text-end fw-bold">₺{{ "{:,.2f}".format((m.grand_total if m else d.total_price)) }}</td>
                             <td>
-                                {% if m %}
-                                <span class="badge {{ 'bg-success' if m.status == 'paid' else ('bg-primary' if m.status == 'sent' else 'bg-secondary') }}">{{ status_labels.get(m.status, m.status) }}</span>
+                                {% if not m %}
+                                <span class="badge bg-light text-muted border">Gönderilmedi</span>
+                                <small class="d-block text-muted mt-1">Taslak oluşturulmadı</small>
+                                {% elif m.status == 'draft' %}
+                                <span class="badge bg-secondary">Gönderilmedi</span>
+                                <small class="d-block text-muted mt-1">Taslak hazır</small>
                                 {% else %}
-                                <span class="badge bg-light text-muted border">Oluşturulmadı</span>
+                                <span class="badge bg-success">Gönderildi</span>
+                                <small class="d-block text-muted mt-1">{{ 'Ödendi' if m.status == 'paid' else 'Tahsilat bekliyor' }}</small>
                                 {% endif %}
                             </td>
                             <td>
@@ -112,11 +132,7 @@
                                 <a href="{{ url_for('makbuzlar.detail_makbuz', party_id=d.party_id, year=year, month=month) }}" class="btn btn-sm btn-outline-primary">
                                     <i class="bi bi-eye"></i> Detay
                                 </a>
-                                {% if m and m.status == 'draft' %}
-                                <button type="submit" class="btn btn-sm btn-success" name="return_to" value="list" formmethod="post" formaction="{{ url_for('makbuzlar.send_makbuz', makbuz_id=m.id) }}" onclick="return confirm('{{ d.party.display_name }} makbuzu WhatsApp üzerinden gönderilsin mi?');" {% if not d.party.phone %}disabled title="Doktorun telefon numarası yok"{% endif %}>
-                                    <i class="bi bi-whatsapp"></i> WhatsApp'tan gönder
-                                </button>
-                                {% elif m and m.status == 'sent' %}
+                                {% if m and m.status == 'sent' %}
                                 <a href="{{ url_for('payments.mark_paid', makbuz_id=m.id) }}" class="btn btn-sm btn-primary">
                                     <i class="bi bi-cash-coin"></i> Tahsilat kaydet
                                 </a>
@@ -159,14 +175,49 @@
     var boxes = function () {
         return document.querySelectorAll('input[name="party_ids"]');
     };
+    var updateSelection = function () {
+        var all = Array.prototype.slice.call(boxes());
+        var selected = all.filter(function (box) { return box.checked; });
+        var count = document.getElementById("makbuz-selected-count");
+        var generateButton = document.getElementById("bulk-generate-button");
+        var sendButton = document.getElementById("bulk-send-button");
+        if (count) count.textContent = selected.length + " doktor seçildi";
+        if (generateButton) generateButton.disabled = selected.length === 0;
+        if (sendButton) sendButton.disabled = selected.length === 0;
+        selectAll.checked = all.length > 0 && selected.length === all.length;
+        selectAll.indeterminate = selected.length > 0 && selected.length < all.length;
+    };
     selectAll.addEventListener("change", function () {
         boxes().forEach(function (box) { box.checked = selectAll.checked; });
+        updateSelection();
     });
     document.addEventListener("change", function (event) {
         if (event.target.name !== "party_ids") return;
-        var all = Array.prototype.slice.call(boxes());
-        selectAll.checked = all.length > 0 && all.every(function (box) { return box.checked; });
+        updateSelection();
     });
+    updateSelection();
 })();
 </script>
+{% if sending %}
+<script>
+(function () {
+    var progress = document.getElementById("makbuz-send-progress");
+    var timer = window.setInterval(function () {
+        fetch("{{ url_for('makbuzlar.send_status') }}", {headers: {"Accept": "application/json"}})
+            .then(function (response) { return response.json(); })
+            .then(function (payload) {
+                var job = payload.send_job;
+                if (job && job.running) {
+                    progress.querySelector("span").textContent = "Makbuzlar gönderiliyor: " + job.done + "/" + job.total + " tamamlandı.";
+                    return;
+                }
+                window.clearInterval(timer);
+                var target = new URL(window.location.href);
+                target.searchParams.delete("sending");
+                window.location.replace(target.toString());
+            });
+    }, 1200);
+})();
+</script>
+{% endif %}
 {% endblock %}

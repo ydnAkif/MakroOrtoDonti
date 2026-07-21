@@ -315,7 +315,52 @@ def test_bulk_generate_creates_drafts_without_sending(client, app):
     assert "checked" not in p2_vat_control
     assert f'name="vat_{p1}_vat_rate" value="10.00"' in list_html
     assert "₺3,100.00" in list_html
-    assert "WhatsApp'tan gönder" in list_html
+    assert "Seçilenleri WhatsApp'tan gönder" in list_html
+    assert list_html.count("Seçilenleri WhatsApp'tan gönder") == 1
+
+
+def test_bulk_send_uses_selected_doctors_ready_drafts(client, app):
+    from app.services.makbuz_send_queue import MakbuzSendQueue
+
+    login(client, "admin", "admin-pass")
+    p1 = _make_doctor(app, name="Dr. Send One", phone="+905551110041")
+    p2 = _make_doctor(app, name="Dr. Send Two", phone="+905551110042")
+    p3 = _make_doctor(app, name="Dr. No Draft", phone="+905551110043")
+    for party_id in (p1, p2, p3):
+        _add_work_order(app, party_id, date(2026, 6, 8), 500)
+    for party_id in (p1, p2):
+        client.post(
+            f"/makbuzlar/{party_id}/generate",
+            data={"year": 2026, "month": 6},
+            follow_redirects=False,
+        )
+
+    with app.app_context():
+        expected_ids = db.session.execute(
+            db.select(Makbuz.id)
+            .where(Makbuz.party_id.in_([p1, p2]))
+            .order_by(Makbuz.id)
+        ).scalars().all()
+
+    with patch.object(
+        MakbuzSendQueue,
+        "start_batch",
+        return_value=(True, "2 makbuz için gönderim başlatıldı."),
+    ) as start_batch:
+        response = client.post(
+            "/makbuzlar/bulk-send",
+            data={
+                "year": "2026",
+                "month": "6",
+                "party_ids": [str(p1), str(p2), str(p3)],
+            },
+            follow_redirects=False,
+        )
+
+    assert response.status_code == 302
+    assert "sending=1" in response.location
+    start_batch.assert_called_once()
+    assert sorted(start_batch.call_args.args[0]) == expected_ids
 
 
 def test_makbuz_list_send_returns_to_list_and_exposes_collection_action(client, app):

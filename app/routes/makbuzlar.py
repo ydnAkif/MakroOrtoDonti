@@ -159,6 +159,7 @@ def list_makbuzlar():
         preparation_count=preparation_count,
         draft_count=draft_count,
         awaiting_payment_count=awaiting_payment_count,
+        sending=request.args.get("sending") == "1",
         grand_total_apparatus=grand_total_apparatus,
         grand_total_extra=grand_total_extra,
         grand_total_price=grand_total_price,
@@ -253,6 +254,53 @@ def send_makbuz(makbuz_id):
             month=makbuz.month,
         ))
     return redirect(url_for("makbuzlar.detail_makbuz", party_id=makbuz.party_id, year=makbuz.year, month=makbuz.month))
+
+
+@makbuzlar_bp.route("/bulk-send", methods=["POST"])
+@login_required
+@permissions_required("billing.edit")
+def bulk_send_makbuzlar():
+    """Send the selected doctors' ready drafts as one background batch."""
+    from app.services.makbuz_send_queue import MakbuzSendQueue
+
+    year = request.form.get("year", date.today().year, type=int)
+    month = request.form.get("month", date.today().month, type=int)
+    party_ids = request.form.getlist("party_ids", type=int)
+
+    if not party_ids:
+        flash("Gönderilecek doktor seçilmedi.", "danger")
+        return redirect(url_for("makbuzlar.list_makbuzlar", year=year, month=month))
+
+    makbuz_ids = db.session.execute(
+        db.select(Makbuz.id).where(
+            Makbuz.party_id.in_(party_ids),
+            Makbuz.year == year,
+            Makbuz.month == month,
+            Makbuz.status == Makbuz.STATUS_DRAFT,
+        )
+    ).scalars().all()
+
+    if not makbuz_ids:
+        flash("Seçilen doktorlar için gönderilmeye hazır taslak yok.", "danger")
+        return redirect(url_for("makbuzlar.list_makbuzlar", year=year, month=month))
+
+    started, message = MakbuzSendQueue.start_batch(makbuz_ids)
+    flash(message, "info" if started else "danger")
+    return redirect(url_for(
+        "makbuzlar.list_makbuzlar",
+        year=year,
+        month=month,
+        sending=1 if started else None,
+    ))
+
+
+@makbuzlar_bp.route("/send-status")
+@login_required
+@permissions_required("billing.view")
+def send_status():
+    from app.services.makbuz_send_queue import MakbuzSendQueue
+
+    return jsonify({"send_job": MakbuzSendQueue.current_job()})
 
 
 @makbuzlar_bp.route("/bulk-generate", methods=["POST"])
