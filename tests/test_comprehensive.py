@@ -787,7 +787,7 @@ def test_party_crud_dentist_customer(client, app):
 
     response = client.post("/parties/add", data={
         "party_type": "dentist",
-        "name": "Dr. Mehmet Oz",
+        "name": "DR. mehmet oz",
         "phone": "+905559876543",
         "email": "mehmet@dentist.com",
         "tax_id": "12345678901",

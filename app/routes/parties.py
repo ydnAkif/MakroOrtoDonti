@@ -77,9 +77,11 @@ def list_parties():
 @permissions_required("clinical.edit")
 def add_party():
     if request.method == "POST":
+        from app.services.validation_service import normalize_display_name
+
         party = Party(
             party_type=PartyType.DENTIST,
-            name=request.form.get("name", "").strip(),
+            name=normalize_display_name(request.form.get("name", "")),
             phone=request.form.get("phone", "").strip() or None,
             email=request.form.get("email", "").strip() or None,
             address=request.form.get("address", "").strip() or None,
@@ -114,6 +116,7 @@ def import_parties():
         try:
             import io
             from openpyxl import load_workbook
+            from app.services.validation_service import normalize_display_name
 
             wb = load_workbook(io.BytesIO(file.read()), read_only=True, data_only=True)
             ws = wb.active
@@ -127,6 +130,7 @@ def import_parties():
                 if not name:
                     skipped += 1
                     continue
+                name = normalize_display_name(name)
                 phone = _text(row[1] if len(row) > 1 else None, 20)
                 email = _text(row[2] if len(row) > 2 else None, 200)
                 address = _text(row[3] if len(row) > 3 else None, 2000)
@@ -145,6 +149,7 @@ def import_parties():
                 ).scalars().first()
 
                 if existing:
+                    existing.name = name
                     existing.phone = phone or existing.phone
                     existing.email = email or existing.email
                     existing.address = address or existing.address
@@ -181,7 +186,7 @@ def detail_party(party_id):
     work_orders = db.session.execute(
         db.select(WorkOrder)
         .where(WorkOrder.party_id == party_id)
-        .order_by(WorkOrder.work_date.desc())
+        .order_by(WorkOrder.work_date.desc(), WorkOrder.id.desc())
     ).scalars().all()
 
     total_apparatus = sum(wo.apparatus_price for wo in work_orders)
@@ -205,7 +210,9 @@ def edit_party(party_id):
     party = db.get_or_404(Party, party_id)
 
     if request.method == "POST":
-        party.name = request.form.get("name", "").strip()
+        from app.services.validation_service import normalize_display_name
+
+        party.name = normalize_display_name(request.form.get("name", ""))
         party.phone = request.form.get("phone", "").strip() or None
         party.email = request.form.get("email", "").strip() or None
         party.address = request.form.get("address", "").strip() or None
@@ -238,7 +245,7 @@ def add_work_order(party_id):
     party = db.get_or_404(Party, party_id)
 
     if request.method == "POST":
-        from app.services.validation_service import parse_date, parse_float
+        from app.services.validation_service import normalize_display_name, parse_date, parse_float
 
         work_date = parse_date(request.form.get("work_date", ""))
         if not work_date:
@@ -254,7 +261,7 @@ def add_work_order(party_id):
             work_date=work_date,
             apparatus_type=request.form.get("apparatus_type", "").strip(),
             extra_addons=request.form.get("extra_addons", "").strip() or None,
-            patient_name=request.form.get("patient_name", "").strip(),
+            patient_name=normalize_display_name(request.form.get("patient_name", "")),
             apparatus_price=apparatus_price,
             extra_price=extra_price,
             total_price=apparatus_price + extra_price,
@@ -288,7 +295,7 @@ def edit_work_order(party_id, wo_id):
     wo = db.get_or_404(WorkOrder, wo_id)
 
     if request.method == "POST":
-        from app.services.validation_service import parse_date, parse_float
+        from app.services.validation_service import normalize_display_name, parse_date, parse_float
 
         work_date = parse_date(request.form.get("work_date", ""))
         if not work_date:
@@ -302,7 +309,7 @@ def edit_work_order(party_id, wo_id):
         wo.work_date = work_date
         wo.apparatus_type = request.form.get("apparatus_type", "").strip()
         wo.extra_addons = request.form.get("extra_addons", "").strip() or None
-        wo.patient_name = request.form.get("patient_name", "").strip()
+        wo.patient_name = normalize_display_name(request.form.get("patient_name", ""))
         wo.apparatus_price = apparatus_price
         wo.extra_price = extra_price
         wo.total_price = apparatus_price + extra_price

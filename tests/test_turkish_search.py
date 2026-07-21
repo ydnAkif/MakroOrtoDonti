@@ -9,6 +9,7 @@ from openpyxl import Workbook
 from app.extensions import db
 from app.models.models import Party, PartyType, Treatment
 from app.services.search_service import tr_collation_key, tr_fold, tr_order
+from app.services.validation_service import normalize_display_name
 
 from conftest import login
 
@@ -26,6 +27,15 @@ class TestTrFold:
     def test_none_and_empty(self):
         assert tr_fold(None) == ""
         assert tr_fold("") == ""
+
+
+class TestNormalizeDisplayName:
+    def test_uses_turkish_title_case(self):
+        assert normalize_display_name("  DR. İBRAHİM   IŞIK  ") == "Dr. İbrahim Işık"
+        assert normalize_display_name("ayşe-nur o'CONNOR") == "Ayşe-Nur O'Connor"
+
+    def test_preserves_short_organization_abbreviations(self):
+        assert normalize_display_name("ABC SAĞLIK A.Ş.") == "ABC Sağlık A.Ş."
 
 
 def _seed_dentist(app, name, phone=None):

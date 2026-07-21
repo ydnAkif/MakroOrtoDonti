@@ -67,7 +67,7 @@ def test_edit_work_order_route(client, app):
         data={
             "work_date": "2026-06-15",
             "apparatus_type": "Hyrax",
-            "patient_name": "Yeni Hasta",
+            "patient_name": "yENİ hASTA",
             "apparatus_price": "1500",
             "extra_price": "100",
             "exchange_rate_applied": "40",
@@ -81,6 +81,20 @@ def test_edit_work_order_route(client, app):
         assert wo.apparatus_type == "Hyrax"
         assert wo.patient_name == "Yeni Hasta"
         assert float(wo.total_price) == 1600.0
+
+
+def test_work_orders_are_listed_newest_first_with_same_date_tiebreaker(client, app):
+    login(client, "admin", "admin-pass")
+    party_id = _make_doctor(app, name="Dr. Sıralama", phone="+905551110097")
+    first_id = _add_work_order(app, party_id, date(2026, 6, 10), 1000)
+    second_id = _add_work_order(app, party_id, date(2026, 6, 10), 1200)
+    with app.app_context():
+        db.session.get(WorkOrder, first_id).patient_name = "Aynı Gün İlk Kayıt"
+        db.session.get(WorkOrder, second_id).patient_name = "Aynı Gün Son Kayıt"
+        db.session.commit()
+
+    html = client.get(f"/parties/{party_id}").get_data(as_text=True)
+    assert html.index("Aynı Gün Son Kayıt") < html.index("Aynı Gün İlk Kayıt")
 
 
 def test_generate_makbuz_computes_vat(client, app):

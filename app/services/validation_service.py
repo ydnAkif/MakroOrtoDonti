@@ -1,6 +1,7 @@
 from datetime import date
 from enum import Enum
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
+import re
 
 from app.models.models import TreatmentCategory
 
@@ -13,6 +14,42 @@ TREATMENT_CATEGORY_ALIASES = {
 }
 
 VALID_CURRENCIES = ("TL", "EUR", "USD")
+
+_TR_LOWER_TRANSLATION = str.maketrans({"I": "ı", "İ": "i"})
+_TR_UPPER_TRANSLATION = str.maketrans({"i": "İ", "ı": "I"})
+_NAME_TITLES = {
+    "dr": "Dr.",
+    "dt": "Dt.",
+    "uzm": "Uzm.",
+    "prof": "Prof.",
+    "doç": "Doç.",
+}
+
+
+def normalize_display_name(value: object) -> str:
+    """Apply Turkish-aware title casing while preserving short abbreviations."""
+    clean = " ".join(str(value or "").strip().split())
+    if not clean:
+        return ""
+
+    def normalize_token(token: str) -> str:
+        title_key = token.rstrip(".").translate(_TR_LOWER_TRANSLATION).lower()
+        if title_key in _NAME_TITLES:
+            return _NAME_TITLES[title_key]
+
+        letters = "".join(char for char in token if char.isalpha())
+        if letters.isupper() and len(letters) <= 3:
+            return token
+
+        parts = re.split(r"([-’'])", token)
+        for index, part in enumerate(parts):
+            if not part or part in {"-", "'", "’"}:
+                continue
+            lowered = part.translate(_TR_LOWER_TRANSLATION).lower()
+            parts[index] = lowered[0].translate(_TR_UPPER_TRANSLATION).upper() + lowered[1:]
+        return "".join(parts)
+
+    return " ".join(normalize_token(token) for token in clean.split(" "))
 
 
 def normalize_treatment_fields(name, description, category, price_eur, currency=None):
