@@ -93,8 +93,14 @@ def test_work_orders_are_listed_newest_first_with_same_date_tiebreaker(client, a
         db.session.get(WorkOrder, second_id).patient_name = "Aynı Gün Son Kayıt"
         db.session.commit()
 
-    html = client.get(f"/parties/{party_id}").get_data(as_text=True)
+    html = client.get(f"/parties/{party_id}?year=2026&month=6").get_data(as_text=True)
     assert html.index("Aynı Gün Son Kayıt") < html.index("Aynı Gün İlk Kayıt")
+
+    filtered_html = client.get(
+        f"/parties/{party_id}?year=2026&month=6&search=son+kayit"
+    ).get_data(as_text=True)
+    assert "Aynı Gün Son Kayıt" in filtered_html
+    assert "Aynı Gün İlk Kayıt" not in filtered_html
 
 
 def test_generate_makbuz_computes_vat(client, app):
@@ -133,7 +139,7 @@ def test_party_detail_reflects_persisted_receipt_vat_and_formats_phone(client, a
         follow_redirects=False,
     )
 
-    html = client.get(f"/parties/{party_id}").get_data(as_text=True)
+    html = client.get(f"/parties/{party_id}?year=2026&month=6").get_data(as_text=True)
     assert "+90 533 769 44 69" in html
     assert "KDV (makbuzlar): ₺200.00" in html
     assert "₺1,200.00" in html

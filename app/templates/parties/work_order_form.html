@@ -24,12 +24,13 @@
             </div>
             <div class="card-body">
                 <form method="POST" action="{{ url_for('parties.edit_work_order', party_id=party.id, wo_id=work_order.id) if work_order else url_for('parties.add_work_order', party_id=party.id) }}">
-                    {% if request.args.get('return_to') == 'work_orders' %}
-                    <input type="hidden" name="return_to" value="work_orders">
+                    {% if request.args.get('return_to') %}
+                    <input type="hidden" name="return_to" value="{{ request.args.get('return_to') }}">
                     <input type="hidden" name="return_view" value="{{ request.args.get('return_view', 'day') }}">
                     <input type="hidden" name="return_date" value="{{ request.args.get('return_date', '') }}">
                     <input type="hidden" name="return_year" value="{{ request.args.get('return_year', '') }}">
                     <input type="hidden" name="return_month" value="{{ request.args.get('return_month', '') }}">
+                    <input type="hidden" name="return_search" value="{{ request.args.get('return_search', '') }}">
                     {% endif %}
                     <div class="row g-3">
                         <div class="col-md-4">
@@ -103,7 +104,9 @@
 
                     <hr>
                     <div class="d-flex justify-content-between">
-                        {% if request.args.get('return_to') == 'work_orders' %}
+                        {% if request.args.get('return_to') == 'party_detail' %}
+                        <a href="{{ url_for('parties.detail_party', party_id=party.id, year=request.args.get('return_year'), month=request.args.get('return_month'), search=request.args.get('return_search')) }}" class="btn btn-outline-secondary">
+                        {% elif request.args.get('return_to') == 'work_orders' %}
                         {% if request.args.get('return_view') == 'month' %}
                         <a href="{{ url_for('parties.list_work_orders', view='month', year=request.args.get('return_year'), month=request.args.get('return_month')) }}" class="btn btn-outline-secondary">
                         {% else %}

@@ -50,10 +50,11 @@
             </div>
         </div>
 
-        {% if total_overall > 0 %}
+        {% if period_work_order_count > 0 %}
         <div class="card border-0 shadow-sm mt-3 border-start border-primary border-4">
             <div class="card-body">
-                <h6 class="text-primary"><i class="bi bi-calculator"></i> Toplam İş Emri Özeti</h6>
+                <h6 class="text-primary"><i class="bi bi-calculator"></i> {{ period_label }} Özeti</h6>
+                <p class="small text-muted mb-2">{{ period_work_order_count }} iş emri{% if period_makbuz %} · {{ period_makbuz_status }} makbuz{% endif %}</p>
                 <p class="mb-1">Aparey: ₺{{ "{:,.2f}".format(total_apparatus) }}</p>
                 <p class="mb-1">Ekstra: ₺{{ "{:,.2f}".format(total_extra) }}</p>
                 <p class="mb-1">Matrah: ₺{{ "{:,.2f}".format(total_overall) }}</p>
@@ -67,12 +68,35 @@
     <div class="col-md-8">
         <div class="card border-0 shadow-sm">
             <div class="card-header bg-white d-flex justify-content-between align-items-center">
-                <h5 class="mb-0"><i class="bi bi-clipboard2-check"></i> İş Emirleri</h5>
+                <div><h5 class="mb-0"><i class="bi bi-clipboard2-check"></i> İş Emirleri</h5><small class="text-muted">{{ period_label }} · {{ work_orders|length }} sonuç</small></div>
                 <a href="{{ url_for('parties.add_work_order', party_id=party.id) }}" class="btn btn-sm btn-primary">
                     <i class="bi bi-plus"></i> Yeni İş Emri
                 </a>
             </div>
             <div class="card-body p-0">
+                <form method="GET" action="{{ url_for('parties.detail_party', party_id=party.id) }}" class="doctor-workorder-toolbar">
+                    <a href="{{ url_for('parties.detail_party', party_id=party.id, year=previous_year, month=previous_month, search=search) }}" class="btn btn-sm btn-outline-secondary" title="Önceki ay" aria-label="Önceki ay"><i class="bi bi-chevron-left" aria-hidden="true"></i></a>
+                    <div>
+                        <label class="visually-hidden" for="doctor-workorder-month">Ay</label>
+                        <select class="form-select" id="doctor-workorder-month" name="month" onchange="this.form.submit()">
+                            {% for month_number, month_name in months %}<option value="{{ month_number }}" {% if month_number == month %}selected{% endif %}>{{ month_name }}</option>{% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="visually-hidden" for="doctor-workorder-year">Yıl</label>
+                        <select class="form-select" id="doctor-workorder-year" name="year" onchange="this.form.submit()">
+                            {% for option_year in years %}<option value="{{ option_year }}" {% if option_year == year %}selected{% endif %}>{{ option_year }}</option>{% endfor %}
+                        </select>
+                    </div>
+                    <div class="doctor-workorder-search">
+                        <i class="bi bi-search" aria-hidden="true"></i>
+                        <label class="visually-hidden" for="doctor-workorder-query">İş emirlerinde ara</label>
+                        <input type="search" class="form-control" id="doctor-workorder-query" name="search" value="{{ search }}" placeholder="Hasta veya aparey ara" autocomplete="off">
+                    </div>
+                    <button type="submit" class="btn btn-sm btn-outline-secondary">Ara</button>
+                    {% if search %}<a href="{{ url_for('parties.detail_party', party_id=party.id, year=year, month=month) }}" class="btn btn-sm btn-outline-secondary">Temizle</a>{% endif %}
+                    <a href="{{ url_for('parties.detail_party', party_id=party.id, year=next_year, month=next_month, search=search) }}" class="btn btn-sm btn-outline-secondary" title="Sonraki ay" aria-label="Sonraki ay"><i class="bi bi-chevron-right" aria-hidden="true"></i></a>
+                </form>
                 <div class="table-responsive">
                     <table class="table table-hover mb-0" id="work-orders-table">
                         <thead class="table-light">
@@ -105,10 +129,14 @@
                                 <td class="text-end">₺{{ "{:,.2f}".format(wo.extra_price) }}</td>
                                 <td class="text-end fw-bold">₺{{ "{:,.2f}".format(wo.total_price) }}</td>
                                 <td>
-                                    <a href="{{ url_for('parties.edit_work_order', party_id=party.id, wo_id=wo.id) }}" class="btn btn-sm btn-outline-primary" onclick="event.stopPropagation()">
+                                    <a href="{{ url_for('parties.edit_work_order', party_id=party.id, wo_id=wo.id, return_to='party_detail', return_year=year, return_month=month, return_search=search) }}" class="btn btn-sm btn-outline-primary" onclick="event.stopPropagation()">
                                         <i class="bi bi-pencil"></i>
                                     </a>
                                     <form method="POST" action="{{ url_for('parties.delete_work_order', party_id=party.id, wo_id=wo.id) }}" class="d-inline" onsubmit="return confirm('Bu iş emrini silmek istediğinize emin misiniz?');" onclick="event.stopPropagation()">
+                                        <input type="hidden" name="return_to" value="party_detail">
+                                        <input type="hidden" name="return_year" value="{{ year }}">
+                                        <input type="hidden" name="return_month" value="{{ month }}">
+                                        <input type="hidden" name="return_search" value="{{ search }}">
                                         <button type="submit" class="btn btn-sm btn-outline-danger">
                                             <i class="bi bi-trash"></i>
                                         </button>
@@ -163,7 +191,7 @@
                             </tr>
                             {% else %}
                             <tr>
-                                <td colspan="7" class="text-center text-muted py-3">Henüz iş emri yok.</td>
+                                <td colspan="7" class="empty-state">{% if search %}"{{ search }}" için bu ayda iş emri bulunamadı.{% else %}{{ period_label }} döneminde iş emri yok.{% endif %}</td>
                             </tr>
                             {% endfor %}
                         </tbody>

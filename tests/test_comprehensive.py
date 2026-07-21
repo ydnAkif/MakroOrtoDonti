@@ -773,11 +773,28 @@ def test_party_work_order_totals_on_detail(client, app):
                 extra_price=Decimal("0.00"),
                 total_price=Decimal("300.00"),
             ))
+        previous_month_date = date.today().replace(day=1) - timedelta(days=1)
+        db.session.add(WorkOrder(
+            party_id=party_id,
+            work_date=previous_month_date,
+            apparatus_type="Önceki Ay Apareyi",
+            patient_name="Önceki Ay Detay Hastası",
+            apparatus_price=Decimal("900.00"),
+            extra_price=Decimal("0.00"),
+            total_price=Decimal("900.00"),
+        ))
         db.session.commit()
 
     response = client.get(f"/parties/{party_id}")
     assert response.status_code == 200
-    assert "600.00" in response.get_data(as_text=True)
+    html = response.get_data(as_text=True)
+    assert "600.00" in html
+    assert "Önceki Ay Detay Hastası" not in html
+
+    previous_response = client.get(
+        f"/parties/{party_id}?year={previous_month_date.year}&month={previous_month_date.month}"
+    )
+    assert "Önceki Ay Detay Hastası" in previous_response.get_data(as_text=True)
 
 
 def test_work_order_ledger_filters_by_day_and_month(client, app):

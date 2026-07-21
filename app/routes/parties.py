@@ -245,29 +245,89 @@ def import_parties():
 def detail_party(party_id):
     party = db.get_or_404(Party, party_id)
 
-    work_orders = db.session.execute(
+    today = date.today()
+    year = request.args.get("year", today.year, type=int)
+    month = request.args.get("month", today.month, type=int)
+    try:
+        period_start = date(year, month, 1)
+    except ValueError:
+        year, month = today.year, today.month
+        period_start = date(year, month, 1)
+    period_end = date(year + (month == 12), month % 12 + 1, 1)
+
+    period_work_orders = db.session.execute(
         db.select(WorkOrder)
-        .where(WorkOrder.party_id == party_id)
+        .where(
+            WorkOrder.party_id == party_id,
+            WorkOrder.work_date >= period_start,
+            WorkOrder.work_date < period_end,
+        )
         .order_by(WorkOrder.work_date.desc(), WorkOrder.id.desc())
     ).scalars().all()
 
-    total_apparatus = sum(wo.apparatus_price for wo in work_orders)
-    total_extra = sum(wo.extra_price for wo in work_orders)
-    total_overall = sum(wo.total_price for wo in work_orders)
-    total_vat = sum(db.session.execute(
-        db.select(Makbuz.vat_amount).where(Makbuz.party_id == party_id)
-    ).scalars().all(), Decimal("0.00"))
+    search = request.args.get("search", "").strip()
+    if search:
+        from app.services.search_service import tr_fold
+
+        folded_search = tr_fold(search)
+        work_orders = [
+            wo for wo in period_work_orders
+            if folded_search in tr_fold(" ".join(filter(None, [
+                wo.patient_name, wo.apparatus_type, wo.extra_addons, wo.notes,
+            ])))
+        ]
+    else:
+        work_orders = period_work_orders
+
+    total_apparatus = sum((wo.apparatus_price for wo in period_work_orders), Decimal("0.00"))
+    total_extra = sum((wo.extra_price for wo in period_work_orders), Decimal("0.00"))
+    total_overall = sum((wo.total_price for wo in period_work_orders), Decimal("0.00"))
+    period_makbuz = db.session.execute(
+        db.select(Makbuz).where(
+            Makbuz.party_id == party_id,
+            Makbuz.year == year,
+            Makbuz.month == month,
+        )
+    ).scalar_one_or_none()
+    total_vat = period_makbuz.vat_amount if period_makbuz else Decimal("0.00")
     total_with_vat = total_overall + total_vat
+
+    oldest_work_date = db.session.scalar(
+        db.select(db.func.min(WorkOrder.work_date)).where(WorkOrder.party_id == party_id)
+    )
+    first_year = min(oldest_work_date.year if oldest_work_date else today.year, year)
+    last_year = max(today.year + 1, year)
+    previous_month_date = period_start - timedelta(days=1)
 
     return render_template(
         "parties/detail.html",
         party=party,
         work_orders=work_orders,
+        period_work_order_count=len(period_work_orders),
+        search=search,
+        year=year,
+        month=month,
+        months=MONTHS,
+        years=range(last_year, first_year - 1, -1),
+        period_label=f"{MONTHS[month - 1][1]} {year}",
+        previous_year=previous_month_date.year,
+        previous_month=previous_month_date.month,
+        next_year=period_end.year,
+        next_month=period_end.month,
         total_apparatus=total_apparatus,
         total_extra=total_extra,
         total_overall=total_overall,
         total_vat=total_vat,
         total_with_vat=total_with_vat,
+        period_makbuz=period_makbuz,
+        period_makbuz_status=(
+            {
+                Makbuz.STATUS_DRAFT: "Taslak",
+                Makbuz.STATUS_SENT: "Gönderildi",
+                Makbuz.STATUS_PAID: "Ödendi",
+            }.get(period_makbuz.status, period_makbuz.status)
+            if period_makbuz else None
+        ),
     )
 
 
@@ -339,7 +399,10 @@ def add_work_order(party_id):
         db.session.add(wo)
         db.session.commit()
         flash("İş emri başarıyla eklendi.", "success")
-        return redirect(url_for("parties.detail_party", party_id=party.id))
+        return redirect(url_for(
+            "parties.detail_party", party_id=party.id,
+            year=work_date.year, month=work_date.month,
+        ))
 
     today = date.today().isoformat()
     from app.services.exchange_service import get_latest_rate, get_latest_usd_rate
@@ -398,6 +461,13 @@ def edit_work_order(party_id, wo_id):
                 "parties.list_work_orders", view="day",
                 date=request.form.get("return_date", ""),
             ))
+        if request.form.get("return_to") == "party_detail":
+            return redirect(url_for(
+                "parties.detail_party", party_id=party.id,
+                year=request.form.get("return_year", type=int),
+                month=request.form.get("return_month", type=int),
+                search=request.form.get("return_search", ""),
+            ))
         return redirect(url_for("parties.detail_party", party_id=party.id))
 
     from app.services.exchange_service import get_latest_rate, get_latest_usd_rate
@@ -434,5 +504,12 @@ def delete_work_order(party_id, wo_id):
             "parties.list_work_orders",
             view="day",
             date=request.form.get("return_date", ""),
+        ))
+    if request.form.get("return_to") == "party_detail":
+        return redirect(url_for(
+            "parties.detail_party", party_id=party_id,
+            year=request.form.get("return_year", type=int),
+            month=request.form.get("return_month", type=int),
+            search=request.form.get("return_search", ""),
         ))
     return redirect(url_for("parties.detail_party", party_id=party_id))

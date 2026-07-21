@@ -65,7 +65,7 @@ def test_dentist_work_order_and_makbuz_payment_critical_flow(authenticated_page,
     page.locator("#patient_name").fill("E2E Hasta")
     page.locator("#apparatus_price").fill("100")
     page.get_by_role("button", name="Kaydet").click()
-    page.wait_for_url(f"{live_server_url}/parties/{party_id}")
+    page.wait_for_url(f"{live_server_url}/parties/{party_id}*")
 
     page.goto(f"{live_server_url}/makbuzlar/{party_id}")
     page.get_by_role("button", name="Makbuz Oluştur").click()
