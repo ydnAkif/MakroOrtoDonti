@@ -112,6 +112,10 @@ Oturum `data/whatsapp_session.db` dosyasında saklanır; uygulama yeniden başla
 
 **Makbuz gönderimi (WhatsApp sayfasından):** WhatsApp sayfasındaki "Makbuz Gönderimi" paneli seçilen dönemin makbuzlu doktorlarını listeler. Doktorlar tek tek veya "Gönderilmemişleri Seç" ile toplu seçilir; gönderim arka planda kuyruk olarak çalışır (doktorlar arasında 3 saniye bekleme), ilerleme sayfada canlı izlenir. Her başarılı gönderimde makbuz "Gönderildi" durumuna geçer. Aynı anda tek toplu gönderim çalışır; telefonu olmayan doktorlar seçilemez ve dönemde makbuzu oluşturulmamış doktor varsa panel Makbuzlar sayfasına yönlendirir.
 
+**Gönderim geçmişi:** Her gönderim denemesi (el ile veya otomatik) `makbuz_send_logs` tablosuna kalıcı olarak yazılır ve WhatsApp sayfasındaki "Gönderim Geçmişi" bölümünde tarih, doktor, dönem, sonuç ve kaynak bilgisiyle listelenir. Yeni tabloyu oluşturmak için `flask --app run:app db upgrade` çalıştırın.
+
+**Otomatik gönderim:** WhatsApp sayfasındaki "Otomatik gönderim" anahtarı açıksa, her ayın 1'inde saat 06:30'da (06:00'daki otomatik taslak üretiminden sonra) önceki ayın taslak makbuzları telefonu kayıtlı doktorlara otomatik gönderilir. WhatsApp bağlı değilse gönderim atlanır ve log'a uyarı düşülür; taslaklar elle gönderilebilir. Ayar varsayılan olarak kapalıdır.
+
 **Tek worker zorunluluğu:** WhatsApp istemcisi süreç içinde tek bir arka plan thread'inde çalışır ve oturum dosyası süreçler arasında paylaşılamaz. Gunicorn **`--workers 1`** ile çalıştırılmalıdır. Yanlışlıkla çok worker başlatılırsa `data/whatsapp.worker.lock` üzerindeki dosya kilidi sayesinde istemciyi yalnız bir worker sahiplenir; diğer worker'lardaki gönderimler açık bir hata mesajıyla reddedilir.
 
 ## Zamanlanmış işler

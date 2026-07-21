@@ -17,7 +17,7 @@ import uuid
 from datetime import datetime, timezone
 
 from app.extensions import db
-from app.models.models import Makbuz, WorkOrder
+from app.models.models import Makbuz, MakbuzSendLog, WorkOrder
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +59,9 @@ class MakbuzSendQueue:
     # ------------------------------------------------------------------ start
 
     @classmethod
-    def start_batch(cls, makbuz_ids: list[int]) -> tuple[bool, str]:
+    def start_batch(
+        cls, makbuz_ids: list[int], triggered_by: str = MakbuzSendLog.TRIGGER_MANUAL
+    ) -> tuple[bool, str]:
         """Validate and launch a batch. Returns (started, message)."""
         from app.services.whatsapp_service import WhatsAppService
 
@@ -80,8 +82,11 @@ class MakbuzSendQueue:
                 continue
             items.append({
                 "makbuz_id": makbuz.id,
+                "party_id": makbuz.party_id,
                 "doctor": makbuz.party.display_name if makbuz.party else "?",
                 "phone": makbuz.party.phone if makbuz.party else None,
+                "year": makbuz.year,
+                "month": makbuz.month,
                 "status": "pending",  # pending -> sending -> sent | failed
                 "message": None,
             })
@@ -94,6 +99,7 @@ class MakbuzSendQueue:
             cls._job = {
                 "id": uuid.uuid4().hex[:12],
                 "running": True,
+                "triggered_by": triggered_by,
                 "total": len(items),
                 "done": 0,
                 "sent": 0,
@@ -125,6 +131,7 @@ class MakbuzSendQueue:
         except Exception:
             logger.exception("Makbuz gönderim kuyruğu beklenmedik şekilde durdu")
         finally:
+            leftovers = []
             with cls._lock:
                 if cls._job is not None:
                     for item in cls._job["items"]:
@@ -133,8 +140,11 @@ class MakbuzSendQueue:
                             item["message"] = "Gönderim tamamlanamadı."
                             cls._job["failed"] += 1
                             cls._job["done"] += 1
+                            leftovers.append(dict(item))
                     cls._job["running"] = False
                     cls._job["finished_at"] = datetime.now(timezone.utc).isoformat()
+            for item in leftovers:
+                cls._persist_log(item)
 
     @classmethod
     def _process_all(cls, makbuz_ids: list[int]) -> None:
@@ -159,6 +169,7 @@ class MakbuzSendQueue:
         cls._mark_item(
             makbuz_id, status="sent" if ok else "failed", message=message
         )
+        snapshot = None
         with cls._lock:
             if cls._job is not None:
                 cls._job["done"] += 1
@@ -166,6 +177,48 @@ class MakbuzSendQueue:
                     cls._job["sent"] += 1
                 else:
                     cls._job["failed"] += 1
+                for item in cls._job["items"]:
+                    if item["makbuz_id"] == makbuz_id:
+                        snapshot = dict(item)
+                        break
+        if snapshot is not None:
+            cls._persist_log(snapshot)
+
+    @classmethod
+    def _persist_log(cls, item: dict) -> None:
+        """Write one history row; never raises into the queue thread."""
+
+        def _write():
+            with cls._lock:
+                job = cls._job or {}
+                batch_id = job.get("id", "?")
+                triggered_by = job.get("triggered_by", MakbuzSendLog.TRIGGER_MANUAL)
+            try:
+                db.session.add(MakbuzSendLog(
+                    batch_id=batch_id,
+                    makbuz_id=item.get("makbuz_id"),
+                    party_id=item.get("party_id"),
+                    doctor_name=item.get("doctor") or "?",
+                    phone=item.get("phone"),
+                    year=item.get("year") or 0,
+                    month=item.get("month") or 0,
+                    success=item.get("status") == "sent",
+                    message=item.get("message"),
+                    triggered_by=triggered_by,
+                ))
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
+                raise
+
+        try:
+            if cls._app is not None:
+                with cls._app.app_context():
+                    _write()
+            else:
+                _write()
+        except Exception:
+            logger.exception("Makbuz gönderim geçmişi kaydedilemedi")
 
     @classmethod
     def _send_one(cls, makbuz_id: int) -> tuple[bool, str]:

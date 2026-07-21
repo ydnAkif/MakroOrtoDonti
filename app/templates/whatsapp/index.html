@@ -308,6 +308,106 @@ endblock %} {% block content %}
           >
         </div>
         {% endif %}
+
+        <hr class="my-3" />
+
+        <!-- Auto-send toggle -->
+        <form
+          method="POST"
+          action="{{ url_for('whatsapp.auto_send_toggle') }}"
+          class="d-flex align-items-start justify-content-between gap-3"
+        >
+          <div class="form-check form-switch mb-0">
+            <input
+              class="form-check-input"
+              type="checkbox"
+              role="switch"
+              id="wa-auto-send"
+              name="enabled"
+              onchange="this.form.submit()"
+              {% if auto_send_on %}checked{% endif %}
+            />
+            <label class="form-check-label" for="wa-auto-send">
+              <strong>Otomatik gönderim</strong>
+              <span class="d-block small text-muted">
+                Her ayın 1'inde saat 06:30'da, önceki ayın taslak makbuzları
+                telefonu kayıtlı doktorlara otomatik gönderilir (WhatsApp
+                bağlıysa).
+              </span>
+            </label>
+          </div>
+          <noscript>
+            <button type="submit" class="btn btn-sm btn-outline-primary">
+              Kaydet
+            </button>
+          </noscript>
+        </form>
+
+        {% if send_history %}
+        <hr class="my-3" />
+
+        <!-- Send history -->
+        <div>
+          <button
+            class="btn btn-sm btn-link text-decoration-none px-0"
+            type="button"
+            data-bs-toggle="collapse"
+            data-bs-target="#wa-history"
+            aria-expanded="false"
+            aria-controls="wa-history"
+          >
+            <i class="bi bi-clock-history"></i> Gönderim Geçmişi
+            ({{ send_history|length }})
+          </button>
+          <div class="collapse" id="wa-history">
+            <div class="table-responsive mt-2">
+              <table class="table table-sm align-middle mb-0">
+                <thead>
+                  <tr class="small text-muted">
+                    <th>Tarih</th>
+                    <th>Doktor</th>
+                    <th>Dönem</th>
+                    <th>Sonuç</th>
+                    <th>Kaynak</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for log in send_history %}
+                  <tr class="small">
+                    <td class="text-muted text-nowrap">
+                      {{ log.created_at.strftime('%d.%m.%Y %H:%M') }}
+                    </td>
+                    <td>{{ log.doctor_name }}</td>
+                    <td class="text-nowrap">{{ '%02d'|format(log.month) }}/{{ log.year }}</td>
+                    <td>
+                      {% if log.success %}
+                      <span class="badge bg-success">Gönderildi</span>
+                      {% else %}
+                      <span
+                        class="badge bg-danger"
+                        {% if log.message %}title="{{ log.message }}"{% endif %}
+                        >Başarısız</span
+                      >
+                      {% if log.message %}
+                      <span class="text-muted">{{ log.message }}</span>
+                      {% endif %}
+                      {% endif %}
+                    </td>
+                    <td>
+                      {% if log.triggered_by == 'scheduler' %}
+                      <span class="badge bg-info text-dark">Otomatik</span>
+                      {% else %}
+                      <span class="badge bg-light text-muted border">El ile</span>
+                      {% endif %}
+                    </td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+        {% endif %}
       </div>
     </div>
   </div>

@@ -6,7 +6,7 @@ from sqlalchemy import extract
 
 from app.authz import permissions_required
 from app.extensions import db
-from app.models.models import Makbuz, Party, WorkOrder
+from app.models.models import Makbuz, MakbuzSendLog, Party, Settings, WorkOrder
 from app.routes.makbuzlar import MONTHS, STATUS_LABELS
 
 whatsapp_bp = Blueprint("whatsapp", __name__)
@@ -55,6 +55,7 @@ def _doctors_without_makbuz(year: int, month: int) -> int:
 @permissions_required("messaging.use")
 def index():
     from app.services.makbuz_send_queue import MakbuzSendQueue
+    from app.services.scheduler_service import auto_send_enabled
     from app.services.whatsapp_service import WhatsAppService
 
     status = WhatsAppService.get_status()
@@ -65,6 +66,10 @@ def index():
 
     candidates = _makbuz_candidates(year, month)
     missing_makbuz_count = _doctors_without_makbuz(year, month)
+
+    send_history = db.session.execute(
+        db.select(MakbuzSendLog).order_by(MakbuzSendLog.id.desc()).limit(25)
+    ).scalars().all()
 
     parties_with_phone = db.session.execute(
         db.select(Party).where(
@@ -86,6 +91,8 @@ def index():
         years=list(range(today.year - 2, today.year + 1)),
         status_labels=STATUS_LABELS,
         send_job=MakbuzSendQueue.current_job(),
+        send_history=send_history,
+        auto_send_on=auto_send_enabled(),
     )
 
 
@@ -102,6 +109,36 @@ def send_makbuz_batch():
     started, message = MakbuzSendQueue.start_batch(makbuz_ids)
     flash(message, "info" if started else "danger")
     return redirect(url_for("whatsapp.index", year=year, month=month))
+
+
+@whatsapp_bp.route("/auto-send-toggle", methods=["POST"])
+@login_required
+@permissions_required("billing.edit")
+def auto_send_toggle():
+    from app.services.scheduler_service import AUTO_SEND_TOGGLE_KEY
+
+    enabled = request.form.get("enabled") == "on"
+    row = db.session.execute(
+        db.select(Settings).where(Settings.key == AUTO_SEND_TOGGLE_KEY)
+    ).scalar_one_or_none()
+    if row is None:
+        row = Settings(
+            key=AUTO_SEND_TOGGLE_KEY,
+            value="false",
+            description="Ayın 1'inde önceki ayın taslak makbuzlarını WhatsApp'tan otomatik gönder",
+        )
+        db.session.add(row)
+    row.value = "true" if enabled else "false"
+    db.session.commit()
+
+    flash(
+        "Otomatik makbuz gönderimi açıldı. Her ayın 1'inde saat 06:30'da, "
+        "önceki ayın taslakları otomatik gönderilecek."
+        if enabled
+        else "Otomatik makbuz gönderimi kapatıldı.",
+        "success",
+    )
+    return redirect(url_for("whatsapp.index"))
 
 
 @whatsapp_bp.route("/connect", methods=["POST"])

@@ -13,7 +13,7 @@ from unittest.mock import MagicMock, patch
 from conftest import login
 
 from app.extensions import db
-from app.models.models import Makbuz, Party, PartyType, WorkOrder, money
+from app.models.models import Makbuz, MakbuzSendLog, Party, PartyType, WorkOrder, money
 from app.services.makbuz_send_queue import MakbuzSendQueue, send_makbuz_via_whatsapp
 from app.services.whatsapp_service import WhatsAppService
 
@@ -178,6 +178,219 @@ class TestQueue:
         MakbuzSendQueue._job = {"running": False, "items": []}
         MakbuzSendQueue.clear_finished()
         assert MakbuzSendQueue.current_job() is None
+
+
+class TestSendHistory:
+    def test_batch_persists_log_rows(self, app):
+        WhatsAppService._connected = True
+        MakbuzSendQueue._app = app
+        _, m1 = _seed_doctor_with_makbuz(app, name="Dr. Log Bir", phone="+905551110011")
+        _, m2 = _seed_doctor_with_makbuz(app, name="Dr. Log İki", phone="+905551110012")
+
+        def fake_send(makbuz_id):
+            return (makbuz_id == m1), "ok" if makbuz_id == m1 else "telefon kapalı"
+
+        with app.app_context():
+            with patch(
+                "app.services.makbuz_send_queue.send_makbuz_via_whatsapp",
+                side_effect=fake_send,
+            ):
+                MakbuzSendQueue.start_batch([m1, m2])
+                assert _wait_until(lambda: not MakbuzSendQueue.is_running())
+
+        job = MakbuzSendQueue.current_job()
+        with app.app_context():
+            logs = db.session.execute(
+                db.select(MakbuzSendLog).order_by(MakbuzSendLog.id)
+            ).scalars().all()
+            assert len(logs) == 2
+            by_doctor = {log.doctor_name: log for log in logs}
+            ok_log = by_doctor["Dr. Log Bir"]
+            fail_log = by_doctor["Dr. Log İki"]
+            assert ok_log.success is True
+            assert fail_log.success is False
+            assert fail_log.message == "telefon kapalı"
+            assert ok_log.batch_id == job["id"]
+            assert ok_log.triggered_by == MakbuzSendLog.TRIGGER_MANUAL
+            assert ok_log.year == 2026 and ok_log.month == 6
+            assert ok_log.phone == "+905551110011"
+
+    def test_crash_leftovers_are_logged(self, app):
+        WhatsAppService._connected = True
+        MakbuzSendQueue._app = app
+        _, m1 = _seed_doctor_with_makbuz(app, name="Dr. Log Kaza", phone="+905551110013")
+
+        with app.app_context():
+            with patch(
+                "app.services.makbuz_send_queue.send_makbuz_via_whatsapp",
+                side_effect=RuntimeError("çöktü"),
+            ):
+                MakbuzSendQueue.start_batch([m1])
+                assert _wait_until(lambda: not MakbuzSendQueue.is_running())
+
+        with app.app_context():
+            logs = db.session.execute(db.select(MakbuzSendLog)).scalars().all()
+            assert len(logs) == 1
+            assert logs[0].success is False
+
+    def test_history_rendered_on_page(self, client, app):
+        login(client, "admin", "admin-pass")
+        with app.app_context():
+            db.session.add(MakbuzSendLog(
+                batch_id="abc", doctor_name="Dr. Geçmiş", phone="+905551110014",
+                year=2026, month=6, success=True, triggered_by="scheduler",
+            ))
+            db.session.commit()
+        response = client.get("/whatsapp/")
+        assert "Gönderim Geçmişi".encode() in response.data
+        assert "Dr. Geçmiş".encode() in response.data
+        assert b"Otomatik" in response.data
+
+
+class TestAutoSendScheduler:
+    def _fix_today(self, sched, day):
+        from datetime import date as real_date
+
+        class FixedDate(real_date):
+            @classmethod
+            def today(cls):
+                return real_date(2026, 7, day)
+
+        original = sched.date
+        sched.date = FixedDate
+        return original
+
+    def _enable_auto_send(self, app):
+        from app.models.models import Settings
+        from app.services.scheduler_service import AUTO_SEND_TOGGLE_KEY
+
+        with app.app_context():
+            db.session.add(Settings(key=AUTO_SEND_TOGGLE_KEY, value="true"))
+            db.session.commit()
+
+    def test_sends_previous_month_drafts(self, app):
+        import app.services.scheduler_service as sched
+
+        _, m1 = _seed_doctor_with_makbuz(app, name="Dr. Oto Bir", phone="+905551110021")
+        # sent makbuz and phoneless doctor must be excluded
+        _seed_doctor_with_makbuz(app, name="Dr. Oto Gönderilmiş", phone="+905551110022", status="sent")
+        _seed_doctor_with_makbuz(app, name="Dr. Oto Telefonsuz", phone=None)
+
+        self._enable_auto_send(app)
+        WhatsAppService._connected = True
+
+        original = self._fix_today(sched, day=1)
+        try:
+            with patch.object(
+                MakbuzSendQueue, "start_batch", return_value=(True, "başladı")
+            ) as mock_start:
+                sched._auto_send_monthly_makbuzlar(app)
+            mock_start.assert_called_once_with(
+                [m1], triggered_by=MakbuzSendLog.TRIGGER_SCHEDULER
+            )
+        finally:
+            sched.date = original
+
+    def test_runs_once_per_day(self, app):
+        import app.services.scheduler_service as sched
+
+        _seed_doctor_with_makbuz(app, name="Dr. Oto Tek", phone="+905551110023")
+        self._enable_auto_send(app)
+        WhatsAppService._connected = True
+
+        original = self._fix_today(sched, day=1)
+        try:
+            with patch.object(
+                MakbuzSendQueue, "start_batch", return_value=(True, "başladı")
+            ) as mock_start:
+                sched._auto_send_monthly_makbuzlar(app)
+                sched._auto_send_monthly_makbuzlar(app)
+            assert mock_start.call_count == 1
+        finally:
+            sched.date = original
+
+    def test_skips_when_disabled(self, app):
+        import app.services.scheduler_service as sched
+
+        _seed_doctor_with_makbuz(app, name="Dr. Oto Kapalı", phone="+905551110024")
+        WhatsAppService._connected = True
+
+        original = self._fix_today(sched, day=1)
+        try:
+            with patch.object(MakbuzSendQueue, "start_batch") as mock_start:
+                sched._auto_send_monthly_makbuzlar(app)
+            assert not mock_start.called
+        finally:
+            sched.date = original
+
+    def test_skips_when_not_connected(self, app):
+        import app.services.scheduler_service as sched
+
+        _seed_doctor_with_makbuz(app, name="Dr. Oto Bağsız", phone="+905551110025")
+        self._enable_auto_send(app)
+
+        original = self._fix_today(sched, day=1)
+        try:
+            with patch.object(MakbuzSendQueue, "start_batch") as mock_start:
+                sched._auto_send_monthly_makbuzlar(app)
+            assert not mock_start.called
+        finally:
+            sched.date = original
+
+    def test_skips_when_not_first_of_month(self, app):
+        import app.services.scheduler_service as sched
+
+        self._enable_auto_send(app)
+        WhatsAppService._connected = True
+
+        original = self._fix_today(sched, day=15)
+        try:
+            with patch.object(MakbuzSendQueue, "start_batch") as mock_start:
+                sched._auto_send_monthly_makbuzlar(app)
+            assert not mock_start.called
+        finally:
+            sched.date = original
+
+    def test_noop_when_no_drafts(self, app):
+        import app.services.scheduler_service as sched
+
+        self._enable_auto_send(app)
+        WhatsAppService._connected = True
+
+        original = self._fix_today(sched, day=1)
+        try:
+            with patch.object(MakbuzSendQueue, "start_batch") as mock_start:
+                sched._auto_send_monthly_makbuzlar(app)
+            assert not mock_start.called
+        finally:
+            sched.date = original
+
+
+class TestAutoSendToggle:
+    def test_disabled_by_default(self, client, app):
+        login(client, "admin", "admin-pass")
+        response = client.get("/whatsapp/")
+        assert b"wa-auto-send" in response.data
+        switch_markup = response.data.split(b'id="wa-auto-send"')[1].split(b"/>")[0]
+        assert b"checked" not in switch_markup
+
+    def test_toggle_on_and_off(self, client, app):
+        from app.services.scheduler_service import auto_send_enabled
+
+        login(client, "admin", "admin-pass")
+        response = client.post(
+            "/whatsapp/auto-send-toggle", data={"enabled": "on"}, follow_redirects=True
+        )
+        assert "açıldı".encode() in response.data
+        with app.app_context():
+            assert auto_send_enabled() is True
+
+        response = client.post(
+            "/whatsapp/auto-send-toggle", data={}, follow_redirects=True
+        )
+        assert "kapatıldı".encode() in response.data
+        with app.app_context():
+            assert auto_send_enabled() is False
 
 
 class TestWhatsAppMakbuzPanel:

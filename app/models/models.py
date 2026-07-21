@@ -545,6 +545,33 @@ class Makbuz(Base, TimestampMixin):
         return f"<Makbuz {self.party_id} {self.year}-{self.month:02d} ₺{self.grand_total:.2f} ({self.status})>"
 
 
+class MakbuzSendLog(Base, TimestampMixin):
+    """WhatsApp makbuz gönderimlerinin kalıcı geçmişi (batch bazlı, doktor başına bir satır)."""
+
+    __tablename__ = "makbuz_send_logs"
+
+    TRIGGER_MANUAL = "manual"
+    TRIGGER_SCHEDULER = "scheduler"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    batch_id: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
+    makbuz_id: Mapped[int | None] = mapped_column(ForeignKey("makbuzlar.id"), nullable=True, index=True)
+    party_id: Mapped[int | None] = mapped_column(ForeignKey("parties.id"), nullable=True, index=True)
+
+    # Snapshot fields so history stays readable if the doctor/makbuz changes
+    doctor_name: Mapped[str] = mapped_column(String(200), nullable=False)
+    phone: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    year: Mapped[int] = mapped_column(Integer, nullable=False)
+    month: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    success: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    triggered_by: Mapped[str] = mapped_column(String(20), nullable=False, default=TRIGGER_MANUAL)
+
+    def __repr__(self) -> str:
+        return f"<MakbuzSendLog {self.doctor_name} {self.year}-{self.month:02d} {'ok' if self.success else 'fail'}>"
+
+
 class LoginAttempt(Base, TimestampMixin):
     __tablename__ = "login_attempts"
 
