@@ -246,16 +246,16 @@ def test_send_failure_keeps_status(client, app):
         assert db.session.get(Makbuz, makbuz_id).status == Makbuz.STATUS_DRAFT
 
 
-def test_bulk_approve_and_send(client, app):
+def test_bulk_generate_creates_drafts_without_sending(client, app):
     login(client, "admin", "admin-pass")
     p1 = _make_doctor(app, name="Dr. Bulk One", phone="+905551110001")
     p2 = _make_doctor(app, name="Dr. Bulk Two", phone="+905551110002")
     _add_work_order(app, p1, date(2026, 6, 3), 1000)
     _add_work_order(app, p2, date(2026, 6, 4), 2000)
 
-    with patch("app.services.whatsapp_service.WhatsAppService.send_makbuz_message", return_value={"success": True, "message": "ok"}):
+    with patch("app.services.whatsapp_service.WhatsAppService.send_makbuz_message") as mock_send:
         response = client.post(
-            "/makbuzlar/bulk-send",
+            "/makbuzlar/bulk-generate",
             data={
                 "year": 2026, "month": 6,
                 "party_ids": [str(p1), str(p2)],
@@ -265,14 +265,15 @@ def test_bulk_approve_and_send(client, app):
             follow_redirects=False,
         )
         assert response.status_code == 302
+        mock_send.assert_not_called()
 
     with app.app_context():
         m1 = db.session.execute(db.select(Makbuz).where(Makbuz.party_id == p1)).scalar_one()
         m2 = db.session.execute(db.select(Makbuz).where(Makbuz.party_id == p2)).scalar_one()
-        assert m1.status == Makbuz.STATUS_SENT
+        assert m1.status == Makbuz.STATUS_DRAFT
         assert m1.vat_applied is True
         assert m1.grand_total == Decimal("1100.00")
-        assert m2.status == Makbuz.STATUS_SENT
+        assert m2.status == Makbuz.STATUS_DRAFT
         assert m2.vat_applied is False
 
 

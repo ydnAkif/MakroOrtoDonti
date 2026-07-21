@@ -233,45 +233,33 @@ def send_makbuz(makbuz_id):
     return redirect(url_for("makbuzlar.detail_makbuz", party_id=makbuz.party_id, year=makbuz.year, month=makbuz.month))
 
 
-@makbuzlar_bp.route("/bulk-send", methods=["POST"])
+@makbuzlar_bp.route("/bulk-generate", methods=["POST"])
 @login_required
 @permissions_required("billing.edit")
-def bulk_approve_and_send():
+def bulk_generate_drafts():
     year = request.form.get("year", date.today().year, type=int)
     month = request.form.get("month", date.today().month, type=int)
     party_ids = request.form.getlist("party_ids", type=int)
 
     if not party_ids:
-        flash("Gönderilecek doktor seçilmedi.", "danger")
+        flash("Taslak oluşturulacak doktor seçilmedi.", "danger")
         return redirect(url_for("makbuzlar.list_makbuzlar", year=year, month=month))
 
-    generated, sent, failed = 0, 0, 0
+    generated, failed = 0, 0
     for pid in party_ids:
         vat_applied, vat_rate = _parse_vat_form(prefix=f"vat_{pid}_")
         try:
-            makbuz = _generate_makbuz(pid, year, month, vat_applied, vat_rate)
+            _generate_makbuz(pid, year, month, vat_applied, vat_rate)
             db.session.commit()
             generated += 1
         except ValueError:
             db.session.rollback()
-            makbuz = db.session.execute(
-                db.select(Makbuz).where(Makbuz.party_id == pid, Makbuz.year == year, Makbuz.month == month)
-            ).scalar_one_or_none()
-            if makbuz is None or makbuz.status == Makbuz.STATUS_DRAFT:
-                failed += 1
-                continue
-
-        success, _ = _send_makbuz(makbuz)
-        if success:
-            sent += 1
-        else:
             failed += 1
 
-    flash(
-        f"Toplu gönderim tamamlandı: {sent} makbuz gönderildi, {failed} başarısız "
-        f"({generated} taslak yeniden hesaplandı).",
-        "info" if not failed else "warning",
-    )
+    message = f"{generated} taslak makbuz oluşturuldu veya güncellendi."
+    if failed:
+        message += f" {failed} kilitli makbuz değiştirilemedi."
+    flash(message, "success" if not failed else "warning")
     return redirect(url_for("makbuzlar.list_makbuzlar", year=year, month=month))
 
 

@@ -2,7 +2,7 @@
 {% block title %}Makbuzlar - {{ clinic_name }}{% endblock %}
 
 {% block content %}
-<header class="workspace-header"><div><h1>Makbuzlar</h1><p>Aylık iş emirlerini kontrol edin ve gönderin.</p></div></header>
+<header class="workspace-header"><div><h1>Makbuzlar</h1><p>Aylık iş emirlerini kontrol edin ve taslak makbuzları hazırlayın.</p></div></header>
 
 <!-- Month/Year Filter -->
 <div class="toolbar-panel">
@@ -30,19 +30,19 @@
 <div class="summary-line">
     <div><span>İş emri</span><strong>{{ grand_total_count }}</strong></div>
     <div><span>Dönem toplamı</span><strong>₺{{ "{:,.2f}".format(grand_total_price) }}</strong></div>
-    <div><span>Gönderime hazır</span><strong>{{ draft_count }} makbuz</strong></div>
+    <div><span>Taslak</span><strong>{{ draft_count }} makbuz</strong></div>
 </div>
 
 <!-- Doctor List -->
-<form method="POST" action="{{ url_for('makbuzlar.bulk_approve_and_send') }}">
+<form method="POST" action="{{ url_for('makbuzlar.bulk_generate_drafts') }}">
     <input type="hidden" name="year" value="{{ year }}">
     <input type="hidden" name="month" value="{{ month }}">
     <div class="work-panel">
         <div class="work-panel__header">
             <div><h2>{{ months[month - 1][1] }} {{ year }}</h2><p>Doktor bazlı makbuz durumu</p></div>
             {% if draft_count %}
-            <button type="submit" class="btn btn-success btn-sm" onclick="return confirm('Seçilen doktorların makbuzları oluşturulup WhatsApp üzerinden gönderilecek. Devam edilsin mi?');">
-                <i class="bi bi-whatsapp"></i> Seçilenleri Onayla ve Gönder
+            <button type="submit" class="btn btn-primary btn-sm">
+                <i class="bi bi-file-earmark-plus" aria-hidden="true"></i> Seçilenler için taslak oluştur
             </button>
             {% endif %}
         </div>
