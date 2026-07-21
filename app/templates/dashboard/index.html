@@ -1,138 +1,35 @@
 {% extends "base.html" %}
 {% block title %}Genel Bakış - {{ clinic_name }}{% endblock %}
-
 {% block content %}
 {% if whatsapp_state != 'connected' %}
-<div
-  id="wa-connect-banner"
-  class="alert alert-warning alert-dismissible fade show d-none align-items-center mb-4"
-  role="alert"
->
-  <i class="bi bi-whatsapp me-2"></i>
-  <strong>WhatsApp bağlı değil.</strong>
-  Makbuz ve mesaj gönderebilmek için bağlantıyı kurun.
-  <a href="{{ url_for('whatsapp.index') }}" class="btn btn-sm btn-success ms-2">
-    <i class="bi bi-qr-code-scan"></i> Bağlan
-  </a>
-  <button
-    type="button"
-    class="btn-close"
-    data-bs-dismiss="alert"
-    aria-label="Kapat"
-  ></button>
+<div id="wa-connect-banner" class="notice-strip notice-strip--warning mb-3" role="status">
+    <i class="bi bi-whatsapp" aria-hidden="true"></i><span><strong>WhatsApp bağlı değil.</strong> Makbuz göndermek için bağlantıyı kurun.</span>
+    <a href="{{ url_for('whatsapp.index') }}" class="btn btn-sm btn-outline-secondary ms-auto">Bağlan</a>
 </div>
-<script>
-  (function () {
-    var banner = document.getElementById("wa-connect-banner");
-    if (!banner) return;
-    if (!sessionStorage.getItem("waBannerDismissed")) {
-      banner.classList.remove("d-none");
-    }
-    banner.addEventListener("closed.bs.alert", function () {
-      sessionStorage.setItem("waBannerDismissed", "1");
-    });
-  })();
-</script>
 {% endif %}
-<section class="dashboard-hero" aria-labelledby="dashboard-title">
-    <div class="dashboard-hero-content">
-        <span class="page-eyebrow text-white-50">Klinik özeti</span>
-        <h1 id="dashboard-title">Bugünün akışına<br>hakim olun.</h1>
-        <p>Diş hekimi hareketlerini, aylık iş emirlerini ve makbuz görünümünü tek bakışta izleyin.</p>
-        <div class="d-flex flex-wrap gap-2">
-            <a href="{{ url_for('parties.list_parties') }}" class="btn btn-light"><i class="bi bi-clipboard2-plus"></i>İş emri gir</a>
-            <a href="{{ url_for('makbuzlar.list_makbuzlar') }}" class="btn btn-outline-light"><i class="bi bi-receipt"></i>Makbuzlar</a>
-            <a href="{{ url_for('parties.add_party') }}" class="btn btn-outline-light"><i class="bi bi-person-plus"></i>Yeni diş hekimi</a>
-        </div>
-        {% if current_rate %}
-        <div class="hero-meta"><span><i class="bi bi-currency-exchange me-1"></i>1 EUR = ₺{{ "{:,.4f}".format(current_rate.eur_to_try) }}</span><span>1 USD = ₺{{ "{:,.4f}".format(current_usd_rate) if current_usd_rate else '—' }}</span><span>{{ current_rate.rate_date.strftime('%d.%m.%Y') }} kuru</span></div>
-        {% endif %}
+<header class="workspace-header">
+    <div><h1>Genel bakış</h1><p>Bugünkü klinik akışı</p></div>
+    <div class="workspace-actions">
+        <a href="{{ url_for('parties.list_parties') }}" class="btn btn-primary"><i class="bi bi-clipboard2-plus" aria-hidden="true"></i>İş emri gir</a>
+        <a href="{{ url_for('parties.add_party') }}" class="btn btn-outline-secondary"><i class="bi bi-person-plus" aria-hidden="true"></i>Doktor ekle</a>
     </div>
+</header>
+<nav class="workflow-strip" aria-label="Klinik iş akışı">
+    <a href="{{ url_for('parties.list_parties') }}"><span class="workflow-step">1</span><span><small>Doktorlar</small><strong>{{ total_patients }} aktif kayıt</strong></span></a>
+    <a href="{{ url_for('parties.list_parties') }}"><span class="workflow-step">2</span><span><small>Bu ayki iş emirleri</small><strong>{{ monthly_work_orders }} iş · ₺{{ "{:,.2f}".format(monthly_total_eur) }}</strong></span></a>
+    <a href="{{ url_for('makbuzlar.list_makbuzlar') }}"><span class="workflow-step">3</span><span><small>Makbuzlar</small><strong>{{ monthly_drafts }} taslak</strong></span></a>
+    <a href="{{ url_for('payments.list_payments') }}"><span class="workflow-step">4</span><span><small>Tahsilat</small><strong>{{ awaiting_payment }} ödeme bekliyor</strong></span></a>
+</nav>
+{% if current_rate %}<div class="rate-line"><i class="bi bi-currency-exchange" aria-hidden="true"></i><span>Güncel kur</span><strong>1 EUR = ₺{{ "{:,.4f}".format(current_rate.eur_to_try) }}</strong><small>{{ current_rate.rate_date.strftime('%d.%m.%Y') }}</small></div>{% endif %}
+<section class="work-panel" aria-labelledby="recent-workorders-title">
+    <div class="work-panel__header"><div><h2 id="recent-workorders-title">Son iş emirleri</h2><p>En son eklenen beş kayıt</p></div><a href="{{ url_for('makbuzlar.list_makbuzlar') }}" class="text-link">Makbuzlara git <i class="bi bi-arrow-right" aria-hidden="true"></i></a></div>
+    <div class="table-responsive"><table class="table table-hover align-middle compact-table">
+        <thead><tr><th>Tarih</th><th>Doktor</th><th>Hasta</th><th>İşlem</th><th class="text-end">Tutar</th></tr></thead>
+        <tbody>{% for wo in recent_work_orders %}<tr>
+            <td>{{ wo.work_date.strftime('%d.%m.%Y') }}</td><td><a href="{{ url_for('parties.detail_party', party_id=wo.party_id) }}">{{ wo.party.name if wo.party else '-' }}</a></td><td>{{ wo.patient_name }}</td>
+            <td>{% set items = wo.apparatus_type|fromjson %}{% if items is iterable and items is not string and items|length > 0 %}{{ items[0].name if items[0] is mapping else items[0] }}{% if items|length > 1 %} +{{ items|length - 1 }}{% endif %}{% else %}{{ wo.apparatus_type }}{% endif %}</td>
+            <td class="text-end"><strong>₺{{ "{:,.2f}".format(wo.total_price) }}</strong></td>
+        </tr>{% else %}<tr><td colspan="5" class="empty-state"><strong>Henüz iş emri yok.</strong><br><a href="{{ url_for('parties.list_parties') }}">İlk iş emrini girin</a></td></tr>{% endfor %}</tbody>
+    </table></div>
 </section>
-
-<div class="row g-3 mb-4">
-    <div class="col-6 col-xl-3">
-        <article class="card metric-card h-100">
-            <div class="card-body"><span class="metric-icon"><i class="bi bi-heart-pulse"></i></span><div class="metric-label">Toplam diş hekimi</div><p class="metric-value">{{ total_patients }}</p></div>
-        </article>
-    </div>
-    <div class="col-6 col-xl-3">
-        <article class="card metric-card h-100" style="--metric-color: var(--amber-500); --metric-tint: rgba(216,160,59,.13);">
-            <div class="card-body"><span class="metric-icon"><i class="bi bi-receipt"></i></span><div class="metric-label">Bu ayki iş emri</div><p class="metric-value">{{ monthly_work_orders }}</p></div>
-        </article>
-    </div>
-    <div class="col-6 col-xl-3">
-        <article class="card metric-card h-100" style="--metric-color: var(--success-500); --metric-tint: rgba(45,155,115,.13);">
-            <div class="card-body"><span class="metric-icon"><i class="bi bi-cash-stack"></i></span><div class="metric-label">Bu ayki toplam</div><p class="metric-value">₺{{ "{:,.2f}".format(monthly_total_eur) }}</p></div>
-        </article>
-    </div>
-    <div class="col-6 col-xl-3">
-        <article class="card metric-card h-100" style="--metric-color: var(--sky-500); --metric-tint: rgba(53,175,208,.13);">
-            <div class="card-body"><span class="metric-icon"><i class="bi bi-cash-stack"></i></span><div class="metric-label">Toplam iş emri</div><p class="metric-value">{{ total_work_orders_all }}</p></div>
-        </article>
-    </div>
-</div>
-
-<div class="row g-4">
-    <div class="col-xl-7">
-        <section class="card h-100" aria-labelledby="recent-workorders-title">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <div><span class="page-eyebrow mb-1">Son hareketler</span><h2 class="h5 mb-0" id="recent-workorders-title">Son iş emirleri</h2></div>
-                <a href="{{ url_for('makbuzlar.list_makbuzlar') }}" class="btn btn-sm btn-outline-primary">Tümünü gör<i class="bi bi-arrow-right"></i></a>
-            </div>
-            <div class="card-body p-0">
-                <div class="table-responsive">
-                    <table class="table table-hover align-middle">
-                        <thead><tr><th>Tarih</th><th>Doktor</th><th>Hasta</th><th>Aparat</th><th>Tutar</th></tr></thead>
-                        <tbody>
-                        {% for wo in recent_work_orders %}
-                            <tr>
-                                <td>{{ wo.work_date.strftime('%d.%m.%Y') }}</td>
-                                <td><a href="{{ url_for('makbuzlar.detail_makbuz', party_id=wo.party_id) }}">{{ wo.party.name if wo.party else '-' }}</a></td>
-                                <td>{{ wo.patient_name }}</td>
-                                <td>
-                                    {% set items = wo.apparatus_type|fromjson %}
-                                    {% if items is iterable and items is not string and items|length > 0 %}
-                                        {%- for item in items -%}
-                                            {{ item.name if item is mapping else item }}{% if not loop.last %}, {% endif %}
-                                        {%- endfor -%}
-                                    {% else %}
-                                        {{ wo.apparatus_type }}
-                                    {% endif %}
-                                </td>
-                                <td><strong>₺{{ "{:,.2f}".format(wo.total_price) }}</strong></td>
-                            </tr>
-                        {% else %}
-                            <tr><td colspan="5" class="empty-state text-muted"><i class="bi bi-receipt"></i>Henüz iş emri bulunmuyor.<br><a href="{{ url_for('parties.list_parties') }}">Diş hekimlerini görüntüleyin</a></td></tr>
-                        {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </section>
-    </div>
-
-    <div class="col-xl-5">
-        <section class="card h-100" aria-labelledby="recent-dentists-title">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <div><span class="page-eyebrow mb-1">Klinik hareketi</span><h2 class="h5 mb-0" id="recent-dentists-title">Son diş hekimleri</h2></div>
-                <a href="{{ url_for('parties.list_parties') }}" class="btn btn-sm btn-outline-primary" aria-label="Tüm diş hekimlerini gör"><i class="bi bi-arrow-right"></i></a>
-            </div>
-            <div class="list-group list-group-flush">
-                {% for p in recent_patients %}
-                <a href="{{ url_for('parties.detail_party', party_id=p.id) }}" class="list-group-item list-group-item-action p-3">
-                    <div class="d-flex justify-content-between align-items-center gap-3">
-                        <div class="d-flex align-items-center min-w-0">
-                            <div class="avatar-circle me-3 bg-success bg-opacity-10 text-success fw-bold rounded-circle d-flex align-items-center justify-content-center" style="width:42px;height:42px;">{{ (p.name[:2] if p.name else 'DH')|upper }}</div>
-                            <div><h3 class="h6 mb-1">{{ p.name }}</h3><small class="text-muted">{{ p.phone or 'Telefon eklenmemiş' }}</small></div>
-                        </div>
-                    </div>
-                </a>
-                {% else %}
-                <div class="empty-state text-muted"><i class="bi bi-person-plus"></i>Henüz diş hekimi bulunmuyor.<br><a href="{{ url_for('parties.add_party') }}">İlk diş hekimini ekleyin</a></div>
-                {% endfor %}
-            </div>
-        </section>
-    </div>
-</div>
 {% endblock %}

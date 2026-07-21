@@ -7,13 +7,6 @@
     <title>{% block title %}{{ clinic_name }}{% endblock %}</title>
     <meta name="theme-color" content="#123b48" />
     <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='images/brand-mark.svg') }}" />
-    <!-- Theme Switcher Init script to avoid flash of light theme -->
-    <script>
-        (function() {
-            const storedTheme = localStorage.getItem('theme') || 'light';
-            document.documentElement.setAttribute('data-bs-theme', storedTheme);
-        })();
-    </script>
     <link
       href="{{ url_for('static', filename='vendor/bootstrap/bootstrap.min.css') }}"
       rel="stylesheet"
@@ -84,7 +77,7 @@
       <a href="{{ url_for('parties.list_parties') }}" class="{% if 'parties' in request.endpoint|default('') %}active{% endif %}" {% if 'parties' in request.endpoint|default('') %}aria-current="page"{% endif %}><i class="bi bi-heart-pulse" aria-hidden="true"></i><span>Diş Hekimleri</span></a>
       <a href="{{ url_for('makbuzlar.list_makbuzlar') }}" class="{% if 'makbuzlar' in request.endpoint|default('') %}active{% endif %}" {% if 'makbuzlar' in request.endpoint|default('') %}aria-current="page"{% endif %}><i class="bi bi-receipt" aria-hidden="true"></i><span>Makbuzlar</span></a>
       <a href="{{ url_for('payments.list_payments') }}" class="{% if 'payment' in request.endpoint|default('') %}active{% endif %}" {% if 'payment' in request.endpoint|default('') %}aria-current="page"{% endif %}><i class="bi bi-wallet2" aria-hidden="true"></i><span>Tahsilat</span></a>
-      <a href="{{ url_for('settings.index') }}" class="{% if request.endpoint == 'settings.index' %}active{% endif %}" {% if request.endpoint == 'settings.index' %}aria-current="page"{% endif %}><i class="bi bi-sliders" aria-hidden="true"></i><span>Ayarlar</span></a>
+      <a href="{{ url_for('whatsapp.index') }}" class="{% if 'whatsapp' in request.endpoint|default('') %}active{% endif %}" {% if 'whatsapp' in request.endpoint|default('') %}aria-current="page"{% endif %}><i class="bi bi-whatsapp" aria-hidden="true"></i><span>WhatsApp</span></a>
     </nav>
     {% endif %}
 

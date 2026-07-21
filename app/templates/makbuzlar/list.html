@@ -2,13 +2,10 @@
 {% block title %}Makbuzlar - {{ clinic_name }}{% endblock %}
 
 {% block content %}
-<header class="page-header">
-    <div><span class="page-eyebrow">Finans</span><h1>Makbuzlar</h1><p class="page-description">Doktorlara göre aylık iş emri toplamlarını görüntüleyin.</p></div>
-</header>
+<header class="workspace-header"><div><h1>Makbuzlar</h1><p>Aylık iş emirlerini kontrol edin ve gönderin.</p></div></header>
 
 <!-- Month/Year Filter -->
-<div class="card border-0 shadow-sm mb-4">
-    <div class="card-body">
+<div class="toolbar-panel">
         <form method="GET" action="{{ url_for('makbuzlar.list_makbuzlar') }}" class="row g-3 align-items-end">
             <div class="col-md-3">
                 <label class="form-label">Yıl</label>
@@ -26,60 +23,23 @@
                     {% endfor %}
                 </select>
             </div>
-            <div class="col-md-2">
-                <button type="submit" class="btn btn-primary w-100"><i class="bi bi-funnel"></i> Filtrele</button>
-            </div>
+            <noscript><div class="col-md-2"><button type="submit" class="btn btn-primary w-100">Göster</button></div></noscript>
         </form>
-    </div>
 </div>
 
-<!-- Grand Totals -->
-<div class="row g-3 mb-4">
-    <div class="col-6 col-md-3">
-        <article class="card metric-card h-100">
-            <div class="card-body">
-                <span class="metric-icon"><i class="bi bi-receipt"></i></span>
-                <div class="metric-label">Toplam İş Emri</div>
-                <p class="metric-value">{{ grand_total_count }}</p>
-            </div>
-        </article>
-    </div>
-    <div class="col-6 col-md-3">
-        <article class="card metric-card h-100" style="--metric-color: var(--amber-500); --metric-tint: rgba(216,160,59,.13);">
-            <div class="card-body">
-                <span class="metric-icon"><i class="bi bi-gear"></i></span>
-                <div class="metric-label">Aparat Toplamı</div>
-                <p class="metric-value">₺{{ "{:,.2f}".format(grand_total_apparatus) }}</p>
-            </div>
-        </article>
-    </div>
-    <div class="col-6 col-md-3">
-        <article class="card metric-card h-100" style="--metric-color: var(--success-500); --metric-tint: rgba(45,155,115,.13);">
-            <div class="card-body">
-                <span class="metric-icon"><i class="bi bi-plus-circle"></i></span>
-                <div class="metric-label">Ekstra Toplam</div>
-                <p class="metric-value">₺{{ "{:,.2f}".format(grand_total_extra) }}</p>
-            </div>
-        </article>
-    </div>
-    <div class="col-6 col-md-3">
-        <article class="card metric-card h-100" style="--metric-color: var(--sky-500); --metric-tint: rgba(53,175,208,.13);">
-            <div class="card-body">
-                <span class="metric-icon"><i class="bi bi-cash-stack"></i></span>
-                <div class="metric-label">Genel Toplam</div>
-                <p class="metric-value">₺{{ "{:,.2f}".format(grand_total_price) }}</p>
-            </div>
-        </article>
-    </div>
+<div class="summary-line">
+    <div><span>İş emri</span><strong>{{ grand_total_count }}</strong></div>
+    <div><span>Dönem toplamı</span><strong>₺{{ "{:,.2f}".format(grand_total_price) }}</strong></div>
+    <div><span>Gönderime hazır</span><strong>{{ draft_count }} makbuz</strong></div>
 </div>
 
 <!-- Doctor List -->
 <form method="POST" action="{{ url_for('makbuzlar.bulk_approve_and_send') }}">
     <input type="hidden" name="year" value="{{ year }}">
     <input type="hidden" name="month" value="{{ month }}">
-    <div class="card border-0 shadow-sm">
-        <div class="card-header bg-white d-flex align-items-center justify-content-between flex-wrap gap-2">
-            <h5 class="mb-0"><i class="bi bi-people"></i> {{ months[month - 1][1] }} {{ year }} - Doktor Bazlı Toplamlar</h5>
+    <div class="work-panel">
+        <div class="work-panel__header">
+            <div><h2>{{ months[month - 1][1] }} {{ year }}</h2><p>Doktor bazlı makbuz durumu</p></div>
             {% if draft_count %}
             <button type="submit" class="btn btn-success btn-sm" onclick="return confirm('Seçilen doktorların makbuzları oluşturulup WhatsApp üzerinden gönderilecek. Devam edilsin mi?');">
                 <i class="bi bi-whatsapp"></i> Seçilenleri Onayla ve Gönder
@@ -96,8 +56,6 @@
                             </th>
                             <th>Doktor</th>
                             <th class="text-center">İş Emri</th>
-                            <th class="text-end">Aparat (₺)</th>
-                            <th class="text-end">Ekstra (₺)</th>
                             <th class="text-end">Toplam (₺)</th>
                             <th>Durum</th>
                             <th>KDV</th>
@@ -115,9 +73,6 @@
                             </td>
                             <td>
                                 <div class="d-flex align-items-center">
-                                    <div class="avatar-circle me-2 bg-success bg-opacity-10 text-success fw-bold rounded-circle d-flex align-items-center justify-content-center" style="width:38px;height:38px;font-size:0.85rem;">
-                                        {{ (d.party.name[:2] if d.party else 'DH')|upper }}
-                                    </div>
                                     <div>
                                         <a href="{{ url_for('makbuzlar.detail_makbuz', party_id=d.party_id, year=year, month=month) }}" class="fw-bold text-decoration-none">{{ d.party.name if d.party else '-' }}</a>
                                         {% if d.party and d.party.phone %}<br><small class="text-muted">{{ d.party.phone }}</small>{% endif %}
@@ -125,8 +80,6 @@
                                 </div>
                             </td>
                             <td class="text-center"><span class="badge bg-primary">{{ d.count }}</span></td>
-                            <td class="text-end">₺{{ "{:,.2f}".format(d.total_apparatus) }}</td>
-                            <td class="text-end">₺{{ "{:,.2f}".format(d.total_extra) }}</td>
                             <td class="text-end fw-bold">₺{{ "{:,.2f}".format((m.grand_total if m else d.total_price)) }}</td>
                             <td>
                                 {% if m %}
@@ -139,7 +92,8 @@
                                 {% if not m or m.status == 'draft' %}
                                 <div class="form-check form-switch">
                                     <input class="form-check-input" type="checkbox" name="vat_{{ d.party_id }}_vat_applied" id="vat-{{ d.party_id }}">
-                                    <input type="number" step="0.01" min="0" class="form-control form-control-sm mt-1" style="width:5.5rem;" name="vat_{{ d.party_id }}_vat_rate" value="20" placeholder="Oran %">
+                                    <label class="form-check-label small" for="vat-{{ d.party_id }}">%20</label>
+                                    <input type="hidden" name="vat_{{ d.party_id }}_vat_rate" value="20">
                                 </div>
                                 {% elif m.vat_applied %}
                                 <small class="text-muted">%{{ '{:.2f}'.format(m.vat_rate) }}</small>
@@ -160,7 +114,7 @@
                         </tr>
                         {% else %}
                         <tr>
-                            <td colspan="9" class="empty-state text-muted">
+                            <td colspan="7" class="empty-state text-muted">
                                 <i class="bi bi-receipt"></i>
                                 Bu ay için iş emri bulunmamaktadır.
                             </td>
@@ -173,8 +127,6 @@
                             <td></td>
                             <td class="fw-bold">TOPLAM</td>
                             <td class="text-center fw-bold">{{ grand_total_count }}</td>
-                            <td class="text-end fw-bold">₺{{ "{:,.2f}".format(grand_total_apparatus) }}</td>
-                            <td class="text-end fw-bold">₺{{ "{:,.2f}".format(grand_total_extra) }}</td>
                             <td class="text-end fw-bold fs-5">₺{{ "{:,.2f}".format(grand_total_price) }}</td>
                             <td colspan="3"></td>
                         </tr>

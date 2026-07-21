@@ -1,9 +1,9 @@
 from flask import Blueprint, render_template
 from flask_login import login_required
-from datetime import date, timedelta
+from datetime import date
 
 from app.extensions import db
-from app.models.models import Party, PartyType, Treatment, ExchangeRate, WorkOrder
+from app.models.models import Party, PartyType, ExchangeRate, WorkOrder, Makbuz
 from sqlalchemy import extract
 
 dashboard_bp = Blueprint("dashboard", __name__)
@@ -17,10 +17,6 @@ def index():
             Party.party_type == PartyType.DENTIST,
             Party.is_active == True
         )
-    ).scalar() or 0
-
-    total_treatments = db.session.execute(
-        db.select(db.func.count(Treatment.id)).where(Treatment.is_active == True)
     ).scalar() or 0
 
     today = date.today()
@@ -41,21 +37,21 @@ def index():
         )
     ).scalar() or 0
 
-    total_work_orders_all = db.session.execute(
-        db.select(db.func.count(WorkOrder.id))
+    monthly_drafts = db.session.execute(
+        db.select(db.func.count(Makbuz.id)).where(
+            Makbuz.year == current_year,
+            Makbuz.month == current_month,
+            Makbuz.status == Makbuz.STATUS_DRAFT,
+        )
+    ).scalar() or 0
+    awaiting_payment = db.session.execute(
+        db.select(db.func.count(Makbuz.id)).where(Makbuz.status == Makbuz.STATUS_SENT)
     ).scalar() or 0
 
     recent_work_orders = db.session.execute(
         db.select(WorkOrder)
         .join(Party, WorkOrder.party_id == Party.id)
         .order_by(WorkOrder.created_at.desc())
-        .limit(5)
-    ).scalars().all()
-
-    recent_patients = db.session.execute(
-        db.select(Party)
-        .where(Party.party_type == PartyType.DENTIST, Party.is_active == True)
-        .order_by(Party.created_at.desc())
         .limit(5)
     ).scalars().all()
 
@@ -68,12 +64,11 @@ def index():
     return render_template(
         "dashboard/index.html",
         total_patients=total_patients,
-        total_treatments=total_treatments,
         monthly_work_orders=monthly_work_orders,
         monthly_total_eur=monthly_total_eur,
-        total_work_orders_all=total_work_orders_all,
+        monthly_drafts=monthly_drafts,
+        awaiting_payment=awaiting_payment,
         recent_work_orders=recent_work_orders,
-        recent_patients=recent_patients,
         current_rate=current_rate,
         current_usd_rate=current_rate.usd_to_try if current_rate else None,
     )

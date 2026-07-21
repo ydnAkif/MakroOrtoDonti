@@ -2,33 +2,11 @@
 {% block title %}Tahsilatlar - {{ clinic_name }}{% endblock %}
 
 {% block content %}
-<header class="page-header">
-    <div><span class="page-eyebrow">Nakit akışı</span><h1>Tahsilatlar</h1><p class="page-description">Doktor bazında toplam faturalanan, tahsil edilen ve bakiye tutarları.</p></div>
-</header>
-
-<!-- Summary Metrics -->
-<div class="row g-3 mb-4">
-    <div class="col-md-4">
-        <div class="card metric-card h-100" style="--metric-color: var(--sky-500); --metric-tint: rgba(53,175,208,.13);">
-            <div class="card-body">
-                <span class="metric-icon"><i class="bi bi-receipt"></i></span><div class="metric-label">Toplam Faturalanan</div><p class="metric-value">₺{{ "{:,.2f}".format(grand_billed) }}</p>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-4">
-        <div class="card metric-card h-100" style="--metric-color: var(--success-500); --metric-tint: rgba(45,155,115,.13);">
-            <div class="card-body">
-                <span class="metric-icon"><i class="bi bi-cash-stack"></i></span><div class="metric-label">Toplam Tahsil Edilen</div><p class="metric-value">₺{{ "{:,.2f}".format(grand_paid) }}</p>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-4">
-        <div class="card metric-card h-100" style="--metric-color: var(--amber-500); --metric-tint: rgba(216,160,59,.13);">
-            <div class="card-body">
-                <span class="metric-icon"><i class="bi bi-exclamation-circle"></i></span><div class="metric-label">Bekleyen Bakiye</div><p class="metric-value">₺{{ "{:,.2f}".format(grand_outstanding) }}</p>
-            </div>
-        </div>
-    </div>
+<header class="workspace-header"><div><h1>Tahsilatlar</h1><p>Bekleyen ödemeleri kaydedin ve doktor bakiyelerini izleyin.</p></div></header>
+<div class="summary-line">
+    <div><span>Faturalanan</span><strong>₺{{ "{:,.2f}".format(grand_billed) }}</strong></div>
+    <div><span>Tahsil edilen</span><strong>₺{{ "{:,.2f}".format(grand_paid) }}</strong></div>
+    <div><span>Bekleyen bakiye</span><strong>₺{{ "{:,.2f}".format(grand_outstanding) }}</strong></div>
 </div>
 
 <!-- Section Tabs -->
@@ -50,10 +28,9 @@
 <div class="tab-content" id="paymentsTabContent">
     <!-- Pending Makbuzlar Tab Pane -->
     <div class="tab-pane fade show active" id="pending-pane" role="tabpanel">
-        <div class="card border-0 shadow-sm border-start border-warning border-4">
-            <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
-                <h6 class="mb-0 text-warning fw-bold"><i class="bi bi-exclamation-circle"></i> Gönderildi, Ödemesi Bekleniyor</h6>
-                <span class="text-muted small">Ödeme aldığınız makbuzun yanındaki 'Ödeme Kaydet' butonuna tıklayın.</span>
+        <div class="work-panel">
+            <div class="work-panel__header">
+                <div><h2>Ödeme bekleyenler</h2><p>Ödemeyi aldığınızda kaydı tamamlayın.</p></div>
             </div>
             <div class="card-body {% if pending_makbuzlar %}p-0{% endif %}">
                 {% if pending_makbuzlar %}

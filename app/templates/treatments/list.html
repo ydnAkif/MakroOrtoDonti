@@ -2,8 +2,8 @@
 {% block title %}İşlemler - {{ clinic_name }}{% endblock %}
 
 {% block content %}
-<header class="page-header">
-    <div><span class="page-eyebrow">Klinik katalog</span><h1>İşlem kataloğu</h1><p class="page-description">İşlem tanımlarını, kategorileri ve fiyatlarını güncel tutun.</p></div>
+<header class="workspace-header">
+    <div><h1>İşlem kataloğu</h1><p>İşlem adları, kategoriler ve fiyatlar.</p></div>
     <div class="d-flex gap-2">
         <a href="{{ url_for('treatments.import_treatments') }}" class="btn btn-outline-success">
             <i class="bi bi-upload"></i> XLS içe aktar
