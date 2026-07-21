@@ -59,6 +59,8 @@ def create_app(config_class=Config) -> Flask:
 
     # Register transactional audit listeners before handling requests.
     from .services import audit_service  # noqa: F401
+    # Registers the Turkish-aware tr_fold() function on SQLite connections.
+    from .services import search_service  # noqa: F401
     from .services.observability import init_observability
     init_observability(app)
 

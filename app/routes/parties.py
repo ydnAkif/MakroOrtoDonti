@@ -37,12 +37,16 @@ def list_parties():
     )
 
     if search:
-        search_pattern = f"%{search}%"
+        from app.services.search_service import tr_contains
+
+        phone_digits = search.replace(" ", "").replace("-", "")
         query = query.where(
             db.or_(
-                Party.name.ilike(search_pattern),
-                Party.phone.ilike(search_pattern),
-                Party.email.ilike(search_pattern),
+                tr_contains(Party.name, search),
+                tr_contains(Party.email, search),
+                db.func.replace(db.func.replace(Party.phone, " ", ""), "-", "").ilike(
+                    f"%{phone_digits}%"
+                ),
             )
         )
 
@@ -119,13 +123,14 @@ def import_parties():
                 tax_id = _text(row[4] if len(row) > 4 else None, 50)
                 notes = _text(row[5] if len(row) > 5 else None, 2000)
 
+                # Yalnızca isimle eşleştir (Türkçe duyarlı): aynı telefonu paylaşan
+                # farklı isimli kayıtlar (ör. iki şubeli klinik) ayrı satır kalmalı.
+                from app.services.search_service import tr_equals
+
                 existing = db.session.execute(
                     db.select(Party).where(
                         Party.party_type == PartyType.DENTIST,
-                        db.or_(
-                            db.func.lower(Party.name) == name.lower(),
-                            db.and_(Party.phone.isnot(None), Party.phone == phone) if phone else db.false(),
-                        ),
+                        tr_equals(Party.name, name),
                     )
                 ).scalars().first()
 

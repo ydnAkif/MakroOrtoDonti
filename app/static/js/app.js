@@ -15,11 +15,14 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function normalizeText(value) {
+        // NFD \u015f/\u011f/\u00fc/\u00f6/\u00e7'yi ayr\u0131\u015ft\u0131r\u0131r; noktas\u0131z "\u0131" ayr\u0131\u015fmad\u0131\u011f\u0131 i\u00e7in ayr\u0131ca
+        // "i"ye indirgenir ki "pinar" aramas\u0131 "P\u0131nar"\u0131 bulsun.
         return (value || '')
             .toString()
             .toLowerCase()
             .normalize('NFD')
-            .replace(/[\u0300-\u036f]/g, '');
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/\u0131/g, 'i');
     }
 
     // Typeahead for selects with many options

@@ -77,3 +77,22 @@ def test_dentist_work_order_and_makbuz_payment_critical_flow(authenticated_page,
     page.get_by_role("button", name="Kaydet").click()
     page.wait_for_url(f"{live_server_url}/payments/")
     assert page.get_by_text("₺100.00").first.is_visible()
+
+
+def test_turkish_search_in_browser_filters(authenticated_page, live_server_url):
+    """ASCII yazım ('pinar', 'sahin') Türkçe isimleri hem sunucu aramasında
+    hem istemci tarafı filtrelerde bulmalı."""
+    page = authenticated_page
+
+    # Sunucu tarafı: diş hekimi listesi araması
+    page.goto(f"{live_server_url}/parties/?search=pinar")
+    assert page.get_by_text("Dr. Pınar Şahin").first.is_visible()
+
+    # İstemci tarafı: WhatsApp toplu mesaj kişi filtresi
+    page.goto(f"{live_server_url}/whatsapp/")
+    filter_input = page.locator("input.js-checkbox-filter")
+    filter_input.fill("sahin")
+    pinar_row = page.locator("#bulk-patient-list .form-check", has_text="Dr. Pınar Şahin")
+    other_row = page.locator("#bulk-patient-list .form-check", has_text="Dr. E2E Hekim")
+    assert pinar_row.is_visible()
+    assert other_row.is_hidden()

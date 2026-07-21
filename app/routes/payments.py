@@ -29,7 +29,9 @@ def list_payments():
         Party.party_type == PartyType.DENTIST, Party.is_active == True
     )
     if search:
-        doctors_query = doctors_query.where(Party.name.ilike(f"%{search}%"))
+        from app.services.search_service import tr_contains
+
+        doctors_query = doctors_query.where(tr_contains(Party.name, search))
     doctors = db.session.execute(doctors_query.order_by(Party.name)).scalars().all()
 
     makbuz_query = db.select(Makbuz)

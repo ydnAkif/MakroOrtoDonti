@@ -36,7 +36,9 @@ def list_treatments():
     if category:
         query = query.where(Treatment.category == category)
     if search:
-        query = query.where(Treatment.name.ilike(f"%{search}%"))
+        from app.services.search_service import tr_contains
+
+        query = query.where(tr_contains(Treatment.name, search))
 
     query = query.order_by(Treatment.category, Treatment.name)
     pagination = db.paginate(query, page=max(request.args.get("page", 1, type=int), 1), per_page=30, max_per_page=100, error_out=False)

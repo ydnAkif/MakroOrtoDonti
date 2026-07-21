@@ -118,6 +118,10 @@ Oturum `data/whatsapp_session.db` dosyasında saklanır; uygulama yeniden başla
 
 **Tek worker zorunluluğu:** WhatsApp istemcisi süreç içinde tek bir arka plan thread'inde çalışır ve oturum dosyası süreçler arasında paylaşılamaz. Gunicorn **`--workers 1`** ile çalıştırılmalıdır. Yanlışlıkla çok worker başlatılırsa `data/whatsapp.worker.lock` üzerindeki dosya kilidi sayesinde istemciyi yalnız bir worker sahiplenir; diğer worker'lardaki gönderimler açık bir hata mesajıyla reddedilir.
 
+## Türkçe duyarlı arama
+
+Diş hekimi, tahsilat ve işlem kataloğu aramaları ile sayfa içi filtreler Türkçe karakterlere duyarlıdır: sorgu ve kayıt ortak ASCII iskelete indirgenir (İ/ı→i, Ş/ş→s, Ğ/ğ→g, Ü/ü→u, Ö/ö→o, Ç/ç→c). Böylece "pinar" araması "Pınar"ı, "busra" araması "Büşra"yı bulur; telefon aramasında boşluk ve tire yok sayılır. SQLite bağlantılarına `tr_fold` fonksiyonu otomatik kaydedilir (`app/services/search_service.py`). Excel'den doktor içe aktarma da aynı katlamayla **yalnızca isme göre** eşleştirir; aynı telefonu paylaşan farklı isimli kayıtlar (ör. iki şubeli klinik) ayrı satır olarak korunur.
+
 ## Zamanlanmış işler
 
 Döviz kuru artık kullanıcı isteği içinden thread başlatmaz. Sistem cron'u veya platform scheduler'ı günde bir kez şu komutu çalıştırmalıdır:
@@ -180,7 +184,7 @@ GitHub Actions, her push ve pull request için Python 3.13/3.14 üzerinde derlem
 
 ## Bilinen sınırlar
 
-- WhatsApp toplu gönderimi HTTP request içinde senkron ve kişi başına 3 saniye beklemeli çalışır.
+- WhatsApp toplu *metin* mesajı HTTP request içinde senkron ve kişi başına 3 saniye beklemeli çalışır (makbuz gönderimi arka plan kuyruğundadır).
 - WhatsApp bağlantı durumu process-local olduğundan çoklu Gunicorn worker ile güvenilir değildir.
 - SMTP/WhatsApp/kur/import akışlarının bazıları haricî exception metnini kullanıcı mesajına taşır.
 - Login kilidi IP ve kullanıcı adını tek `OR` sayacında birleştirir; hedefli hesap kilitleme riskini azaltacak bağımsız limitler planlanmıştır.
