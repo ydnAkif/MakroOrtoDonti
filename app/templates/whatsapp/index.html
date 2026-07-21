@@ -447,9 +447,19 @@ endblock %} {% block content %}
             <input
               type="text"
               class="form-control mb-2 js-checkbox-filter"
+              id="bulk-patient-filter"
               data-target="#bulk-patient-list .form-check"
               placeholder="Yazdıkça kişi filtrele..."
             />
+            <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+              <button type="button" class="btn btn-sm btn-outline-secondary" id="bulk-select-all">
+                Tümünü seç
+              </button>
+              <button type="button" class="btn btn-sm btn-outline-secondary" id="bulk-select-none">
+                Seçimi temizle
+              </button>
+              <span class="small text-muted ms-auto" id="bulk-selected-count">{{ patients|length }} kişi seçildi</span>
+            </div>
             <div
               id="bulk-patient-list"
               class="border rounded p-3"
@@ -463,6 +473,7 @@ endblock %} {% block content %}
                   name="patient_ids"
                   value="{{ p.id }}"
                   id="patient_{{ p.id }}"
+                  checked
                 />
                 <label class="form-check-label" for="patient_{{ p.id }}">
                   {{ p.display_name }} ({{ p.phone|phone_display }})
@@ -488,13 +499,14 @@ endblock %} {% block content %}
           <button
             type="submit"
             class="btn btn-warning"
+            id="bulk-message-submit"
             onclick="
               return confirm(
                 'Seçili kişilere mesaj gönderilecek. Emin misiniz?',
               );
             "
           >
-            <i class="bi bi-megaphone"></i> Toplu Gönder
+            <i class="bi bi-megaphone"></i> <span>Toplu Gönder ({{ patients|length }})</span>
           </button>
         </form>
       </div>
@@ -555,6 +567,59 @@ endblock %} {% block content %}
       });
     }
     updateCount();
+
+    // ---- Bulk free-message selection ---------------------------------
+    var bulkChecks = Array.prototype.slice.call(
+      document.querySelectorAll('#bulk-patient-list input[name="patient_ids"]')
+    );
+    var bulkSelectAll = document.getElementById("bulk-select-all");
+    var bulkSelectNone = document.getElementById("bulk-select-none");
+    var bulkCount = document.getElementById("bulk-selected-count");
+    var bulkSubmit = document.getElementById("bulk-message-submit");
+    var bulkFilter = document.getElementById("bulk-patient-filter");
+
+    function visibleBulkChecks() {
+      return bulkChecks.filter(function (checkbox) {
+        return checkbox.closest(".form-check").style.display !== "none";
+      });
+    }
+
+    function updateBulkCount() {
+      var selected = bulkChecks.filter(function (checkbox) {
+        return checkbox.checked;
+      }).length;
+      if (bulkCount) bulkCount.textContent = selected + " kişi seçildi";
+      if (bulkSubmit) {
+        bulkSubmit.disabled = selected === 0;
+        bulkSubmit.querySelector("span").textContent = "Toplu Gönder (" + selected + ")";
+      }
+    }
+
+    if (bulkSelectAll) {
+      bulkSelectAll.addEventListener("click", function () {
+        visibleBulkChecks().forEach(function (checkbox) {
+          checkbox.checked = true;
+        });
+        updateBulkCount();
+      });
+    }
+    if (bulkSelectNone) {
+      bulkSelectNone.addEventListener("click", function () {
+        visibleBulkChecks().forEach(function (checkbox) {
+          checkbox.checked = false;
+        });
+        updateBulkCount();
+      });
+    }
+    bulkChecks.forEach(function (checkbox) {
+      checkbox.addEventListener("change", updateBulkCount);
+    });
+    if (bulkFilter) {
+      bulkFilter.addEventListener("input", function () {
+        window.setTimeout(updateBulkCount, 0);
+      });
+    }
+    updateBulkCount();
 
     // ---- Status + job polling -----------------------------------------
     var statusUrl = "{{ url_for('whatsapp.status') }}";

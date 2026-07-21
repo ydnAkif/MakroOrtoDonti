@@ -490,6 +490,25 @@ class TestWhatsAppMakbuzPanel:
         assert b"wa-select-all" in response.data
         assert "Makbuz Gönderimi".encode() in response.data
 
+    def test_bulk_message_recipients_default_to_all_selected(self, client, app):
+        login(client, "admin", "admin-pass")
+        _seed_doctor_with_makbuz(
+            app, name="Dr. Toplu Bir", phone="+905551110061"
+        )
+        _seed_doctor_with_makbuz(
+            app, name="Dr. Toplu İki", phone="+905551110062"
+        )
+
+        html = client.get("/whatsapp/").get_data(as_text=True)
+        bulk_section = html.split("Toplu Mesaj Gönderimi", 1)[1]
+        recipient_inputs = bulk_section.split('name="message"', 1)[0]
+        assert 'id="bulk-select-all"' in bulk_section
+        assert 'id="bulk-select-none"' in bulk_section
+        assert "Seçimi temizle" in bulk_section
+        assert recipient_inputs.count('name="patient_ids"') >= 2
+        for markup in recipient_inputs.split('name="patient_ids"')[1:]:
+            assert "checked" in markup.split("/>", 1)[0]
+
     def test_index_empty_period_shows_hint(self, client, app):
         login(client, "admin", "admin-pass")
         response = client.get("/whatsapp/?year=2020&month=2")
