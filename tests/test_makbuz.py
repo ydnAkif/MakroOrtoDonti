@@ -276,6 +276,14 @@ def test_bulk_generate_creates_drafts_without_sending(client, app):
         assert m2.status == Makbuz.STATUS_DRAFT
         assert m2.vat_applied is False
 
+    list_html = client.get("/makbuzlar/?year=2026&month=6").get_data(as_text=True)
+    p1_vat_control = list_html.split(f'id="vat-{p1}"', 1)[1].split(">", 1)[0]
+    p2_vat_control = list_html.split(f'id="vat-{p2}"', 1)[1].split(">", 1)[0]
+    assert "checked" in p1_vat_control
+    assert "checked" not in p2_vat_control
+    assert f'name="vat_{p1}_vat_rate" value="10.00"' in list_html
+    assert "₺3,100.00" in list_html
+
 
 def test_scheduler_generates_previous_month_drafts_once(app):
     from app.services.scheduler_service import _generate_monthly_drafts, _previous_month

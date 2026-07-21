@@ -131,7 +131,10 @@ def list_makbuzlar():
 
     grand_total_apparatus = sum(d["total_apparatus"] for d in doctors)
     grand_total_extra = sum(d["total_extra"] for d in doctors)
-    grand_total_price = sum(d["total_price"] for d in doctors)
+    grand_total_price = sum(
+        (d["makbuz"].grand_total if d["makbuz"] else d["total_price"])
+        for d in doctors
+    )
     grand_total_count = sum(d["count"] for d in doctors)
     draft_count = sum(1 for d in doctors if d["makbuz"] is None or d["makbuz"].status == Makbuz.STATUS_DRAFT)
 
