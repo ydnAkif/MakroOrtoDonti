@@ -123,39 +123,76 @@ document.addEventListener('DOMContentLoaded', function() {
         select.dataset.searchReady = '1';
     });
 
-    // Server-side search for paginated lists: debounced auto-submit.
+    // Live server-side search for paginated lists — no page reload.
     // A client-only row filter can only see the current page's rows, so
-    // typing "ö" would never reveal matches sitting on other pages. Instead
-    // we submit the GET form (Turkish-aware search across the whole table)
-    // shortly after the user stops typing, and restore focus + caret after
-    // the reload so typing continues uninterrupted.
-    document.querySelectorAll('input.js-table-filter').forEach(function(input) {
+    // typing "ö" would never reveal matches on other pages. Instead we fetch
+    // just the results fragment (Turkish-aware search across the whole table)
+    // and swap it in, keeping the input, focus and scroll position intact.
+    document.querySelectorAll('input.js-live-search').forEach(function(input) {
         var form = input.closest('form');
-        if (!form) {
-            return;
+        var results = document.querySelector(input.getAttribute('data-results') || '');
+        if (!form || !results || !window.fetch || !window.DOMParser) {
+            return; // no JS support: the form still submits normally
         }
 
-        var delay = parseInt(input.getAttribute('data-autosubmit-delay'), 10) || 400;
+        var delay = parseInt(input.getAttribute('data-search-delay'), 10) || 250;
         var timer = null;
+        var controller = null;
+
+        function swapResults(html) {
+            var parsed = new DOMParser().parseFromString(html, 'text/html');
+            var nodes = Array.prototype.slice.call(parsed.body.childNodes);
+            results.replaceChildren();
+            nodes.forEach(function(node) {
+                results.appendChild(document.importNode(node, true));
+            });
+        }
+
+        function runSearch() {
+            var params = new URLSearchParams(new FormData(form));
+            params.set('partial', '1');
+
+            if (controller) {
+                controller.abort(); // drop the in-flight, now-stale request
+            }
+            controller = new AbortController();
+            results.setAttribute('aria-busy', 'true');
+
+            fetch(form.action + '?' + params.toString(), {
+                signal: controller.signal,
+                headers: { 'X-Requested-With': 'fetch' },
+                credentials: 'same-origin'
+            })
+                .then(function(response) { return response.text(); })
+                .then(function(html) {
+                    swapResults(html);
+                    results.removeAttribute('aria-busy');
+                    // Keep the address bar in sync so refresh/bookmark works,
+                    // without pushing a history entry per keystroke.
+                    params.delete('partial');
+                    var query = params.toString();
+                    window.history.replaceState({}, '', form.action + (query ? '?' + query : ''));
+                })
+                .catch(function(error) {
+                    if (error.name !== 'AbortError') {
+                        results.removeAttribute('aria-busy');
+                    }
+                });
+        }
+
         input.addEventListener('input', function() {
             clearTimeout(timer);
-            timer = setTimeout(function() {
-                if (form.requestSubmit) {
-                    form.requestSubmit();
-                } else {
-                    form.submit();
-                }
-            }, delay);
+            timer = setTimeout(runSearch, delay);
         });
 
-        // After an auto-submit reload the page comes back with the query in
-        // the box; return focus and place the caret at the end.
-        if (input.value) {
-            input.focus();
-            var value = input.value;
-            input.value = '';
-            input.value = value;
-        }
+        // Enter would reload the page; results are already live.
+        input.addEventListener('keydown', function(event) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                clearTimeout(timer);
+                runSearch();
+            }
+        });
     });
 
     // Generic checkbox list filter

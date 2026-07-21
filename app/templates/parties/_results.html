@@ -1,0 +1,59 @@
+{# Diş hekimi sonuç tablosu. Hem tam sayfada hem de canlı arama (partial=1)
+   isteğinde tek başına render edilir; bu yüzden base.html'i genişletmez. #}
+<div class="card border-0 shadow-sm">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0 party-table">
+                <thead class="table-light">
+                    <tr>
+                        <th>Ad / Ünvan</th>
+                        <th>Telefon</th>
+                        <th>E-posta</th>
+                        <th>Vergi No</th>
+                        <th class="text-end">İşlem</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in parties %}
+                    <tr class="party-row">
+                        <td class="party-name-cell">
+                            <a href="{{ url_for('parties.detail_party', party_id=p.id) }}" class="text-decoration-none fw-bold">
+                                {{ p.display_name }}
+                            </a>
+                        </td>
+                        <td class="party-phone-cell" data-label="Telefon">
+                            {% if p.phone %}<a href="tel:{{ p.phone }}">{{ p.phone }}</a>{% else %}-{% endif %}
+                        </td>
+                        <td class="party-email-cell" data-label="E-posta">
+                            {% if p.email %}<a href="mailto:{{ p.email }}">{{ p.email }}</a>{% else %}-{% endif %}
+                        </td>
+                        <td class="party-tax-cell" data-label="Vergi No">{{ p.tax_id or '-' }}</td>
+                        <td class="text-end party-actions-cell" data-label="İşlem">
+                            <a href="{{ url_for('parties.add_work_order', party_id=p.id) }}" class="btn btn-sm btn-primary" title="İş Emri Gir" aria-label="{{ p.display_name }} için iş emri gir">
+                                <i class="bi bi-clipboard2-plus" aria-hidden="true"></i> İş Emri
+                            </a>
+                            <a href="{{ url_for('parties.detail_party', party_id=p.id) }}" class="btn btn-sm btn-outline-secondary" title="Görüntüle" aria-label="{{ p.display_name }} ayrıntılarını görüntüle">
+                                <i class="bi bi-eye" aria-hidden="true"></i>
+                            </a>
+                            <a href="{{ url_for('parties.edit_party', party_id=p.id) }}" class="btn btn-sm btn-outline-primary" title="Düzenle" aria-label="{{ p.display_name }} kaydını düzenle">
+                                <i class="bi bi-pencil" aria-hidden="true"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr class="party-empty-row">
+                        <td colspan="5" class="text-center text-muted py-4">
+                            {% if search %}
+                                "{{ search }}" için sonuç bulunamadı.
+                            {% else %}
+                                Henüz diş hekimi bulunmuyor. <a href="{{ url_for('parties.add_party') }}">İlk kaydı ekleyin.</a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% include "components/pagination.html" %}

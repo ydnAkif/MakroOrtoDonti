@@ -124,6 +124,9 @@ def create_app(config_class=Config) -> Flask:
         auto_rate_error = None
         def page_url(page: int) -> str:
             args = request.args.to_dict(flat=True)
+            # "partial" yalnızca canlı arama isteğine aittir; sayfa
+            # bağlantılarına sızarsa tıklandığında tam sayfa yerine parça döner.
+            args.pop("partial", None)
             args["page"] = page
             return url_for(request.endpoint, **(request.view_args or {}), **args)
 

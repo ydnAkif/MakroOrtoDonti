@@ -15,7 +15,7 @@
         <form method="GET" action="{{ url_for('patients.list_patients') }}">
             <div class="input-group">
                 <span class="input-group-text"><i class="bi bi-search"></i></span>
-                <input type="text" class="form-control js-table-filter" name="search" value="{{ search }}" placeholder="Ad, soyad, telefon veya e-posta ile ara..." autocomplete="off">
+                <input type="text" class="form-control" name="search" value="{{ search }}" placeholder="Ad, soyad, telefon veya e-posta ile ara..." autocomplete="off">
                 <button type="submit" class="btn btn-primary">Ara</button>
                 {% if search %}
                 <a href="{{ url_for('patients.list_patients') }}" class="btn btn-outline-secondary">Temizle</a>

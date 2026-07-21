@@ -132,6 +132,38 @@ class TestPartySearch:
         response = client.get("/parties/?search=olmayanisim")
         assert "Şahin İşcan".encode() not in response.data
 
+    def test_partial_returns_only_results_fragment(self, client, app):
+        """Canlı arama sadece sonuç tablosunu ister: tam sayfa (layout, arama
+        formu) dönmemeli ki JS onu olduğu gibi tabloya yerleştirebilsin."""
+        login(client, "admin", "admin-pass")
+        _seed_dentist(app, "Şahin İşcan")
+
+        full = client.get("/parties/").get_data(as_text=True)
+        partial = client.get("/parties/?partial=1").get_data(as_text=True)
+
+        assert "Şahin İşcan" in partial
+        assert "<html" not in partial  # layout yok
+        assert "js-live-search" not in partial  # arama formu tekrarlanmıyor
+        assert "js-live-search" in full
+        assert 'id="parties-results"' in full
+
+    def test_partial_search_filters_and_keeps_pagination_clean(self, client, app):
+        login(client, "admin", "admin-pass")
+        with app.app_context():
+            for i in range(30):
+                db.session.add(Party(party_type=PartyType.DENTIST, name=f"Ahmet {i:02d}"))
+            db.session.add(Party(party_type=PartyType.DENTIST, name="Ömer Özkan"))
+            db.session.commit()
+
+        partial = client.get("/parties/?search=omer&partial=1").get_data(as_text=True)
+        assert "Ömer Özkan" in partial
+        assert "Ahmet 00" not in partial
+
+        # Sayfalama bağlantıları partial parametresini taşımamalı; aksi halde
+        # tıklandığında tam sayfa yerine parça açılır.
+        paged = client.get("/parties/?partial=1").get_data(as_text=True)
+        assert "partial=1" not in paged
+
     def test_search_finds_name_that_lives_on_a_later_page(self, client, app):
         """25/sayfa listede 'Ö' ile başlayan isim son sayfalarda olsa bile
         arama tüm veritabanını tarayıp bulmalı (istemci-sayfa filtresi değil)."""

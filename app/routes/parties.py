@@ -58,8 +58,14 @@ def list_parties():
     pagination = db.paginate(query, page=max(request.args.get("page", 1, type=int), 1), per_page=25, max_per_page=100, error_out=False)
     parties = pagination.items
 
+    # Canlı arama yalnızca sonuç tablosunu ister; sayfa yeniden yüklenmez.
+    template = (
+        "parties/_results.html"
+        if request.args.get("partial") == "1"
+        else "parties/list.html"
+    )
     return render_template(
-        "parties/list.html",
+        template,
         parties=parties,
         search=search,
         pagination=pagination,

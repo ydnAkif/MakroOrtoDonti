@@ -98,15 +98,26 @@ def test_turkish_search_in_browser_filters(authenticated_page, live_server_url):
     assert other_row.is_hidden()
 
 
-def test_parties_search_box_autosubmits_to_server(authenticated_page, live_server_url):
-    """Diş hekimi arama kutusuna yazınca (debounce) sunucuya gidip tüm
-    veritabanında Türkçe-duyarlı arama yapmalı; ASCII 'pinar' → 'Pınar'."""
+def test_parties_live_search_without_page_reload(authenticated_page, live_server_url):
+    """Arama kutusuna yazınca sonuçlar sayfa YENİLENMEDEN güncellenmeli;
+    tüm veritabanında Türkçe-duyarlı arama yapılmalı ('pinar' → 'Pınar')."""
     page = authenticated_page
     page.goto(f"{live_server_url}/parties/")
 
-    page.locator("input.js-table-filter").fill("pinar")
-    # Debounced auto-submit navigates with ?search=pinar
-    page.wait_for_url(f"{live_server_url}/parties/?search=pinar", timeout=5000)
+    # Sayfanın yeniden yüklenip yüklenmediğini anlamak için bir işaret bırak.
+    page.evaluate("window.__notReloaded = true")
+
+    page.locator("input.js-live-search").fill("pinar")
+
+    # Sonuçlar yerinde güncellenir
+    page.wait_for_function(
+        "() => document.querySelectorAll('#parties-results tbody tr').length === 1",
+        timeout=5000,
+    )
     assert page.get_by_text("Dr. Pınar Şahin").first.is_visible()
-    # Focus + caret restored so typing can continue
+
+    # Sayfa yenilenmedi: işaret hâlâ duruyor ve odak kutuda kaldı
+    assert page.evaluate("window.__notReloaded") is True
     assert page.evaluate("document.activeElement.name") == "search"
+    # Adres çubuğu aramayla senkron (yenile/yer imi çalışsın)
+    assert "search=pinar" in page.url
