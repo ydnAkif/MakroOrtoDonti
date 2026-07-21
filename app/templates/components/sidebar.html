@@ -1,26 +1,26 @@
 <nav class="sidebar-nav" aria-label="Uygulama bölümleri">
-    <div class="nav-section-label">Çalışma alanı</div>
+    <div class="nav-section-label">Günlük iş</div>
     <ul class="nav flex-column">
-        <li class="nav-item"><a class="nav-link {% if request.endpoint == 'dashboard.index' %}active{% endif %}" href="{{ url_for('dashboard.index') }}" {% if request.endpoint == 'dashboard.index' %}aria-current="page"{% endif %}><i class="bi bi-grid-1x2" aria-hidden="true"></i><span>Genel bakış</span></a></li>
-        <li class="nav-item"><a class="nav-link {% if 'parties' in request.endpoint|default('') %}active{% endif %}" href="{{ url_for('parties.list_parties') }}" {% if 'parties' in request.endpoint|default('') %}aria-current="page"{% endif %}><i class="bi bi-heart-pulse" aria-hidden="true"></i><span>Diş Hekimleri</span></a></li>
-        <li class="nav-item"><a class="nav-link {% if 'treatment' in request.endpoint|default('') %}active{% endif %}" href="{{ url_for('treatments.list_treatments') }}" {% if 'treatment' in request.endpoint|default('') %}aria-current="page"{% endif %}><i class="bi bi-clipboard2-pulse" aria-hidden="true"></i><span>İşlem kataloğu</span></a></li>
-    </ul>
-
-    <div class="nav-section-label">Finans</div>
-    <ul class="nav flex-column">
+        <li class="nav-item"><a class="nav-link {% if 'parties' in request.endpoint|default('') %}active{% endif %}" href="{{ url_for('parties.list_parties') }}" {% if 'parties' in request.endpoint|default('') %}aria-current="page"{% endif %}><i class="bi bi-clipboard2-plus" aria-hidden="true"></i><span>İş Emirleri &amp; Doktorlar</span></a></li>
         <li class="nav-item"><a class="nav-link {% if 'makbuzlar' in request.endpoint|default('') %}active{% endif %}" href="{{ url_for('makbuzlar.list_makbuzlar') }}" {% if 'makbuzlar' in request.endpoint|default('') %}aria-current="page"{% endif %}><i class="bi bi-receipt" aria-hidden="true"></i><span>Makbuzlar</span></a></li>
         <li class="nav-item"><a class="nav-link {% if 'payment' in request.endpoint|default('') %}active{% endif %}" href="{{ url_for('payments.list_payments') }}" {% if 'payment' in request.endpoint|default('') %}aria-current="page"{% endif %}><i class="bi bi-wallet2" aria-hidden="true"></i><span>Tahsilatlar</span></a></li>
+    </ul>
+
+    <div class="nav-section-label">Genel</div>
+    <ul class="nav flex-column">
+        <li class="nav-item"><a class="nav-link {% if request.endpoint == 'dashboard.index' %}active{% endif %}" href="{{ url_for('dashboard.index') }}" {% if request.endpoint == 'dashboard.index' %}aria-current="page"{% endif %}><i class="bi bi-grid-1x2" aria-hidden="true"></i><span>Genel bakış</span></a></li>
         <li class="nav-item"><a class="nav-link {% if 'report' in request.endpoint|default('') %}active{% endif %}" href="{{ url_for('reports.index') }}" {% if 'report' in request.endpoint|default('') %}aria-current="page"{% endif %}><i class="bi bi-bar-chart-line" aria-hidden="true"></i><span>Raporlar</span></a></li>
     </ul>
 
-    <div class="nav-section-label">Bağlantılar</div>
+    <div class="nav-section-label">Yönetim</div>
     <ul class="nav flex-column">
+        <li class="nav-item"><a class="nav-link {% if 'treatment' in request.endpoint|default('') %}active{% endif %}" href="{{ url_for('treatments.list_treatments') }}" {% if 'treatment' in request.endpoint|default('') %}aria-current="page"{% endif %}><i class="bi bi-clipboard2-pulse" aria-hidden="true"></i><span>İşlem kataloğu</span></a></li>
         <li class="nav-item"><a class="nav-link {% if 'whatsapp' in request.endpoint|default('') %}active{% endif %}" href="{{ url_for('whatsapp.index') }}" {% if 'whatsapp' in request.endpoint|default('') %}aria-current="page"{% endif %}><i class="bi bi-whatsapp" aria-hidden="true"></i><span>WhatsApp</span></a></li>
         <li class="nav-item"><a class="nav-link {% if 'settings' in request.endpoint|default('') %}active{% endif %}" href="{{ url_for('settings.index') }}" {% if 'settings' in request.endpoint|default('') %}aria-current="page"{% endif %}><i class="bi bi-sliders" aria-hidden="true"></i><span>Ayarlar</span></a></li>
     </ul>
 
     <div class="sidebar-footer">
         <strong>Makro klinik konsolu</strong><br>
-        Diş hekimi, iş emri ve finans akışı tek yerde.
+        İş emri gir, ay sonunda makbuzu gönder.
     </div>
 </nav>

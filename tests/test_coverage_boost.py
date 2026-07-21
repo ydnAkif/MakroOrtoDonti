@@ -395,17 +395,14 @@ class TestWhatsAppService:
                 result = WhatsAppService.connect(phone_number="+905551234567")
                 assert result["success"] is True
 
-    def test_connect_with_phone_error(self, app):
+    def test_connect_start_failure(self, app):
         from app.services.whatsapp_service import WhatsAppService
         WhatsAppService._client = None
 
-        mock_client = MagicMock()
-        mock_client.pair_phone_code.side_effect = Exception("Pair failed")
-        with patch.object(WhatsAppService, "get_client", return_value=mock_client):
+        with patch.object(WhatsAppService, "start", return_value=False):
             with patch("app.services.whatsapp_service.db") as mock_db:
                 mock_session = MagicMock()
                 mock_db.session.execute.return_value = mock_session
-                mock_db.session.commit = MagicMock()
                 result = WhatsAppService.connect(phone_number="+905551234567")
                 assert result["success"] is False
 
@@ -449,12 +446,18 @@ class TestWhatsAppService:
             assert result["success"] is True
             assert WhatsAppService._connected is False
 
-    def test_disconnect_exception(self, app):
+    def test_disconnect_stops_client(self, app):
         from app.services.whatsapp_service import WhatsAppService
+        mock_client = MagicMock()
+        WhatsAppService._client = mock_client
+        WhatsAppService._connected = True
         with patch("app.services.whatsapp_service.db") as mock_db:
-            mock_db.session.execute.side_effect = Exception("db error")
+            mock_session = MagicMock()
+            mock_db.session.execute.return_value = mock_session
             result = WhatsAppService.disconnect()
-            assert result["success"] is False
+            assert result["success"] is True
+            assert WhatsAppService._connected is False
+            mock_client.stop.assert_called_once()
 
     def test_get_status_with_session(self, app):
         from app.extensions import db
@@ -1038,133 +1041,25 @@ class TestAuthExtra:
 
 
 # ============================================================
-# invoices routes — extra coverage
+# makbuzlar routes — extra coverage
 # ============================================================
 
-class TestInvoicesExtra:
-    def test_status_update_auto_payment(self, client, app):
-        from app.extensions import db
-        from app.models.models import Party, PartyType, Invoice, Payment
-
+class TestMakbuzApiExtra:
+    def test_api_exchange_rate_valid_date(self, client, app):
         login(client, "admin", "admin-pass")
-        with app.app_context():
-            party = db.session.execute(
-                db.select(Party).where(Party.party_type == PartyType.DENTIST).limit(1)
-            ).scalar_one()
-            from app.models.invoice_service import InvoiceService
-            inv = InvoiceService.create_invoice(
-                session=db.session,
-                party_id=party.id,
-                items=[{"item_type": "service", "description": "Auto Pay Test", "quantity": 1, "unit_price_eur": 200}],
-                invoice_date=date.today(),
-            )
-            inv_id = inv.id
-
-        response = client.post(f"/invoices/{inv_id}/status", data={"status": "paid"}, follow_redirects=False)
-        assert response.status_code == 302
-
-        with app.app_context():
-            inv2 = db.session.get(Invoice, inv_id)
-            assert inv2.status == "paid"
-            total_paid = sum(p.amount_eur for p in inv2.payments)
-            assert total_paid >= inv2.total_eur - Decimal("0.01")
-
-    def test_status_update_to_overdue(self, client, app):
-        from app.extensions import db
-        from app.models.models import Party, PartyType, Invoice
-
-        login(client, "admin", "admin-pass")
-        with app.app_context():
-            party = db.session.execute(
-                db.select(Party).where(Party.party_type == PartyType.DENTIST).limit(1)
-            ).scalar_one()
-            from app.models.invoice_service import InvoiceService
-            inv = InvoiceService.create_invoice(
-                session=db.session,
-                party_id=party.id,
-                items=[{"item_type": "service", "description": "Overdue Test", "quantity": 1, "unit_price_eur": 100}],
-                invoice_date=date.today(),
-            )
-            inv_id = inv.id
-
-        response = client.post(f"/invoices/{inv_id}/status", data={"status": "overdue"}, follow_redirects=False)
-        assert response.status_code == 302
-
-        with app.app_context():
-            assert db.session.get(Invoice, inv_id).status == "overdue"
-
-    def test_send_email_route(self, client, app):
-        from app.extensions import db
-        from app.models.models import Party, PartyType
-
-        login(client, "admin", "admin-pass")
-        with app.app_context():
-            party = db.session.execute(
-                db.select(Party).where(Party.party_type == PartyType.DENTIST).limit(1)
-            ).scalar_one()
-            from app.models.invoice_service import InvoiceService
-            inv = InvoiceService.create_invoice(
-                session=db.session,
-                party_id=party.id,
-                items=[{"item_type": "service", "description": "Email Test", "quantity": 1, "unit_price_eur": 100}],
-                invoice_date=date.today(),
-            )
-            inv_id = inv.id
-
-        response = client.post(f"/invoices/{inv_id}/send-email", follow_redirects=False)
-        assert response.status_code == 302
+        response = client.get(f"/makbuzlar/api/exchange-rate?date={date.today().isoformat()}")
+        assert response.status_code == 200
+        assert response.get_json()["rate"] == 40.0
 
     def test_api_exchange_rate_invalid_date(self, client, app):
         login(client, "admin", "admin-pass")
-        response = client.get("/invoices/api/exchange-rate?date=invalid")
+        response = client.get("/makbuzlar/api/exchange-rate?date=invalid")
         assert response.status_code == 400
 
     def test_api_exchange_rate_no_rate_for_date(self, client, app):
         login(client, "admin", "admin-pass")
-        response = client.get("/invoices/api/exchange-rate?date=1990-01-01")
+        response = client.get("/makbuzlar/api/exchange-rate?date=1990-01-01")
         assert response.status_code == 404
-
-    def test_api_treatment_price_404(self, client, app):
-        login(client, "admin", "admin-pass")
-        response = client.get("/invoices/api/treatment-price/99999")
-        assert response.status_code == 404
-
-    def test_api_party_info_404(self, client, app):
-        login(client, "admin", "admin-pass")
-        response = client.get("/invoices/api/party/99999")
-        assert response.status_code == 404
-
-    def test_add_invoice_invalid_date(self, client, app):
-        from app.extensions import db
-        from app.models.models import Party, PartyType
-
-        login(client, "admin", "admin-pass")
-        with app.app_context():
-            party = db.session.execute(
-                db.select(Party).where(Party.party_type == PartyType.DENTIST).limit(1)
-            ).scalar_one()
-            pid = party.id
-
-        response = client.post("/invoices/add", data={
-            "party_id": pid,
-            "invoice_date": "invalid-date",
-            "items_json": json.dumps([{
-                "item_type": "service", "description": "Test", "quantity": 1, "unit_price_eur": 100,
-            }]),
-        }, follow_redirects=False)
-        assert response.status_code == 302
-
-    def test_add_invoice_no_party(self, client, app):
-        login(client, "admin", "admin-pass")
-        response = client.post("/invoices/add", data={
-            "party_id": "",
-            "patient_id": "",
-            "invoice_date": date.today().isoformat(),
-            "items_json": json.dumps([{
-                "item_type": "service", "description": "Test", "quantity": 1, "unit_price_eur": 100,
-            }]),
-        }, follow_redirects=False)
-        assert response.status_code == 302
 
 
 # ============================================================

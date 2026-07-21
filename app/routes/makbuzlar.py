@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, redirect, url_for, flash, request, jsonify
+from flask import Blueprint, render_template, redirect, url_for, flash, request, jsonify, make_response
 from flask_login import login_required
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
@@ -210,6 +210,25 @@ def generate_makbuz(party_id):
         flash(str(exc), "danger")
 
     return redirect(url_for("makbuzlar.detail_makbuz", party_id=party_id, year=year, month=month))
+
+
+@makbuzlar_bp.route("/<int:makbuz_id>/pdf")
+@login_required
+@permissions_required("billing.view")
+def pdf_makbuz(makbuz_id):
+    """Makbuz PDF'ini göndermeden önce tarayıcıda önizle veya indir."""
+    from app.services.makbuz_pdf_service import generate_makbuz_pdf
+
+    makbuz = db.get_or_404(Makbuz, makbuz_id)
+    work_orders = _work_orders_for_period(makbuz.party_id, makbuz.year, makbuz.month)
+    pdf_bytes = generate_makbuz_pdf(makbuz, work_orders)
+
+    filename = f"makbuz_{makbuz.year}_{makbuz.month:02d}_{makbuz.party_id}.pdf"
+    disposition = "attachment" if request.args.get("download") else "inline"
+    response = make_response(pdf_bytes)
+    response.headers["Content-Type"] = "application/pdf"
+    response.headers["Content-Disposition"] = f'{disposition}; filename="{filename}"'
+    return response
 
 
 @makbuzlar_bp.route("/<int:makbuz_id>/send", methods=["POST"])

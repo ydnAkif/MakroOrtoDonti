@@ -75,6 +75,29 @@ def test_generate_makbuz_without_vat(client, app):
         assert makbuz.grand_total == Decimal("750.00")
 
 
+def test_makbuz_pdf_preview_and_download(client, app):
+    login(client, "admin", "admin-pass")
+    party_id = _make_doctor(app, name="Dr. PDF Önizleme")
+    _add_work_order(app, party_id, date(2026, 6, 12), 1200, extra_price=300)
+    client.post(f"/makbuzlar/{party_id}/generate", data={"year": 2026, "month": 6}, follow_redirects=False)
+
+    with app.app_context():
+        makbuz_id = db.session.execute(
+            db.select(Makbuz.id).where(Makbuz.party_id == party_id)
+        ).scalar_one()
+
+    response = client.get(f"/makbuzlar/{makbuz_id}/pdf")
+    assert response.status_code == 200
+    assert response.headers["Content-Type"] == "application/pdf"
+    assert "inline" in response.headers["Content-Disposition"]
+    assert response.data.startswith(b"%PDF")
+
+    response = client.get(f"/makbuzlar/{makbuz_id}/pdf?download=1")
+    assert response.status_code == 200
+    assert "attachment" in response.headers["Content-Disposition"]
+    assert f"makbuz_2026_06_{party_id}.pdf" in response.headers["Content-Disposition"]
+
+
 def test_cannot_regenerate_sent_makbuz(client, app):
     login(client, "admin", "admin-pass")
     party_id = _make_doctor(app, name="Dr. Locked")

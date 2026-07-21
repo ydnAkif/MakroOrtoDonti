@@ -105,4 +105,6 @@ def send_bulk():
 def status():
     from app.services.whatsapp_service import WhatsAppService
     status = WhatsAppService.get_status()
+    if status.get("connected_at") is not None:
+        status["connected_at"] = status["connected_at"].isoformat()
     return jsonify(status)

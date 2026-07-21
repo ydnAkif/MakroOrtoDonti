@@ -510,9 +510,13 @@ textarea.form-control { min-height: 92px; }
 .table-pill--category { min-width: 8rem; }
 .bg-warning { background-color: var(--amber-500) !important; }
 .bg-success { background-color: var(--success-500) !important; }
+/* Solid override above defeats Bootstrap's bg-opacity tint; restore it (--success-500 = rgb(23 106 74)). */
+.bg-success.bg-opacity-10 { background-color: rgba(23, 106, 74, .12) !important; }
 .bg-danger { background-color: var(--danger-500) !important; }
 .bg-info { background-color: var(--sky-500) !important; }
 .text-primary { color: var(--aqua-700) !important; }
+.text-success { color: var(--success-500) !important; }
+[data-bs-theme="dark"] .text-success { color: var(--report-collected) !important; }
 .text-muted { color: var(--ink-600) !important; }
 
 .alert { border: 1px solid currentColor; border-radius: 13px; background-color: var(--surface); font-size: .84rem; box-shadow: var(--shadow-sm); }

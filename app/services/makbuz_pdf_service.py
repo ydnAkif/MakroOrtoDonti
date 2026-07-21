@@ -2,7 +2,7 @@ import json
 import os
 
 from fpdf import FPDF
-from fpdf.enums import XPos, YPos
+from fpdf.enums import MethodReturnValue, XPos, YPos
 
 CURRENCY_SYMBOLS = {"TL": "₺", "EUR": "€", "USD": "$"}
 
@@ -30,6 +30,27 @@ def _format_items(raw: str | None) -> str:
         else:
             parts.append(str(item))
     return ", ".join(parts)
+
+
+def _item_lines(raw: str | None, bullet: str = "•") -> list[str]:
+    """Same source data as _format_items, but one line per item for the PDF table."""
+    if not raw:
+        return []
+    try:
+        items = json.loads(raw)
+    except (json.JSONDecodeError, TypeError):
+        return [f"{bullet} {raw}"]
+    if not isinstance(items, list) or not items:
+        return [f"{bullet} {raw}"]
+    lines = []
+    for item in items:
+        if isinstance(item, dict):
+            symbol = CURRENCY_SYMBOLS.get(item.get("currency", "TL"), "₺")
+            lines.append(f"{bullet} {item.get('name', '')}  {symbol}{float(item.get('price', 0)):,.2f}")
+        else:
+            lines.append(f"{bullet} {item}")
+    return lines
+
 
 FONT_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "fonts")
 FONT_PATH = os.path.join(FONT_DIR, "DejaVuSans.ttf")
@@ -175,14 +196,15 @@ class MakbuzPDF(FPDF):
 
         self.set_y(y + 30)
 
+    TABLE_WIDTHS = (20, 36, 64, 22, 22, 22)
+
     def _table_header(self):
-        widths = (24, 55, 45, 31, 31)
-        labels = ("Tarih", "Hasta", "Aparey / Ekstra", "Aparey (₺)", "Toplam (₺)")
+        labels = ("Tarih", "Hasta", "Yapılan İşlemler", "Aparey (₺)", "Ekstra (₺)", "Toplam (₺)")
         self.set_fill_color(*self.INK)
         self.set_text_color(255, 255, 255)
         self.set_font(self.default_font, "B", 7)
-        for width, label in zip(widths, labels):
-            align = "R" if label in ("Aparey (₺)", "Toplam (₺)") else "L"
+        for width, label in zip(self.TABLE_WIDTHS, labels):
+            align = "R" if "(₺)" in label else "L"
             self.cell(width, 8, label, border=0, fill=True, align=align)
         self.ln()
 
@@ -191,29 +213,40 @@ class MakbuzPDF(FPDF):
         self.set_text_color(*self.AQUA_DARK)
         self.cell(0, 7, "İŞ EMİRLERİ", ln=True)
         self._table_header()
-        widths = (24, 55, 45, 31, 31)
+        widths = self.TABLE_WIDTHS
+        line_h = 4.2
         for index, wo in enumerate(work_orders):
-            if self.get_y() > 255:
+            # Aparey ve ekstralar tam adlarıyla, satır satır — kesme/kısaltma yok.
+            detail = "\n".join(_item_lines(wo.apparatus_type) + _item_lines(wo.extra_addons, bullet="+")) or "-"
+            self.set_font(self.default_font, "", 7.2)
+            detail_lines = self.multi_cell(widths[2] - 3, line_h, detail, dry_run=True, output=MethodReturnValue.LINES)
+            name_lines = self.multi_cell(widths[1] - 2, line_h, wo.patient_name, dry_run=True, output=MethodReturnValue.LINES)
+            row_h = max(8.0, line_h * max(len(detail_lines), len(name_lines)) + 3.2)
+
+            if self.get_y() + row_h > 262:
                 self.add_page()
                 self._table_header()
-            detail = _format_items(wo.apparatus_type)
-            extra_detail = _format_items(wo.extra_addons)
-            if extra_detail:
-                detail = f"{detail} + {extra_detail}" if detail else extra_detail
+                self.set_font(self.default_font, "", 7.2)
+
+            x0, y0 = self.l_margin, self.get_y()
             self.set_fill_color(*(self.SURFACE if index % 2 == 0 else (255, 255, 255)))
+            self.rect(x0, y0, sum(widths), row_h, style="F")
             self.set_text_color(*self.INK)
-            self.set_font(self.default_font, "", 7.2)
-            values = (
-                wo.work_date.strftime("%d.%m.%Y"),
-                wo.patient_name[:32],
-                detail[:38],
-                f"{wo.apparatus_price:,.2f}",
-                f"{wo.total_price:,.2f}",
-            )
-            for width, value in zip(widths, values):
-                align = "R" if width == 31 else "L"
-                self.cell(width, 8, value, border="B", fill=True, align=align)
-            self.ln()
+
+            self.set_xy(x0, y0 + 1.6)
+            self.cell(widths[0], line_h, wo.work_date.strftime("%d.%m.%Y"))
+            self.set_xy(x0 + widths[0], y0 + 1.6)
+            self.multi_cell(widths[1] - 2, line_h, wo.patient_name, align="L")
+            self.set_xy(x0 + widths[0] + widths[1], y0 + 1.6)
+            self.multi_cell(widths[2] - 3, line_h, detail, align="L")
+            self.set_xy(x0 + widths[0] + widths[1] + widths[2], y0 + 1.6)
+            self.cell(widths[3], line_h, f"{wo.apparatus_price:,.2f}", align="R")
+            self.cell(widths[4], line_h, f"{wo.extra_price:,.2f}", align="R")
+            self.cell(widths[5], line_h, f"{wo.total_price:,.2f}", align="R")
+
+            self.set_draw_color(*self.LINE)
+            self.line(x0, y0 + row_h, x0 + sum(widths), y0 + row_h)
+            self.set_y(y0 + row_h)
 
     def add_totals(self, makbuz):
         if self.get_y() > 225:

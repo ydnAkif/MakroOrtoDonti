@@ -157,4 +157,8 @@ def create_app(config_class=Config) -> Flask:
     from .services.scheduler_service import init_scheduler
     init_scheduler(app)
 
+    # Auto-reconnect WhatsApp in the background if a paired session exists.
+    from .services.whatsapp_service import WhatsAppService
+    WhatsAppService.init_app(app)
+
     return app

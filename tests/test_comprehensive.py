@@ -9,10 +9,10 @@ import json
 import pytest
 
 from app.extensions import db
+from app.models.invoice_service import InvoiceService
 from app.models.models import (
-    ExchangeRate, Invoice, InvoiceItem, InvoiceItemType,
-    Patient, PatientTreatment, Party, PartyType, Payment, PaymentMethod,
-    Settings, Treatment, User
+    ExchangeRate, Invoice, Party, PartyType, Payment, PaymentMethod,
+    Settings, Treatment, WorkOrder
 )
 from conftest import login
 
@@ -57,17 +57,16 @@ def test_dashboard_loads(client, app):
         party = db.session.execute(
             db.select(Party).where(Party.party_type == PartyType.DENTIST).limit(1)
         ).scalar_one()
-        client.post("/invoices/add", data={
-            "party_id": party.id,
-            "invoice_date": date.today().isoformat(),
-            "items_json": json.dumps([{
-                "item_type": "treatment",
-                "treatment_id": 1,
-                "description": "Dashboard Test",
-                "quantity": 1,
-                "unit_price_eur": 100.00,
-            }]),
-        })
+        db.session.add(WorkOrder(
+            party_id=party.id,
+            work_date=date.today(),
+            apparatus_type="Aparey",
+            patient_name="Dashboard Test",
+            apparatus_price=Decimal("100.00"),
+            extra_price=Decimal("0.00"),
+            total_price=Decimal("100.00"),
+        ))
+        db.session.commit()
 
     response = client.get("/")
     assert response.status_code == 200
@@ -340,207 +339,8 @@ def test_treatment_import_invalid_file(client, app):
 
 # ==================== INVOICES ====================
 
-def test_invoice_list(client, app):
-    """Fatura listesi gorunmeli."""
-    login(client, "admin", "admin-pass")
-
-    response = client.get("/invoices/")
-    assert response.status_code == 200
-
-
-def test_invoice_list_filter_by_status(client, app):
-    """Fatura listesi duruma gore filtrelenmeli."""
-    login(client, "admin", "admin-pass")
-
-    response = client.get("/invoices/?status=pending")
-    assert response.status_code == 200
-
-    response = client.get("/invoices/?status=paid")
-    assert response.status_code == 200
-
-
-def test_invoice_detail(client, app):
-    """Fatura detay sayfasi acilmali."""
-    login(client, "admin", "admin-pass")
-
-    with app.app_context():
-        party = db.session.execute(
-            db.select(Party).where(Party.party_type == PartyType.DENTIST).limit(1)
-        ).scalar_one()
-        client.post("/invoices/add", data={
-            "party_id": party.id,
-            "invoice_date": date.today().isoformat(),
-            "items_json": json.dumps([{
-                "item_type": "treatment",
-                "treatment_id": 1,
-                "description": "Detail Test",
-                "quantity": 1,
-                "unit_price_eur": 200.00,
-            }]),
-        })
-        invoice_id = db.session.execute(
-            db.select(Invoice).order_by(Invoice.id.desc())
-        ).scalar_one().id
-
-    response = client.get(f"/invoices/{invoice_id}")
-    assert response.status_code == 200
-
-
-def test_invoice_status_update(client, app):
-    """Fatura durumu guncellenebilmeli."""
-    login(client, "admin", "admin-pass")
-
-    with app.app_context():
-        party = db.session.execute(
-            db.select(Party).where(Party.party_type == PartyType.DENTIST).limit(1)
-        ).scalar_one()
-        client.post("/invoices/add", data={
-            "party_id": party.id,
-            "invoice_date": date.today().isoformat(),
-            "items_json": json.dumps([{
-                "item_type": "treatment",
-                "treatment_id": 1,
-                "description": "Status Test",
-                "quantity": 1,
-                "unit_price_eur": 100.00,
-            }]),
-        })
-        invoice_id = db.session.execute(
-            db.select(Invoice).order_by(Invoice.id.desc())
-        ).scalar_one().id
-
-    response = client.post(f"/invoices/{invoice_id}/status", data={
-        "status": "paid",
-    }, follow_redirects=False)
-    assert response.status_code == 302
-
-    with app.app_context():
-        invoice = db.session.get(Invoice, invoice_id)
-        assert invoice.status == "paid"
-
-
-def test_invoice_soft_delete(client, app):
-    """Fatura soft-delete."""
-    login(client, "admin", "admin-pass")
-
-    with app.app_context():
-        party = db.session.execute(
-            db.select(Party).where(Party.party_type == PartyType.DENTIST).limit(1)
-        ).scalar_one()
-        client.post("/invoices/add", data={
-            "party_id": party.id,
-            "invoice_date": date.today().isoformat(),
-            "items_json": json.dumps([{
-                "item_type": "treatment",
-                "treatment_id": 1,
-                "description": "Delete Test",
-                "quantity": 1,
-                "unit_price_eur": 100.00,
-            }]),
-        })
-        invoice_id = db.session.execute(
-            db.select(Invoice).order_by(Invoice.id.desc())
-        ).scalar_one().id
-
-    response = client.post(f"/invoices/{invoice_id}/delete", follow_redirects=False)
-    assert response.status_code == 302
-
-    with app.app_context():
-        invoice = db.session.get(Invoice, invoice_id)
-        assert invoice.is_deleted is True
-
-
-def test_invoice_with_party_preselect(client, app):
-    """Party ID ile fatura olustururken otomatik secim."""
-    login(client, "admin", "admin-pass")
-
-    with app.app_context():
-        party_id = db.session.execute(
-            db.select(Party).where(Party.party_type == PartyType.DENTIST).limit(1)
-        ).scalar_one().id
-
-    response = client.get(f"/invoices/add?party_id={party_id}")
-    assert response.status_code == 200
-    html = response.get_data(as_text=True)
-    assert f'value="{party_id}"' in html
-
-
-def test_invoice_no_items_rejected(client, app):
-    """Kalemsiz fatura olusturulamamali."""
-    login(client, "admin", "admin-pass")
-
-    with app.app_context():
-        party_id = db.session.execute(
-            db.select(Party).where(Party.party_type == PartyType.DENTIST).limit(1)
-        ).scalar_one().id
-
-    response = client.post("/invoices/add", data={
-        "party_id": party_id,
-        "invoice_date": date.today().isoformat(),
-        "notes": "Kalemsiz test",
-    }, follow_redirects=True)
-    assert response.status_code == 200
-    assert "En az bir kalem" in response.get_data(as_text=True)
-
-
-def test_invoice_amount_discount(client, app):
-    """Tutar bazli iskonto hesaplamasi."""
-    login(client, "admin", "admin-pass")
-
-    with app.app_context():
-        party = db.session.execute(
-            db.select(Party).where(Party.party_type == PartyType.DENTIST).limit(1)
-        ).scalar_one()
-
-    items = [{
-        "item_type": "service",
-        "description": "Lab Hizmeti",
-        "quantity": 1,
-        "unit_price_eur": 300.00,
-        "discount_type": "amount",
-        "discount_value": 50.00,
-    }]
-
-    response = client.post("/invoices/add", data={
-        "party_id": party.id,
-        "invoice_date": date.today().isoformat(),
-        "items_json": json.dumps(items),
-    }, follow_redirects=False)
-    assert response.status_code == 302
-
-    with app.app_context():
-        invoice = db.session.execute(
-            db.select(Invoice).order_by(Invoice.id.desc())
-        ).scalar_one()
-        item = invoice.items[0]
-        assert item.line_total_eur == Decimal("250.00")
-
-
-def test_invoice_search(client, app):
-    """Fatura numarasi ile arama."""
-    login(client, "admin", "admin-pass")
-
-    with app.app_context():
-        party = db.session.execute(
-            db.select(Party).where(Party.party_type == PartyType.DENTIST).limit(1)
-        ).scalar_one()
-        client.post("/invoices/add", data={
-            "party_id": party.id,
-            "invoice_date": date.today().isoformat(),
-            "items_json": json.dumps([{
-                "item_type": "treatment",
-                "treatment_id": 1,
-                "description": "Search Test",
-                "quantity": 1,
-                "unit_price_eur": 100.00,
-            }]),
-        })
-        inv_num = db.session.execute(
-            db.select(Invoice).order_by(Invoice.id.desc())
-        ).scalar_one().invoice_number
-
-    response = client.get(f"/invoices/?search={inv_num}")
-    assert response.status_code == 200
+# Not: eski Invoice CRUD rotalari kaldirildi; fatura akisi artik Makbuzlar
+# uzerinden yurutuluyor (bkz. tests/test_makbuz.py).
 
 
 # ==================== PAYMENTS ====================
@@ -650,96 +450,6 @@ def test_party_referred_by(client, app):
 
 # ==================== BUG FIX TESTS ====================
 
-def test_recalculate_totals_includes_discount_and_vat(client, app):
-    """Bug #1: recalculate_totals indirim ve KDV'yi hesaba katmali."""
-    login(client, "admin", "admin-pass")
-
-    with app.app_context():
-        party = db.session.execute(
-            db.select(Party).where(Party.party_type == PartyType.DENTIST).limit(1)
-        ).scalar_one()
-
-    # 2 adet x 100 EUR = 200 EUR, %10 indirim = 180 EUR, %20 KDV = 216 EUR
-    items = [{
-        "item_type": "product",
-        "description": "Test Product",
-        "quantity": 2,
-        "unit_price_eur": 100.00,
-        "vat_rate": 20.0,
-        "discount_type": "percent",
-        "discount_value": 10.0,
-    }]
-
-    response = client.post("/invoices/add", data={
-        "party_id": party.id,
-        "invoice_date": date.today().isoformat(),
-        "items_json": json.dumps(items),
-    }, follow_redirects=False)
-    assert response.status_code == 302
-
-    with app.app_context():
-        invoice = db.session.execute(
-            db.select(Invoice).order_by(Invoice.id.desc())
-        ).scalar_one()
-        # total_eur should include discount and VAT
-        assert invoice.total_eur == Decimal("216.00")
-        assert invoice.total_try > 0
-
-
-def test_party_only_invoice_detail_no_crash(client, app):
-    """Bug #4-6: Party faturalari detay sayfasinda craslamamali."""
-    login(client, "admin", "admin-pass")
-
-    with app.app_context():
-        party = db.session.execute(
-            db.select(Party).where(Party.party_type == PartyType.DENTIST).limit(1)
-        ).scalar_one()
-        client.post("/invoices/add", data={
-            "party_id": party.id,
-            "invoice_date": date.today().isoformat(),
-            "items_json": json.dumps([{
-                "item_type": "treatment",
-                "treatment_id": 1,
-                "description": "Crash Test",
-                "quantity": 1,
-                "unit_price_eur": 100.00,
-            }]),
-        })
-        invoice_id = db.session.execute(
-            db.select(Invoice).order_by(Invoice.id.desc())
-        ).scalar_one().id
-
-    # These should NOT crash
-    response = client.get(f"/invoices/{invoice_id}")
-    assert response.status_code == 200
-    html = response.get_data(as_text=True)
-    assert "Crash Test" in html
-
-
-def test_party_only_dashboard_no_crash(client, app):
-    """Bug #4: Dashboard party faturalarinda craslamamali."""
-    login(client, "admin", "admin-pass")
-
-    with app.app_context():
-        party = db.session.execute(
-            db.select(Party).where(Party.party_type == PartyType.DENTIST).limit(1)
-        ).scalar_one()
-        client.post("/invoices/add", data={
-            "party_id": party.id,
-            "invoice_date": date.today().isoformat(),
-            "items_json": json.dumps([{
-                "item_type": "treatment",
-                "treatment_id": 1,
-                "description": "Dashboard Crash Test",
-                "quantity": 1,
-                "unit_price_eur": 100.00,
-            }]),
-        })
-
-    response = client.get("/")
-    assert response.status_code == 200
-
-
 def test_party_list_enum_badges(client, app):
     """Parties listesi dogru bicimde calismali."""
     login(client, "admin", "admin-pass")
@@ -786,26 +496,16 @@ def test_email_service_party_only(client, app):
     """Bug #2: Email servisi party faturalarinda craslamamali."""
     from app.services.email_service import send_invoice_email
 
-    login(client, "admin", "admin-pass")
-
     with app.app_context():
         party = db.session.execute(
             db.select(Party).where(Party.party_type == PartyType.DENTIST).limit(1)
         ).scalar_one()
-        client.post("/invoices/add", data={
-            "party_id": party.id,
-            "invoice_date": date.today().isoformat(),
-            "items_json": json.dumps([{
-                "item_type": "treatment",
-                "treatment_id": 1,
-                "description": "Email Test",
-                "quantity": 1,
-                "unit_price_eur": 100.00,
-            }]),
-        })
-        invoice = db.session.execute(
-            db.select(Invoice).order_by(Invoice.id.desc())
-        ).scalar_one()
+        invoice = InvoiceService.create_invoice(
+            session=db.session,
+            party_id=party.id,
+            items=[{"item_type": "service", "description": "Email Test", "quantity": 1, "unit_price_eur": 100}],
+            invoice_date=date.today(),
+        )
 
         # Should NOT crash, should return error message about missing email
         success, message = send_invoice_email(invoice)
@@ -816,62 +516,20 @@ def test_whatsapp_service_party_only(client, app):
     """Bug #3: WhatsApp servisi party faturalarinda craslamamali."""
     from app.services.whatsapp_service import WhatsAppService
 
-    login(client, "admin", "admin-pass")
-
     with app.app_context():
         party = db.session.execute(
             db.select(Party).where(Party.party_type == PartyType.DENTIST).limit(1)
         ).scalar_one()
-        client.post("/invoices/add", data={
-            "party_id": party.id,
-            "invoice_date": date.today().isoformat(),
-            "items_json": json.dumps([{
-                "item_type": "treatment",
-                "treatment_id": 1,
-                "description": "WA Test",
-                "quantity": 1,
-                "unit_price_eur": 100.00,
-            }]),
-        })
-        invoice = db.session.execute(
-            db.select(Invoice).order_by(Invoice.id.desc())
-        ).scalar_one()
+        invoice = InvoiceService.create_invoice(
+            session=db.session,
+            party_id=party.id,
+            items=[{"item_type": "service", "description": "WA Test", "quantity": 1, "unit_price_eur": 100}],
+            invoice_date=date.today(),
+        )
 
         # Should NOT crash, should return error about disconnected
         result = WhatsAppService.send_invoice_message(invoice)
         assert not result["success"]  # WhatsApp not connected in test
-
-
-def test_invoice_vat_in_totals(client, app):
-    """KDV dahil toplam hesaplamasi dogru olmali."""
-    login(client, "admin", "admin-pass")
-
-    with app.app_context():
-        party = db.session.execute(
-            db.select(Party).where(Party.party_type == PartyType.DENTIST).limit(1)
-        ).scalar_one()
-
-    items = [{
-        "item_type": "service",
-        "description": "KDV Test",
-        "quantity": 1,
-        "unit_price_eur": 100.00,
-        "vat_rate": 20.0,
-    }]
-
-    response = client.post("/invoices/add", data={
-        "party_id": party.id,
-        "invoice_date": date.today().isoformat(),
-        "items_json": json.dumps(items),
-    }, follow_redirects=False)
-    assert response.status_code == 302
-
-    with app.app_context():
-        invoice = db.session.execute(
-            db.select(Invoice).order_by(Invoice.id.desc())
-        ).scalar_one()
-        # 100 EUR + 20% VAT = 120 EUR
-        assert invoice.total_eur == Decimal("120.00")
 
 
 # ==================== UI CONTRACT TESTS ====================
@@ -898,230 +556,6 @@ def test_party_form_has_unique_common_fields_and_active_default(client):
     for field_id in ("phone", "email", "address", "tax_id"):
         assert html.count(f'id="{field_id}"') == 1
     assert 'id="is_active" name="is_active" checked' in html
-
-
-# ==================== INVOICE FLOW TESTS ====================
-
-def test_invoice_create_flow(client, app):
-    login(client, "admin", "admin-pass")
-
-    with app.app_context():
-        patient_treatment = db.session.execute(db.select(PatientTreatment)).scalar_one()
-
-    response = client.post(
-        "/invoices/add",
-        data={
-            "patient_id": patient_treatment.patient_id,
-            "invoice_date": date.today().isoformat(),
-            "treatment_ids": [str(patient_treatment.id)],
-            "notes": "Test fatura",
-        },
-        follow_redirects=True,
-    )
-
-    assert response.status_code == 200
-    assert "oluşturuldu" in response.get_data(as_text=True)
-
-    with app.app_context():
-        created = db.session.execute(db.select(Invoice)).scalars().all()
-        assert len(created) == 1
-        assert created[0].total_eur > 0
-        assert created[0].total_try > 0
-
-
-def test_invoice_form_totals_and_item_modal_reset_contract(client):
-    login(client, "admin", "admin-pass")
-
-    response = client.get("/invoices/add")
-    assert response.status_code == 200
-    html = response.get_data(as_text=True)
-
-    assert 'id="subtotal-eur"' in html
-    assert 'id="grand-total-eur"' in html
-    assert "line-subtotal-eur" not in html
-    assert "line-vat-eur" not in html
-    assert "function resetItemForm" in html
-    assert "hidden.bs.modal" in html
-    assert "tr.innerHTML" not in html
-    assert "description.textContent = item.description" in html
-
-
-def test_invoice_category_and_date_rate_api(client, app):
-    login(client, "admin", "admin-pass")
-
-    rate_response = client.get(f"/invoices/api/exchange-rate?date={date.today().isoformat()}")
-    assert rate_response.status_code == 200
-    assert rate_response.get_json()["rate"] == 40.0
-
-    with app.app_context():
-        party = db.session.execute(
-            db.select(Party).where(Party.party_type == PartyType.DENTIST).limit(1)
-        ).scalar_one()
-        treatment = db.session.execute(
-            db.select(Treatment).where(Treatment.category == "ana_islemler").limit(1)
-        ).scalar_one()
-
-    response = client.post("/invoices/add", data={
-        "party_id": party.id,
-        "invoice_date": date.today().isoformat(),
-        "items_json": json.dumps([{
-            "item_type": "treatment",
-            "treatment_id": treatment.id,
-            "description": treatment.name,
-            "quantity": 1,
-            "unit_price_eur": float(treatment.price_eur),
-        }]),
-    })
-    assert response.status_code == 302
-
-    list_response = client.get("/invoices/?category=ana_islemler")
-    assert list_response.status_code == 200
-    assert "Ana İşlemler" in list_response.get_data(as_text=True)
-
-
-def test_invoice_flexible_items(client, app):
-    login(client, "admin", "admin-pass")
-
-    with app.app_context():
-        party = db.session.execute(
-            db.select(Party).where(Party.party_type == PartyType.DENTIST).limit(1)
-        ).scalar_one()
-        treatments = db.session.execute(
-            db.select(Treatment).where(Treatment.is_active == True).limit(3)
-        ).scalars().all()
-
-    items = []
-    for t in treatments[:2]:
-        items.append({
-            "item_type": "treatment",
-            "treatment_id": t.id,
-            "description": t.name,
-            "quantity": 1,
-            "unit_price_eur": float(t.price_eur),
-        })
-    items.append({
-        "item_type": "product",
-        "reference_id": None,
-        "description": "Zirkonyum Blok",
-        "quantity": 1,
-        "unit_price_eur": 150.00,
-        "vat_rate": 18.0,
-    })
-    items.append({
-        "item_type": "service",
-        "reference_id": None,
-        "description": "Lab Danismanligi",
-        "quantity": 1,
-        "unit_price_eur": 200.00,
-        "vat_rate": 8.0,
-    })
-
-    response = client.post("/invoices/add", data={
-        "party_id": party.id,
-        "invoice_date": date.today().isoformat(),
-        "due_date": (date.today() + timedelta(days=30)).isoformat(),
-        "items_json": json.dumps(items),
-        "notes": "Karma fatura testi",
-    }, follow_redirects=False)
-
-    assert response.status_code == 302
-
-    with app.app_context():
-        invoice = db.session.execute(
-            db.select(Invoice).order_by(Invoice.id.desc())
-        ).scalar_one()
-
-        assert len(invoice.items) == 4
-        item_types = [item.item_type.value for item in invoice.items]
-        assert "treatment" in item_types
-        assert "product" in item_types
-        assert "service" in item_types
-
-        assert invoice.total_eur > 0
-        assert invoice.total_try > 0
-
-
-def test_party_treatment_invoice_compatibility(client, app):
-    login(client, "admin", "admin-pass")
-
-    with app.app_context():
-        pt = db.session.execute(db.select(PatientTreatment)).scalar_one()
-
-    response = client.post("/invoices/add", data={
-        "party_id": pt.party_id,
-        "invoice_date": date.today().isoformat(),
-        "treatment_ids": [str(pt.id)],
-        "notes": "Legacy format testi",
-    }, follow_redirects=True)
-
-    assert response.status_code == 200
-    assert "oluşturuldu" in response.get_data(as_text=True)
-
-    with app.app_context():
-        invoice = db.session.execute(
-            db.select(Invoice).order_by(Invoice.id.desc())
-        ).scalar_one()
-        assert invoice.party_id == pt.party_id
-        assert invoice.patient_id is None
-
-
-# ==================== INVOICE API TESTS ====================
-
-def test_invoice_api_treatment_price(client, app):
-    login(client, "admin", "admin-pass")
-
-    with app.app_context():
-        pt = db.session.execute(db.select(PatientTreatment)).scalar_one()
-
-    response = client.get(f"/invoices/api/treatment-price/{pt.id}")
-    assert response.status_code == 200
-    data = response.get_json()
-    assert "price_eur" in data
-    assert "treatment_name" in data
-    assert data["price_eur"] == pt.effective_price_eur
-
-
-def test_party_api_info(client, app):
-    login(client, "admin", "admin-pass")
-
-    with app.app_context():
-        party = db.session.execute(
-            db.select(Party).where(Party.party_type == PartyType.DENTIST).limit(1)
-        ).scalar_one()
-
-    response = client.get(f"/invoices/api/party/{party.id}")
-    assert response.status_code == 200
-    data = response.get_json()
-    assert data["id"] == party.id
-    assert data["name"] == party.display_name
-    assert data["party_type"] == party.party_type.value
-
-
-# ==================== PDF TEST ====================
-
-def test_invoice_pdf_download_works(client, app):
-    login(client, "admin", "admin-pass")
-
-    with app.app_context():
-        patient_treatment = db.session.execute(db.select(PatientTreatment)).scalar_one()
-
-    client.post(
-        "/invoices/add",
-        data={
-            "patient_id": patient_treatment.patient_id,
-            "invoice_date": date.today().isoformat(),
-            "treatment_ids": [str(patient_treatment.id)],
-            "notes": "PDF test",
-        },
-        follow_redirects=True,
-    )
-
-    with app.app_context():
-        invoice = db.session.execute(db.select(Invoice).limit(1)).scalar_one()
-
-    response = client.get(f"/invoices/{invoice.id}/pdf")
-    assert response.status_code == 200
-    assert response.mimetype == "application/pdf"
 
 
 # ==================== SETTINGS TESTS ====================
@@ -1203,18 +637,19 @@ def test_reports_use_payments_for_collections_without_double_counting(client, ap
         treatment = db.session.execute(
             db.select(Treatment).where(Treatment.name == "Consultation")
         ).scalar_one()
-
-    client.post("/invoices/add", data={
-        "party_id": party.id,
-        "invoice_date": date.today().isoformat(),
-        "items_json": json.dumps([{
-            "item_type": "treatment",
-            "treatment_id": treatment.id,
-            "description": treatment.name,
-            "quantity": 1,
-            "unit_price_eur": 50.0,
-        }]),
-    })
+        invoice = InvoiceService.create_invoice(
+            session=db.session,
+            party_id=party.id,
+            items=[{
+                "item_type": "treatment",
+                "treatment_id": treatment.id,
+                "description": treatment.name,
+                "quantity": 1,
+                "unit_price_eur": 50.0,
+            }],
+            invoice_date=date.today(),
+        )
+        invoice_id = invoice.id
 
     report = client.get("/reports/").get_data(as_text=True)
     assert "Gerçek tahsilat" in report
@@ -1222,9 +657,8 @@ def test_reports_use_payments_for_collections_without_double_counting(client, ap
     assert "Consultation" in report
 
     with app.app_context():
-        invoice = db.session.execute(db.select(Invoice)).scalar_one()
         db.session.add(Payment(
-            invoice_id=invoice.id,
+            invoice_id=invoice_id,
             payment_date=date.today(),
             amount_eur=20.0,
             amount_try=800.0,
@@ -1284,26 +718,26 @@ def test_reports_aging_report(client, app):
             db.select(Party).where(Party.party_type == PartyType.DENTIST).limit(1)
         ).scalar_one()
 
-    dates = [
-        date.today(),
-        date.today() - timedelta(days=15),
-        date.today() - timedelta(days=45),
-        date.today() - timedelta(days=75),
-    ]
-
-    for i, inv_date in enumerate(dates):
-        response = client.post("/invoices/add", data={
-            "party_id": party.id,
-            "invoice_date": inv_date.isoformat(),
-            "items_json": json.dumps([{
-                "item_type": "treatment",
-                "treatment_id": 1,
-                "description": f"Tedavi {i+1}",
-                "quantity": 1,
-                "unit_price_eur": 200.00,
-            }]),
-        }, follow_redirects=False)
-        assert response.status_code == 302
+        due_dates = [
+            date.today(),
+            date.today() - timedelta(days=15),
+            date.today() - timedelta(days=45),
+            date.today() - timedelta(days=75),
+        ]
+        for i, due_date in enumerate(due_dates):
+            InvoiceService.create_invoice(
+                session=db.session,
+                party_id=party.id,
+                items=[{
+                    "item_type": "treatment",
+                    "treatment_id": 1,
+                    "description": f"Tedavi {i+1}",
+                    "quantity": 1,
+                    "unit_price_eur": 200.00,
+                }],
+                invoice_date=date.today(),
+                due_date=due_date,
+            )
 
     response = client.get("/reports/")
     assert response.status_code == 200
@@ -1320,42 +754,30 @@ def test_reports_aging_report(client, app):
 # /payments artık doktor/makbuz tahsilatını yönetiyor (bkz. tests/test_makbuz.py).
 
 
-def test_party_invoice_link_and_debt_calculation(client, app):
+def test_party_work_order_totals_on_detail(client, app):
+    """Doktor detay sayfasi is emri toplamlarini gostermeli."""
     login(client, "admin", "admin-pass")
 
     with app.app_context():
         party = db.session.execute(
             db.select(Party).where(Party.party_type == PartyType.DENTIST).limit(1)
         ).scalar_one()
+        party_id = party.id
+        for i in range(2):
+            db.session.add(WorkOrder(
+                party_id=party_id,
+                work_date=date.today(),
+                apparatus_type="Aparey",
+                patient_name=f"Hasta {i+1}",
+                apparatus_price=Decimal("300.00"),
+                extra_price=Decimal("0.00"),
+                total_price=Decimal("300.00"),
+            ))
+        db.session.commit()
 
-    for i in range(2):
-        response = client.post("/invoices/add", data={
-            "party_id": party.id,
-            "invoice_date": date.today().isoformat(),
-            "items_json": json.dumps([{
-                "item_type": "treatment",
-                "treatment_id": 1,
-                "description": f"Tedavi {i+1}",
-                "quantity": 1,
-                "unit_price_eur": 300.00,
-            }]),
-        }, follow_redirects=False)
-        assert response.status_code == 302
-
-    with app.app_context():
-        invoices = db.session.execute(
-            db.select(Invoice).where(Invoice.party_id == party.id, Invoice.is_deleted == False)
-        ).scalars().all()
-
-        assert len(invoices) >= 2
-        total_eur = sum(inv.total_eur for inv in invoices if inv.status == "pending")
-        total_try = sum(inv.total_try for inv in invoices if inv.status == "pending")
-
-        assert total_eur >= 600.0
-        assert total_try > 0
-
-        response = client.get(f"/parties/{party.id}")
-        assert response.status_code == 200
+    response = client.get(f"/parties/{party_id}")
+    assert response.status_code == 200
+    assert "600.00" in response.get_data(as_text=True)
 
 
 # ==================== PARTY TESTS ====================

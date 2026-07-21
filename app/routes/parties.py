@@ -81,6 +81,82 @@ def add_party():
     return render_template("parties/form.html", party=None)
 
 
+@parties_bp.route("/import", methods=["GET", "POST"])
+@login_required
+@permissions_required("clinical.edit")
+def import_parties():
+    """Diş hekimlerini Excel dosyasından toplu içe aktar (A: Ad, B: Telefon, C: E-posta, D: Adres, E: Vergi/TC No, F: Not)."""
+    if request.method == "POST":
+        file = request.files.get("file")
+        if not file:
+            flash("Dosya seçilmedi.", "danger")
+            return redirect(url_for("parties.import_parties"))
+
+        filename = (file.filename or "").lower()
+        if not (filename.endswith(".xlsx") or filename.endswith(".xls")):
+            flash("Yalnızca .xlsx veya .xls dosyaları desteklenir.", "danger")
+            return redirect(url_for("parties.import_parties"))
+
+        try:
+            import io
+            from openpyxl import load_workbook
+
+            wb = load_workbook(io.BytesIO(file.read()), read_only=True, data_only=True)
+            ws = wb.active
+            added, updated, skipped = 0, 0, 0
+
+            def _text(value, limit):
+                return str(value).strip()[:limit] if value is not None and str(value).strip() else None
+
+            for row in ws.iter_rows(min_row=2, values_only=True):
+                name = _text(row[0] if row else None, 200)
+                if not name:
+                    skipped += 1
+                    continue
+                phone = _text(row[1] if len(row) > 1 else None, 20)
+                email = _text(row[2] if len(row) > 2 else None, 200)
+                address = _text(row[3] if len(row) > 3 else None, 2000)
+                tax_id = _text(row[4] if len(row) > 4 else None, 50)
+                notes = _text(row[5] if len(row) > 5 else None, 2000)
+
+                existing = db.session.execute(
+                    db.select(Party).where(
+                        Party.party_type == PartyType.DENTIST,
+                        db.or_(
+                            db.func.lower(Party.name) == name.lower(),
+                            db.and_(Party.phone.isnot(None), Party.phone == phone) if phone else db.false(),
+                        ),
+                    )
+                ).scalars().first()
+
+                if existing:
+                    existing.phone = phone or existing.phone
+                    existing.email = email or existing.email
+                    existing.address = address or existing.address
+                    existing.tax_id = tax_id or existing.tax_id
+                    existing.notes = notes or existing.notes
+                    existing.is_active = True
+                    updated += 1
+                else:
+                    db.session.add(Party(
+                        party_type=PartyType.DENTIST, name=name, phone=phone,
+                        email=email, address=address, tax_id=tax_id, notes=notes,
+                        is_active=True,
+                    ))
+                    added += 1
+
+            db.session.commit()
+            wb.close()
+            flash(f"İçe aktarma tamamlandı: {added} yeni, {updated} güncellendi, {skipped} atlandı.", "success")
+            return redirect(url_for("parties.list_parties"))
+        except Exception as e:
+            db.session.rollback()
+            flash(f"İçe aktarma hatası: {str(e)}", "danger")
+            return redirect(url_for("parties.import_parties"))
+
+    return render_template("parties/import.html")
+
+
 @parties_bp.route("/<int:party_id>")
 @login_required
 @permissions_required("clinical.view")

@@ -91,7 +91,9 @@
                 <table class="table table-hover align-middle mb-0">
                     <thead class="table-light">
                         <tr>
-                            <th style="width:2.5rem;"></th>
+                            <th style="width:2.5rem;">
+                                <input type="checkbox" class="form-check-input" id="select-all-parties" title="Tümünü seç" aria-label="Tüm doktorları seç">
+                            </th>
                             <th>Doktor</th>
                             <th class="text-center">İş Emri</th>
                             <th class="text-end">Aparat (₺)</th>
@@ -146,6 +148,11 @@
                                 {% endif %}
                             </td>
                             <td class="text-end">
+                                {% if m %}
+                                <a href="{{ url_for('makbuzlar.pdf_makbuz', makbuz_id=m.id) }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-secondary" title="PDF Önizle">
+                                    <i class="bi bi-file-earmark-pdf"></i>
+                                </a>
+                                {% endif %}
                                 <a href="{{ url_for('makbuzlar.detail_makbuz', party_id=d.party_id, year=year, month=month) }}" class="btn btn-sm btn-outline-primary">
                                     <i class="bi bi-eye"></i> Detay
                                 </a>
@@ -178,4 +185,21 @@
         </div>
     </div>
 </form>
+<script>
+(function () {
+    var selectAll = document.getElementById("select-all-parties");
+    if (!selectAll) return;
+    var boxes = function () {
+        return document.querySelectorAll('input[name="party_ids"]');
+    };
+    selectAll.addEventListener("change", function () {
+        boxes().forEach(function (box) { box.checked = selectAll.checked; });
+    });
+    document.addEventListener("change", function (event) {
+        if (event.target.name !== "party_ids") return;
+        var all = Array.prototype.slice.call(boxes());
+        selectAll.checked = all.length > 0 && all.every(function (box) { return box.checked; });
+    });
+})();
+</script>
 {% endblock %}

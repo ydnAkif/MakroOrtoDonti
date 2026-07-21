@@ -25,6 +25,31 @@ class TestConfig:
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
 
+@pytest.fixture(autouse=True)
+def _reset_whatsapp_state(tmp_path_factory, monkeypatch):
+    """Isolate WhatsAppService class state per test: no real Neonize client,
+    no session/lock files in the repo's data/ directory."""
+    from app.services.whatsapp_service import WhatsAppService
+
+    monkeypatch.setattr(
+        WhatsAppService, "_session_dir", str(tmp_path_factory.mktemp("whatsapp"))
+    )
+    monkeypatch.setattr(WhatsAppService, "_app", None)
+    monkeypatch.setattr(WhatsAppService, "_client", None)
+    monkeypatch.setattr(WhatsAppService, "_thread", None)
+    monkeypatch.setattr(WhatsAppService, "_connected", False)
+    monkeypatch.setattr(WhatsAppService, "_qr_code", None)
+    monkeypatch.setattr(WhatsAppService, "_pair_code", None)
+    yield
+    handle = WhatsAppService._process_lock_handle
+    if handle is not None:
+        try:
+            handle.close()
+        except OSError:
+            pass
+        WhatsAppService._process_lock_handle = None
+
+
 @pytest.fixture()
 def app(tmp_path):
     class IsolatedTestConfig(TestConfig):

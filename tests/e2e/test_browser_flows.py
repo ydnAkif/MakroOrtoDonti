@@ -51,7 +51,7 @@ def test_primary_navigation_and_security_headers(authenticated_page, live_server
     assert page.get_by_role("heading", name="Diş Hekimleri").is_visible()
 
 
-def test_person_invoice_and_payment_critical_flow(authenticated_page, live_server_url):
+def test_dentist_work_order_and_makbuz_payment_critical_flow(authenticated_page, live_server_url):
     page = authenticated_page
 
     page.goto(f"{live_server_url}/parties/add")
@@ -61,18 +61,19 @@ def test_person_invoice_and_payment_critical_flow(authenticated_page, live_serve
     page.wait_for_url(f"{live_server_url}/parties/*")
     party_id = page.url.rstrip("/").split("/")[-1]
 
-    page.goto(f"{live_server_url}/invoices/add")
-    page.locator("#party-select").select_option(value=party_id, force=True)
-    page.locator("#add-custom-btn").click()
-    page.locator("#item-description").fill("E2E özel hizmet")
-    page.locator("#item-unit-price-eur").fill("100")
-    page.locator("#item-form").get_by_role("button", name="Ekle").click()
-    page.get_by_role("button", name="Fatura Oluştur").click()
-    page.wait_for_url(f"{live_server_url}/invoices/*")
-    invoice_id = page.url.rstrip("/").split("/")[-1]
+    page.goto(f"{live_server_url}/parties/{party_id}/work-orders/add")
+    page.locator("#patient_name").fill("E2E Hasta")
+    page.locator("#apparatus_price").fill("100")
+    page.get_by_role("button", name="Kaydet").click()
+    page.wait_for_url(f"{live_server_url}/parties/{party_id}")
 
-    page.goto(f"{live_server_url}/payments/add?invoice_id={invoice_id}")
-    page.locator("#amount-eur").fill("100")
+    page.goto(f"{live_server_url}/makbuzlar/{party_id}")
+    page.get_by_role("button", name="Makbuz Oluştur").click()
+    page.wait_for_url(f"{live_server_url}/makbuzlar/{party_id}*")
+    pdf_href = page.locator('a[href*="/pdf"]').first.get_attribute("href")
+    makbuz_id = pdf_href.split("/makbuzlar/")[-1].split("/")[0]
+
+    page.goto(f"{live_server_url}/payments/{makbuz_id}/mark-paid")
     page.get_by_role("button", name="Kaydet").click()
     page.wait_for_url(f"{live_server_url}/payments/")
-    assert page.get_by_text("€100.00").first.is_visible()
+    assert page.get_by_text("₺100.00").first.is_visible()

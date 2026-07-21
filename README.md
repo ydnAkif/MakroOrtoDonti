@@ -74,8 +74,10 @@ export SESSION_COOKIE_SECURE=true
 export FORCE_HSTS=true
 export DATABASE_ENCRYPTION_AT_REST=true
 flask --app run:app db upgrade
-gunicorn --bind 0.0.0.0:8000 "run:app"
+gunicorn --workers 1 --bind 0.0.0.0:8000 "run:app"
 ```
+
+> **Not:** WhatsApp entegrasyonu nedeniyle gunicorn **tek worker** ile çalıştırılmalıdır (aşağıya bakın).
 
 Health/readiness kontrolü kimlik doğrulama gerektirmez:
 
@@ -96,6 +98,19 @@ flask --app run:app db current
 ```
 
 İlk revision boş şemayı da oluşturabilir; ancak uygulama için zorunlu settings/admin bootstrap'ını yapmaz. Mevcut veride eski `Patient` kayıtlarını `Party` ile eşler, tedavi geçmişini `party_id` üzerine taşır ve finans kolonlarını `Numeric` yapar. `20260720_02` migration'ı mevcut tedavi kataloğunu siler ve Makro Ortodonti'ye özel 54 işlemle (44 Ana İşlemler + 10 Ekstra İşlemler) yeniden doldurur; bu migration'idempotent değildir ve yalnız bir kez çalıştırılmalıdır. SQLite batch geçişi sonunda foreign-key kontrolü başarısızsa migration da başarısız olur. Uygulama yeni legacy `Patient` satırı üretmez; tablo yalnızca kontrollü geriye dönük veri geçişi için tutulur.
+
+## WhatsApp bağlantısı
+
+WhatsApp gönderimi [Neonize](https://github.com/krypton-byte/neonize) (WhatsApp Web protokolü) ile çalışır; ücretli bir API gerektirmez. Bağlantı akışı:
+
+1. Uygulamayı başlatın ve **WhatsApp** sayfasını açın (`/whatsapp/`).
+2. **Bağlan** butonuna tıklayın. Sayfa birkaç saniye içinde QR kod gösterir.
+3. Telefonunuzda WhatsApp > Bağlı Cihazlar > Cihaz Bağla ile QR kodu tarayın. (Telefon numarası girerseniz QR yerine eşleştirme kodu gösterilir.)
+4. Tarama sonrası sayfa otomatik olarak "Bağlı" durumuna geçer.
+
+Oturum `data/whatsapp_session.db` dosyasında saklanır; uygulama yeniden başlatıldığında bu dosya varsa arka planda otomatik yeniden bağlanır, tekrar QR taraması gerekmez.
+
+**Tek worker zorunluluğu:** WhatsApp istemcisi süreç içinde tek bir arka plan thread'inde çalışır ve oturum dosyası süreçler arasında paylaşılamaz. Gunicorn **`--workers 1`** ile çalıştırılmalıdır. Yanlışlıkla çok worker başlatılırsa `data/whatsapp.worker.lock` üzerindeki dosya kilidi sayesinde istemciyi yalnız bir worker sahiplenir; diğer worker'lardaki gönderimler açık bir hata mesajıyla reddedilir.
 
 ## Zamanlanmış işler
 

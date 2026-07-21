@@ -35,11 +35,34 @@ endblock %} {% block content %}
         {% else %}
         <div class="text-center mb-3">
           <div
+            id="wa-idle-icon"
             class="bg-secondary bg-opacity-10 rounded-circle d-inline-flex p-4 mb-3"
           >
             <i class="bi bi-phone text-secondary fs-1"></i>
           </div>
-          <h5 class="text-secondary">Bağlı Değil</h5>
+          <h5 id="wa-status-title" class="text-secondary">
+            {% if status.connecting %}Bağlanıyor...{% else %}Bağlı Değil{% endif %}
+          </h5>
+        </div>
+        <div id="wa-qr-area" class="text-center mb-3 d-none">
+          <img
+            id="wa-qr-image"
+            src=""
+            alt="WhatsApp QR kodu"
+            class="img-fluid border rounded"
+            style="max-width: 240px"
+          />
+          <p class="text-muted small mt-2 mb-0">
+            Telefonunuzda WhatsApp &gt; Bağlı Cihazlar &gt; Cihaz Bağla
+            menüsünden bu QR kodu tarayın.
+          </p>
+        </div>
+        <div id="wa-pair-area" class="text-center mb-3 d-none">
+          <p class="text-muted small mb-1">
+            Telefonunuzda WhatsApp &gt; Bağlı Cihazlar &gt; Cihaz Bağla &gt;
+            Telefon numarasıyla bağla adımında bu kodu girin:
+          </p>
+          <div id="wa-pair-code" class="fs-3 fw-bold font-monospace"></div>
         </div>
         <form method="POST" action="{{ url_for('whatsapp.connect') }}">
           <div class="mb-3">
@@ -172,4 +195,64 @@ endblock %} {% block content %}
     </div>
   </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+{% if not status.connected %}
+<script>
+  (function () {
+    var statusUrl = "{{ url_for('whatsapp.status') }}";
+    var qrArea = document.getElementById("wa-qr-area");
+    var qrImage = document.getElementById("wa-qr-image");
+    var pairArea = document.getElementById("wa-pair-area");
+    var pairCode = document.getElementById("wa-pair-code");
+    var statusTitle = document.getElementById("wa-status-title");
+    var idleIcon = document.getElementById("wa-idle-icon");
+
+    function render(data) {
+      if (data.connected) {
+        window.location.reload();
+        return;
+      }
+      if (data.qr_image) {
+        qrImage.src = data.qr_image;
+        qrArea.classList.remove("d-none");
+        idleIcon.classList.add("d-none");
+      } else {
+        qrArea.classList.add("d-none");
+        idleIcon.classList.remove("d-none");
+      }
+      if (data.pair_code) {
+        pairCode.textContent = data.pair_code;
+        pairArea.classList.remove("d-none");
+      } else {
+        pairArea.classList.add("d-none");
+      }
+      if (data.connecting) {
+        statusTitle.textContent = data.qr_image
+          ? "QR kodu tarayın"
+          : "Bağlanıyor...";
+      } else {
+        statusTitle.textContent = "Bağlı Değil";
+      }
+    }
+
+    function poll() {
+      fetch(statusUrl, { headers: { Accept: "application/json" } })
+        .then(function (r) {
+          return r.json();
+        })
+        .then(function (data) {
+          render(data);
+          setTimeout(poll, 3000);
+        })
+        .catch(function () {
+          setTimeout(poll, 5000);
+        });
+    }
+
+    poll();
+  })();
+</script>
+{% endif %}
 {% endblock %}
