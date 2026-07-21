@@ -571,7 +571,7 @@ textarea.form-control { min-height: 92px; }
 .workflow-strip small { margin-bottom:.18rem; color:var(--ink-600); font-size:.68rem; font-weight:650; }
 .workflow-strip strong { font-size:.82rem; }
 .workflow-step { display:grid; width:28px; height:28px; flex:0 0 28px; place-items:center; border:1px solid var(--line-strong); border-radius:50%; color:var(--aqua-700); font-size:.7rem; font-weight:800; }
-.rate-line { margin-bottom:1rem; font-size:.78rem; }
+.rate-line { flex-wrap:wrap; margin-bottom:1rem; font-size:.78rem; }
 .rate-line>i { color:var(--aqua-700); }
 .rate-line small { margin-left:auto; color:var(--ink-600); }
 .work-panel { overflow:hidden; border:1px solid var(--line); border-radius:var(--radius-md); background:var(--surface); }
