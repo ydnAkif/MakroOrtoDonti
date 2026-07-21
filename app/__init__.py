@@ -52,6 +52,10 @@ def create_app(config_class=Config) -> Flask:
 
     app.jinja_env.filters["fromjson"] = _fromjson
 
+    from .services.validation_service import normalize_optional_text
+
+    app.jinja_env.filters["clean_optional"] = normalize_optional_text
+
     def _currency_symbol(currency):
         return {"TL": "₺", "EUR": "€", "USD": "$"}.get(currency, "₺")
 

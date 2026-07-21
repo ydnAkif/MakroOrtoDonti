@@ -4,6 +4,8 @@ import os
 from fpdf import FPDF
 from fpdf.enums import MethodReturnValue, XPos, YPos
 
+from app.services.validation_service import normalize_optional_text
+
 CURRENCY_SYMBOLS = {"TL": "₺", "EUR": "€", "USD": "$"}
 
 
@@ -14,6 +16,7 @@ def _format_items(raw: str | None) -> str:
     (selected from the treatment catalog) or, for legacy rows, a plain
     description string.
     """
+    raw = normalize_optional_text(raw)
     if not raw:
         return ""
     try:
@@ -34,6 +37,7 @@ def _format_items(raw: str | None) -> str:
 
 def _item_lines(raw: str | None, bullet: str = "•") -> list[str]:
     """Same source data as _format_items, but one line per item for the PDF table."""
+    raw = normalize_optional_text(raw)
     if not raw:
         return []
     try:

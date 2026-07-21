@@ -196,13 +196,14 @@
                             {% endif %}
                         </td>
                         <td>
-                            {% set extras = wo.extra_addons|fromjson %}
+                            {% set extra_value = wo.extra_addons|clean_optional %}
+                            {% set extras = extra_value|fromjson %}
                             {% if extras is iterable and extras is not string and extras|length > 0 %}
                                 {% for ex in extras %}
                                     <span class="badge bg-info text-dark">{{ ex.name if ex is mapping else ex }} ({{ (ex.currency if ex is mapping else 'TL')|currency_symbol }}{{ "{:,.2f}".format(ex.price|float if ex is mapping else 0) }})</span>
                                 {% endfor %}
                             {% else %}
-                                {{ wo.extra_addons or '-' }}
+                                {{ extra_value or '-' }}
                             {% endif %}
                         </td>
                         <td class="text-end">₺{{ "{:,.2f}".format(wo.apparatus_price) }}</td>

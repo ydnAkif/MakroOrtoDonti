@@ -24,6 +24,15 @@ _NAME_TITLES = {
     "prof": "Prof.",
     "doç": "Doç.",
 }
+_EMPTY_OPTIONAL_TEXTS = {"none", "null", "yok", "-", "[]"}
+
+
+def normalize_optional_text(value: object) -> str | None:
+    """Collapse empty/legacy placeholder values into a real database NULL."""
+    clean = str(value or "").strip()
+    if not clean or clean.casefold() in _EMPTY_OPTIONAL_TEXTS:
+        return None
+    return clean
 
 
 def normalize_display_name(value: object) -> str:

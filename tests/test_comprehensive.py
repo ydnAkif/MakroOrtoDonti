@@ -821,7 +821,8 @@ def test_work_order_ledger_filters_by_day_and_month(client, app):
         )
         previous_order = WorkOrder(
             party_id=party.id, work_date=previous_month_date,
-            apparatus_type="Aylık Test Apareyi", patient_name="Önceki Ay Hastası",
+            apparatus_type="Aylık Test Apareyi", extra_addons="None",
+            patient_name="Önceki Ay Hastası", notes="None",
             apparatus_price=Decimal("900"), extra_price=Decimal("0"),
             total_price=Decimal("900"),
         )
@@ -872,7 +873,8 @@ def test_work_order_ledger_filters_by_day_and_month(client, app):
     assert "Bugünkü Hasta" not in month_html
     previous_row = month_html.split("Önceki Ay Hastası", 1)[1].split("</tr>", 1)[0]
     assert "workorder-line-group--extra" in previous_row
-    assert ">Yok<" in previous_row
+    assert ">-<" in previous_row
+    assert "None" not in previous_row
 
 
 def test_work_order_delete_returns_to_ledger(client, app):

@@ -387,7 +387,7 @@ def add_work_order(party_id):
     party = db.get_or_404(Party, party_id)
 
     if request.method == "POST":
-        from app.services.validation_service import normalize_display_name, parse_date, parse_float
+        from app.services.validation_service import normalize_display_name, normalize_optional_text, parse_date, parse_float
 
         work_date = parse_date(request.form.get("work_date", ""))
         if not work_date:
@@ -402,13 +402,13 @@ def add_work_order(party_id):
             party_id=party_id,
             work_date=work_date,
             apparatus_type=request.form.get("apparatus_type", "").strip(),
-            extra_addons=request.form.get("extra_addons", "").strip() or None,
+            extra_addons=normalize_optional_text(request.form.get("extra_addons", "")),
             patient_name=normalize_display_name(request.form.get("patient_name", "")),
             apparatus_price=apparatus_price,
             extra_price=extra_price,
             total_price=apparatus_price + extra_price,
             exchange_rate_applied=exchange_rate_applied,
-            notes=request.form.get("notes", "").strip() or None,
+            notes=normalize_optional_text(request.form.get("notes", "")),
         )
         db.session.add(wo)
         db.session.commit()
@@ -440,7 +440,7 @@ def edit_work_order(party_id, wo_id):
     wo = db.get_or_404(WorkOrder, wo_id)
 
     if request.method == "POST":
-        from app.services.validation_service import normalize_display_name, parse_date, parse_float
+        from app.services.validation_service import normalize_display_name, normalize_optional_text, parse_date, parse_float
 
         work_date = parse_date(request.form.get("work_date", ""))
         if not work_date:
@@ -453,13 +453,13 @@ def edit_work_order(party_id, wo_id):
 
         wo.work_date = work_date
         wo.apparatus_type = request.form.get("apparatus_type", "").strip()
-        wo.extra_addons = request.form.get("extra_addons", "").strip() or None
+        wo.extra_addons = normalize_optional_text(request.form.get("extra_addons", ""))
         wo.patient_name = normalize_display_name(request.form.get("patient_name", ""))
         wo.apparatus_price = apparatus_price
         wo.extra_price = extra_price
         wo.total_price = apparatus_price + extra_price
         wo.exchange_rate_applied = exchange_rate_applied
-        wo.notes = request.form.get("notes", "").strip() or None
+        wo.notes = normalize_optional_text(request.form.get("notes", ""))
 
         db.session.commit()
         flash("İş emri güncellendi.", "success")

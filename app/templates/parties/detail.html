@@ -166,24 +166,26 @@
                                                 <strong class="text-primary">Toplam:</strong> <span class="text-primary fw-bold">₺{{ "{:,.2f}".format(wo.total_price) }}</span>
                                             </div>
                                         </div>
-                                        {% if wo.extra_addons %}
+                                        {% set extra_value = wo.extra_addons|clean_optional %}
+                                        {% if extra_value %}
                                         <div class="mt-2">
                                             <strong>Ekstra Eklentiler:</strong>
                                             <div class="mt-1">
-                                                {% set extras = wo.extra_addons|fromjson %}
+                                                {% set extras = extra_value|fromjson %}
                                                 {% if extras is iterable and extras is not string and extras | length > 0 %}
                                                     {% for ex in extras %}
                                                         <span class="badge bg-info text-dark">{{ ex.name if ex is mapping else ex }} ({{ (ex.currency if ex is mapping else 'TL')|currency_symbol }}{{ "{:,.2f}".format(ex.price|float if ex is mapping else 0) }})</span>
                                                     {% endfor %}
                                                 {% else %}
-                                                    <span class="text-muted">{{ wo.extra_addons }}</span>
+                                                    <span class="text-muted">{{ extra_value }}</span>
                                                 {% endif %}
                                             </div>
                                         </div>
                                         {% endif %}
-                                        {% if wo.notes %}
+                                        {% set note_value = wo.notes|clean_optional %}
+                                        {% if note_value %}
                                         <div class="mt-2">
-                                            <strong>Notlar:</strong> <span class="text-muted">{{ wo.notes }}</span>
+                                            <strong>Notlar:</strong> <span class="text-muted">{{ note_value }}</span>
                                         </div>
                                         {% endif %}
                                     </div>
