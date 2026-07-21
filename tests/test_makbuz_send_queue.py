@@ -459,6 +459,28 @@ class TestAutoSendToggle:
 
 
 class TestWhatsAppMakbuzPanel:
+    def test_doctor_phone_opens_message_form_with_recipient_selected(self, client, app):
+        login(client, "admin", "admin-pass")
+        party_id, _ = _seed_doctor_with_makbuz(
+            app, name="Dr. Mesaj Kısayolu", phone="+905551110055"
+        )
+
+        doctor_list = client.get("/parties/").get_data(as_text=True)
+        assert f"/whatsapp/?message_party_id={party_id}#message-compose" in doctor_list
+
+        whatsapp_html = client.get(
+            f"/whatsapp/?message_party_id={party_id}"
+        ).get_data(as_text=True)
+        disclosure = whatsapp_html.split(
+            '<details class="disclosure-panel mt-3"', 1
+        )[1].split(">", 1)[0]
+        option = whatsapp_html.split(
+            '<option value="+905551110055"', 1
+        )[1].split(">", 1)[0]
+        assert "open" in disclosure
+        assert "selected" in option
+        assert 'id="message-compose"' in whatsapp_html
+
     def test_index_lists_candidates_for_period(self, client, app):
         login(client, "admin", "admin-pass")
         _seed_doctor_with_makbuz(app, name="Dr. Panel", phone="+905551110005")

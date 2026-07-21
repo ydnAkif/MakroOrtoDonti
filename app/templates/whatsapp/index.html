@@ -385,13 +385,13 @@ endblock %} {% block content %}
   </div>
 </div>
 
-<details class="disclosure-panel mt-3">
+<details class="disclosure-panel mt-3" {% if selected_recipient %}open{% endif %}>
   <summary><span><i class="bi bi-chat-left-text" aria-hidden="true"></i><strong>Mesaj araçları</strong><small>Tek kişiye veya seçili doktorlara serbest mesaj gönderin</small></span><i class="bi bi-chevron-down disclosure-chevron" aria-hidden="true"></i></summary>
   <div class="disclosure-content">
 <div class="row g-3">
   <!-- Send Message -->
   <div class="col-lg-6">
-    <div class="card border-0 shadow-sm h-100">
+    <div class="card border-0 shadow-sm h-100" id="message-compose">
       <div class="card-header bg-white">
         <h5 class="mb-0"><i class="bi bi-chat-left-text"></i> Mesaj Gönder</h5>
       </div>
@@ -407,7 +407,7 @@ endblock %} {% block content %}
             >
               <option value="">Kişi seçiniz...</option>
               {% for p in patients %}
-              <option value="{{ p.phone }}">
+              <option value="{{ p.phone }}" {% if selected_recipient and selected_recipient.id == p.id %}selected{% endif %}>
                 {{ p.display_name }} ({{ p.phone|phone_display }})
               </option>
               {% endfor %}
@@ -421,6 +421,7 @@ endblock %} {% block content %}
               rows="4"
               required
               placeholder="Mesajınızı yazın..."
+              {% if selected_recipient %}autofocus{% endif %}
             ></textarea>
           </div>
           <button type="submit" class="btn btn-success">

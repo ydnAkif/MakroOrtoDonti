@@ -82,11 +82,17 @@ def index():
             Party.phone != "",
         ).order_by(tr_order(Party.name))
     ).scalars().all()
+    selected_party_id = request.args.get("message_party_id", type=int)
+    selected_recipient = next(
+        (party for party in parties_with_phone if party.id == selected_party_id),
+        None,
+    )
 
     return render_template(
         "whatsapp/index.html",
         status=status,
         patients=parties_with_phone,
+        selected_recipient=selected_recipient,
         candidates=candidates,
         missing_makbuz_count=missing_makbuz_count,
         year=year,

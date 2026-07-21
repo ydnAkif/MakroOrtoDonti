@@ -19,7 +19,7 @@
                             </a>
                         </td>
                         <td class="party-phone-cell" data-label="Telefon">
-                            {% if p.phone %}<a href="tel:{{ p.phone }}">{{ p.phone|phone_display }}</a>{% else %}-{% endif %}
+                            {% if p.phone %}<a href="{{ url_for('whatsapp.index', message_party_id=p.id, _anchor='message-compose') }}" title="{{ p.display_name }} için WhatsApp mesajı hazırla" aria-label="{{ p.display_name }} adlı doktora WhatsApp mesajı gönder">{{ p.phone|phone_display }}</a>{% else %}-{% endif %}
                         </td>
                         <td class="text-end party-actions-cell" data-label="İşlem">
                             <a href="{{ url_for('parties.add_work_order', party_id=p.id) }}" class="btn btn-sm btn-primary" title="İş Emri Gir" aria-label="{{ p.display_name }} için iş emri gir">
