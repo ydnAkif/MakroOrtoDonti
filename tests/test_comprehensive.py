@@ -790,9 +790,17 @@ def test_work_order_ledger_filters_by_day_and_month(client, app):
             db.select(Party).where(Party.party_type == PartyType.DENTIST).limit(1)
         ).scalar_one()
         today_order = WorkOrder(
-            party_id=party.id, work_date=today, apparatus_type="Günlük Test Apareyi",
+            party_id=party.id, work_date=today,
+            apparatus_type=json.dumps([
+                {"name": "Günlük Test Apareyi", "price": 500, "currency": "TL"},
+                {"name": "İkinci Test Apareyi", "price": 200, "currency": "TL"},
+            ], ensure_ascii=False),
+            extra_addons=json.dumps([
+                {"name": "Test Ekstra İşlemi", "price": 100, "currency": "TL"},
+            ], ensure_ascii=False),
             patient_name="Bugünkü Hasta", apparatus_price=Decimal("700"),
-            extra_price=Decimal("0"), total_price=Decimal("700"),
+            extra_price=Decimal("100"), total_price=Decimal("800"),
+            notes="Kontrol notu",
         )
         previous_order = WorkOrder(
             party_id=party.id, work_date=previous_month_date,
@@ -807,6 +815,11 @@ def test_work_order_ledger_filters_by_day_and_month(client, app):
     day_html = client.get("/parties/work-orders").get_data(as_text=True)
     assert "Bugünkü Hasta" in day_html
     assert "Önceki Ay Hastası" not in day_html
+    assert "Günlük Test Apareyi" in day_html
+    assert "İkinci Test Apareyi" in day_html
+    assert "Test Ekstra İşlemi" in day_html
+    assert "Kontrol notu" in day_html
+    assert "₺800.00" in day_html
     assert f"/work-orders/{today_order_id}/edit" in day_html
 
     edit_response = client.post(

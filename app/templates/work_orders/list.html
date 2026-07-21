@@ -49,20 +49,56 @@
     </div>
     <div class="table-responsive">
         <table class="table table-hover align-middle workorder-ledger">
-            <thead><tr><th>Tarih</th><th>Doktor</th><th>Hasta</th><th>Aparey</th><th class="text-end">Tutar</th><th class="text-end">İşlem</th></tr></thead>
+            <thead><tr><th>Tarih</th><th>Doktor</th><th>Hasta</th><th>İşlem detayı</th><th class="text-end">Tutar dökümü</th><th class="text-end">İşlem</th></tr></thead>
             <tbody>
                 {% for wo in work_orders %}
                 <tr>
                     <td><time class="workorder-date" datetime="{{ wo.work_date.isoformat() }}">{{ wo.work_date.strftime('%d.%m.%Y') }}</time></td>
-                    <td><a href="{{ url_for('parties.detail_party', party_id=wo.party_id) }}">{{ wo.party.display_name if wo.party else '—' }}</a></td>
-                    <td>{{ wo.patient_name }}</td>
-                    <td class="workorder-apparatus">
-                        {% set items = wo.apparatus_type|fromjson %}
-                        {% if items is iterable and items is not string and items|length > 0 %}
-                            <strong>{{ items[0].name if items[0] is mapping else items[0] }}</strong>{% if items|length > 1 %}<small>+{{ items|length - 1 }} kalem</small>{% endif %}
-                        {% else %}<strong>{{ wo.apparatus_type }}</strong>{% endif %}
+                    <td>
+                        <a href="{{ url_for('parties.detail_party', party_id=wo.party_id) }}">{{ wo.party.display_name if wo.party else '—' }}</a>
+                        {% if wo.party and wo.party.phone %}<small class="workorder-doctor-phone">{{ wo.party.phone }}</small>{% endif %}
                     </td>
-                    <td class="text-end fw-bold">₺{{ "{:,.2f}".format(wo.total_price) }}</td>
+                    <td>{{ wo.patient_name }}</td>
+                    <td class="workorder-detail-cell">
+                        {% set items = wo.apparatus_type|fromjson %}
+                        <div class="workorder-line-group">
+                            <span class="workorder-line-label">Aparey</span>
+                            <div class="workorder-line-list">
+                        {% if items is iterable and items is not string and items|length > 0 %}
+                                {% for item in items %}
+                                <div class="workorder-line-item">
+                                    <strong>{{ item.name if item is mapping else item }}</strong>
+                                    {% if item is mapping %}<small>{{ "{:,.2f}".format(item.price|float) }} {{ item.currency|currency_symbol }}</small>{% endif %}
+                                </div>
+                                {% endfor %}
+                        {% else %}<div class="workorder-line-item"><strong>{{ wo.apparatus_type }}</strong></div>{% endif %}
+                            </div>
+                        </div>
+                        {% if wo.extra_addons %}
+                        {% set extras = wo.extra_addons|fromjson %}
+                        <div class="workorder-line-group workorder-line-group--extra">
+                            <span class="workorder-line-label">Ekstra</span>
+                            <div class="workorder-line-list">
+                                {% if extras is iterable and extras is not string and extras|length > 0 %}
+                                    {% for extra in extras %}
+                                    <div class="workorder-line-item">
+                                        <strong>{{ extra.name if extra is mapping else extra }}</strong>
+                                        {% if extra is mapping %}<small>{{ "{:,.2f}".format(extra.price|float) }} {{ extra.currency|currency_symbol }}</small>{% endif %}
+                                    </div>
+                                    {% endfor %}
+                                {% else %}<div class="workorder-line-item"><strong>{{ wo.extra_addons }}</strong></div>{% endif %}
+                            </div>
+                        </div>
+                        {% endif %}
+                        {% if wo.notes %}<div class="workorder-note"><i class="bi bi-journal-text" aria-hidden="true"></i><span>{{ wo.notes }}</span></div>{% endif %}
+                    </td>
+                    <td class="text-end">
+                        <div class="workorder-amounts">
+                            <span><small>Aparey</small><b>₺{{ "{:,.2f}".format(wo.apparatus_price) }}</b></span>
+                            <span><small>Ekstra</small><b>₺{{ "{:,.2f}".format(wo.extra_price) }}</b></span>
+                            <strong><small>Toplam</small>₺{{ "{:,.2f}".format(wo.total_price) }}</strong>
+                        </div>
+                    </td>
                     <td class="text-end workorder-row-actions">
                         <a href="{{ url_for('parties.edit_work_order', party_id=wo.party_id, wo_id=wo.id, return_to='work_orders', return_view=view, return_date=(selected_date.isoformat() if selected_date else none), return_year=(year if view == 'month' else none), return_month=(month if view == 'month' else none)) }}" class="btn btn-sm btn-outline-secondary" title="İş emrini düzenle" aria-label="{{ wo.patient_name }} iş emrini düzenle"><i class="bi bi-pencil" aria-hidden="true"></i></a>
                         <form method="POST" action="{{ url_for('parties.delete_work_order', party_id=wo.party_id, wo_id=wo.id) }}" class="d-inline" onsubmit="return confirm('Bu iş emrini silmek istediğinize emin misiniz?');">
