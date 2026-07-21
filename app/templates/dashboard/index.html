@@ -16,7 +16,7 @@
 </header>
 <nav class="workflow-strip" aria-label="Klinik iş akışı">
     <a href="{{ url_for('parties.list_parties') }}"><span class="workflow-step">1</span><span><small>Doktorlar</small><strong>{{ total_patients }} aktif kayıt</strong></span></a>
-    <a href="{{ url_for('parties.list_work_orders', view='month') }}"><span class="workflow-step">2</span><span><small>Bu ayki iş emirleri</small><strong>{{ monthly_work_orders }} iş · ₺{{ "{:,.2f}".format(monthly_total_eur) }}</strong></span></a>
+    <a href="{{ url_for('parties.list_work_orders', view='month') }}"><span class="workflow-step">2</span><span><small>Bu ayki iş emirleri</small><strong>{{ monthly_work_orders }} iş · ₺{{ "{:,.2f}".format(monthly_total_try) }}</strong></span></a>
     <a href="{{ url_for('makbuzlar.list_makbuzlar') }}"><span class="workflow-step">3</span><span><small>Makbuzlar</small><strong>{{ monthly_drafts }} taslak</strong></span></a>
     <a href="{{ url_for('payments.list_payments') }}"><span class="workflow-step">4</span><span><small>Tahsilat</small><strong>{{ awaiting_payment }} ödeme bekliyor</strong></span></a>
 </nav>

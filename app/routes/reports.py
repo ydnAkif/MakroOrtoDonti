@@ -1,10 +1,11 @@
 from collections import defaultdict
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 
 from flask import Blueprint, render_template, request
 from flask_login import login_required
 from app.authz import permissions_required
+from sqlalchemy import extract
 from sqlalchemy.orm import selectinload
 
 from app.extensions import db
@@ -15,6 +16,8 @@ from app.models.models import (
     InvoiceItem,
     InvoiceItemType,
     Payment,
+    WorkOrder,
+    Makbuz,
     invoice_item_category_key,
 )
 from app.services.validation_service import parse_date
@@ -29,6 +32,8 @@ STATUS_LABELS = {
     Invoice.STATUS_OVERDUE: "Gecikmiş",
     Invoice.STATUS_CANCELLED: "İptal",
 }
+
+
 def _resolve_period(today: date) -> tuple[date, date, str]:
     period = request.args.get("period", "this_month")
     explicit_start = parse_date(request.args.get("start_date", ""))
@@ -54,7 +59,7 @@ def _resolve_period(today: date) -> tuple[date, date, str]:
     return start, end, period
 
 
-def _trend_rows(start: date, end: date, invoices: list[Invoice], payments: list[Payment]) -> list[dict]:
+def _trend_rows(start: date, end: date, invoices: list[Invoice], payments: list[Payment], work_orders: list[WorkOrder], paid_makbuzlar: list[Makbuz]) -> list[dict]:
     day_span = (end - start).days + 1
     use_months = day_span > 100
     values: dict[tuple[int, int] | date, dict[str, Decimal]] = defaultdict(
@@ -66,10 +71,34 @@ def _trend_rows(start: date, end: date, invoices: list[Invoice], payments: list[
             return value.year, value.month
         return value - timedelta(days=value.weekday())
 
+    # Legacy invoices
     for invoice in invoices:
         values[key_for(invoice.invoice_date)]["issued"] += invoice.total_eur
+    # Legacy payments
     for payment in payments:
         values[key_for(payment.payment_date)]["collected"] += payment.amount_eur
+
+    from app.services.exchange_service import get_rate_for_date
+
+    # Work orders (issued)
+    for wo in work_orders:
+        rate = wo.exchange_rate_applied or Decimal("1")
+        if not rate or rate <= 0:
+            rate_obj = get_rate_for_date(wo.work_date)
+            rate = rate_obj.eur_to_try if rate_obj else Decimal("1")
+        if not rate or rate <= 0:
+            rate = Decimal("1")
+        values[key_for(wo.work_date)]["issued"] += wo.total_price / rate
+
+    # Paid makbuzlar (collected)
+    for makbuz in paid_makbuzlar:
+        if makbuz.paid_at:
+            rate_obj = get_rate_for_date(makbuz.paid_at)
+            rate = rate_obj.eur_to_try if rate_obj else Decimal("1")
+            if not rate or rate <= 0:
+                rate = Decimal("1")
+            paid_try = makbuz.paid_amount or makbuz.grand_total or Decimal("0.00")
+            values[key_for(makbuz.paid_at)]["collected"] += paid_try / rate
 
     rows = []
     for key in sorted(values):
@@ -89,6 +118,7 @@ def index():
     today = date.today()
     start_date, end_date, selected_period = _resolve_period(today)
 
+    # 1. Fetch Legacy Data
     invoices = db.session.execute(
         db.select(Invoice)
         .options(selectinload(Invoice.items).selectinload(InvoiceItem.treatment))
@@ -111,8 +141,6 @@ def index():
         .order_by(Payment.payment_date)
     ).scalars().all()
 
-    # Receivables are a point-in-time balance at the report end date. Include
-    # invoices from before the selected period and ignore later payments.
     receivable_invoices = db.session.execute(
         db.select(Invoice)
         .options(selectinload(Invoice.payments))
@@ -124,30 +152,100 @@ def index():
         .order_by(Invoice.invoice_date)
     ).scalars().all()
 
-    issued_eur, issued_try = db.session.execute(
-        db.select(
-            db.func.coalesce(db.func.sum(Invoice.total_eur), 0),
-            db.func.coalesce(db.func.sum(Invoice.total_try), 0),
-        ).where(
-            Invoice.invoice_date.between(start_date, end_date),
-            Invoice.is_deleted == False,
-            Invoice.status != Invoice.STATUS_CANCELLED,
-        )
-    ).one()
-    collected_eur, collected_try = db.session.execute(
-        db.select(
-            db.func.coalesce(db.func.sum(Payment.amount_eur), 0),
-            db.func.coalesce(db.func.sum(Payment.amount_try), 0),
-        ).join(Invoice, Payment.invoice_id == Invoice.id).where(
-            Payment.payment_date.between(start_date, end_date),
-            Invoice.is_deleted == False,
-            Invoice.status != Invoice.STATUS_CANCELLED,
-        )
-    ).one()
+    # 2. Fetch New Data
+    all_makbuzlar = db.session.execute(
+        db.select(Makbuz)
+        .order_by(Makbuz.year, Makbuz.month)
+    ).scalars().all()
 
+    work_orders_in_period = db.session.execute(
+        db.select(WorkOrder)
+        .where(WorkOrder.work_date.between(start_date, end_date))
+        .order_by(WorkOrder.work_date)
+    ).scalars().all()
+
+    # Filter makbuzlar in selected range
+    makbuzlar_in_period = []
+    for m in all_makbuzlar:
+        m_date = date(m.year, m.month, 1)
+        if m.month == 12:
+            m_next_start = date(m.year + 1, 1, 1)
+        else:
+            m_next_start = date(m.year, m.month + 1, 1)
+        m_end = m_next_start - timedelta(days=1)
+        
+        if m_date <= end_date and m_end >= start_date:
+            makbuzlar_in_period.append(m)
+
+    # 3. Calculate Issued (Billed)
+    legacy_issued_eur = sum((inv.total_eur for inv in invoices), Decimal("0.00"))
+    legacy_issued_try = sum((inv.total_try for inv in invoices), Decimal("0.00"))
+
+    makbuz_issued_try = Decimal("0.00")
+    makbuz_issued_eur = Decimal("0.00")
+
+    from app.services.exchange_service import get_rate_for_date
+
+    for m in makbuzlar_in_period:
+        if m.status in (Makbuz.STATUS_SENT, Makbuz.STATUS_PAID):
+            makbuz_issued_try += m.grand_total
+            
+            m_work_orders = db.session.execute(
+                db.select(WorkOrder)
+                .where(
+                    WorkOrder.party_id == m.party_id,
+                    extract("year", WorkOrder.work_date) == m.year,
+                    extract("month", WorkOrder.work_date) == m.month
+                )
+            ).scalars().all()
+            
+            m_subtotal_eur = Decimal("0.00")
+            for wo in m_work_orders:
+                rate = wo.exchange_rate_applied
+                if not rate or rate <= 0:
+                    rate_obj = get_rate_for_date(wo.work_date)
+                    rate = rate_obj.eur_to_try if rate_obj else Decimal("1")
+                if not rate or rate <= 0:
+                    rate = Decimal("1")
+                m_subtotal_eur += wo.total_price / rate
+                
+            if m.vat_applied:
+                m_total_eur = m_subtotal_eur * (Decimal("1") + m.vat_rate / Decimal("100"))
+            else:
+                m_total_eur = m_subtotal_eur
+            makbuz_issued_eur += m_total_eur
+
+    issued_eur = legacy_issued_eur + makbuz_issued_eur
+    issued_try = legacy_issued_try + makbuz_issued_try
+
+    # 4. Calculate Collected (Payments)
+    legacy_collected_eur = sum((p.amount_eur for p in payments), Decimal("0.00"))
+    legacy_collected_try = sum((p.amount_try for p in payments), Decimal("0.00"))
+
+    makbuz_collected_try = Decimal("0.00")
+    makbuz_collected_eur = Decimal("0.00")
+    paid_makbuzlar_in_period = []
+
+    for m in all_makbuzlar:
+        if m.status == Makbuz.STATUS_PAID and m.paid_at and start_date <= m.paid_at <= end_date:
+            paid_makbuzlar_in_period.append(m)
+            paid_try = m.paid_amount or m.grand_total or Decimal("0.00")
+            makbuz_collected_try += paid_try
+            
+            rate_obj = get_rate_for_date(m.paid_at)
+            rate = rate_obj.eur_to_try if rate_obj else Decimal("1")
+            if not rate or rate <= 0:
+                rate = Decimal("1")
+            makbuz_collected_eur += paid_try / rate
+
+    collected_eur = legacy_collected_eur + makbuz_collected_eur
+    collected_try = legacy_collected_try + makbuz_collected_try
+
+    # 5. Calculate Outstanding & Overdue & Aging
     outstanding_eur = Decimal("0.00")
     outstanding_try = Decimal("0.00")
     overdue_eur = Decimal("0.00")
+    
     aging = {
         "not_due": {"label": "Vadesi henüz gelmedi", "count": 0, "amount": Decimal("0.00")},
         "days_0_30": {"label": "1–30 gün gecikmiş", "count": 0, "amount": Decimal("0.00")},
@@ -155,6 +253,8 @@ def index():
         "days_61_plus": {"label": "61+ gün gecikmiş", "count": 0, "amount": Decimal("0.00")},
     }
     receivable_count = 0
+
+    # Legacy receivable invoices
     for invoice in receivable_invoices:
         paid_eur = sum(
             payment.amount_eur
@@ -165,13 +265,12 @@ def index():
         if remaining_eur <= Decimal("0.01"):
             continue
         receivable_count += 1
-
-        # Preserve the invoice's fixed exchange-rate basis for book-value TRY.
-        # Payment-date TRY values cannot be subtracted without mixing rates.
+        
         remaining_ratio = remaining_eur / invoice.total_eur if invoice.total_eur else Decimal("0")
         remaining_try = max(invoice.total_try * remaining_ratio, Decimal("0.00"))
         outstanding_eur += remaining_eur
         outstanding_try += remaining_try
+        
         due_reference = invoice.due_date or invoice.invoice_date
         age_days = (end_date - due_reference).days
         if age_days <= 0:
@@ -187,8 +286,75 @@ def index():
         if age_days > 0:
             overdue_eur += remaining_eur
 
-    treatment_totals: dict[int, dict] = {}
+    # New receivable makbuzlar
+    for m in all_makbuzlar:
+        m_date = date(m.year, m.month, 1)
+        if m_date > end_date:
+            continue
+        if m.status not in (Makbuz.STATUS_SENT, Makbuz.STATUS_PAID):
+            continue
+            
+        is_paid_before_end = (m.status == Makbuz.STATUS_PAID and m.paid_at and m.paid_at <= end_date)
+        if is_paid_before_end:
+            continue
+            
+        remaining_try = m.grand_total
+        
+        m_work_orders = db.session.execute(
+            db.select(WorkOrder)
+            .where(
+                WorkOrder.party_id == m.party_id,
+                extract("year", WorkOrder.work_date) == m.year,
+                extract("month", WorkOrder.work_date) == m.month
+            )
+        ).scalars().all()
+        
+        m_subtotal_eur = Decimal("0.00")
+        for wo in m_work_orders:
+            rate = wo.exchange_rate_applied
+            if not rate or rate <= 0:
+                rate_obj = get_rate_for_date(wo.work_date)
+                rate = rate_obj.eur_to_try if rate_obj else Decimal("1")
+            if not rate or rate <= 0:
+                rate = Decimal("1")
+            m_subtotal_eur += wo.total_price / rate
+            
+        if m.vat_applied:
+            remaining_eur = m_subtotal_eur * (Decimal("1") + m.vat_rate / Decimal("100"))
+        else:
+            remaining_eur = m_subtotal_eur
+            
+        if remaining_eur <= Decimal("0.01"):
+            continue
+            
+        receivable_count += 1
+        outstanding_eur += remaining_eur
+        outstanding_try += remaining_try
+        
+        if m.month == 12:
+            due_date = date(m.year + 1, 1, 15)
+        else:
+            due_date = date(m.year, m.month + 1, 15)
+            
+        age_days = (end_date - due_date).days
+        if age_days <= 0:
+            bucket = "not_due"
+        elif age_days <= 30:
+            bucket = "days_0_30"
+        elif age_days <= 60:
+            bucket = "days_31_60"
+        else:
+            bucket = "days_61_plus"
+        aging[bucket]["count"] += 1
+        aging[bucket]["amount"] += remaining_eur
+        if age_days > 0:
+            overdue_eur += remaining_eur
+
+    # 6. Treatment & Category Stats
+    treatment_totals: dict[object, dict] = {}
     category_totals: dict[str, dict] = defaultdict(lambda: {"count": 0, "amount_eur": Decimal("0.00")})
+
+    # Legacy Invoices
     for invoice in invoices:
         for item in invoice.items:
             item_type = item.item_type.value if isinstance(item.item_type, InvoiceItemType) else str(item.item_type)
@@ -197,6 +363,7 @@ def index():
             amount_eur = item.line_total_eur + item.vat_amount_eur
             category_totals[category_key]["count"] += quantity
             category_totals[category_key]["amount_eur"] += amount_eur
+            
             if item_type == InvoiceItemType.TREATMENT.value and item.treatment:
                 row = treatment_totals.setdefault(item.treatment.id, {
                     "name": item.treatment.name,
@@ -206,6 +373,92 @@ def index():
                 })
                 row["count"] += quantity
                 row["amount_eur"] += amount_eur
+
+    # New WorkOrders
+    import json
+    def parse_wo_items(raw_str: str | None) -> list[dict]:
+        if not raw_str:
+            return []
+        try:
+            items = json.loads(raw_str)
+            if isinstance(items, list):
+                return [item for item in items if isinstance(item, dict)]
+        except (json.JSONDecodeError, TypeError):
+            pass
+        return [{"name": raw_str, "price": 0.0, "currency": "TL"}]
+
+    for wo in work_orders_in_period:
+        app_items = parse_wo_items(wo.apparatus_type)
+        ext_items = parse_wo_items(wo.extra_addons)
+        
+        rate = wo.exchange_rate_applied or Decimal("1")
+        if not rate or rate <= 0:
+            rate_obj = get_rate_for_date(wo.work_date)
+            rate = rate_obj.eur_to_try if rate_obj else Decimal("1")
+        if not rate or rate <= 0:
+            rate = Decimal("1")
+            
+        for item in app_items:
+            price_try = Decimal(str(item.get("price") or 0))
+            currency = item.get("currency", "TL")
+            if price_try == 0:
+                price_try = wo.apparatus_price
+                currency = "TL"
+            
+            if currency == "EUR":
+                item_eur = price_try
+            elif currency == "USD":
+                try_val = price_try * (wo.exchange_rate_applied or Decimal("1"))
+                rate_obj = get_rate_for_date(wo.work_date)
+                eur_rate = rate_obj.eur_to_try if rate_obj else Decimal("1")
+                item_eur = try_val / (eur_rate or Decimal("1"))
+            else:
+                item_eur = price_try / rate
+                
+            category_key = "ana_islemler"
+            category_totals[category_key]["count"] += 1
+            category_totals[category_key]["amount_eur"] += item_eur
+            
+            name = item.get("name", "Bilinmeyen Aparey")
+            row = treatment_totals.setdefault(name, {
+                "name": name,
+                "category": category_key,
+                "count": 0,
+                "amount_eur": Decimal("0.00"),
+            })
+            row["count"] += 1
+            row["amount_eur"] += item_eur
+            
+        for item in ext_items:
+            price_try = Decimal(str(item.get("price") or 0))
+            currency = item.get("currency", "TL")
+            if price_try == 0:
+                price_try = wo.extra_price
+                currency = "TL"
+                
+            if currency == "EUR":
+                item_eur = price_try
+            elif currency == "USD":
+                try_val = price_try * (wo.exchange_rate_applied or Decimal("1"))
+                rate_obj = get_rate_for_date(wo.work_date)
+                eur_rate = rate_obj.eur_to_try if rate_obj else Decimal("1")
+                item_eur = try_val / (eur_rate or Decimal("1"))
+            else:
+                item_eur = price_try / rate
+                
+            category_key = "ekstra_islemler"
+            category_totals[category_key]["count"] += 1
+            category_totals[category_key]["amount_eur"] += item_eur
+            
+            name = item.get("name", "Bilinmeyen Eklenti")
+            row = treatment_totals.setdefault(name, {
+                "name": name,
+                "category": category_key,
+                "count": 0,
+                "amount_eur": Decimal("0.00"),
+            })
+            row["count"] += 1
+            row["amount_eur"] += item_eur
 
     treatment_stats = sorted(
         treatment_totals.values(), key=lambda row: (row["count"], row["amount_eur"]), reverse=True
@@ -217,9 +470,26 @@ def index():
         )
     ]
 
+    # 7. Invoice & Makbuz Statuses
     status_counts = defaultdict(int)
     for invoice in invoices:
         status_counts[invoice.status] += 1
+        
+    for m in makbuzlar_in_period:
+        if m.status == Makbuz.STATUS_PAID:
+            status_counts[Invoice.STATUS_PAID] += 1
+        elif m.status == Makbuz.STATUS_SENT:
+            if m.month == 12:
+                due_date = date(m.year + 1, 1, 15)
+            else:
+                due_date = date(m.year, m.month + 1, 15)
+            if end_date > due_date:
+                status_counts[Invoice.STATUS_OVERDUE] += 1
+            else:
+                status_counts[Invoice.STATUS_PENDING] += 1
+        else:
+            status_counts[Invoice.STATUS_PENDING] += 1
+
     invoice_statuses = [
         {"status": status, "label": STATUS_LABELS[status], "count": status_counts.get(status, 0)}
         for status in (Invoice.STATUS_PAID, Invoice.STATUS_PENDING, Invoice.STATUS_OVERDUE)
@@ -232,12 +502,15 @@ def index():
         .limit(1)
     ).scalar_one_or_none()
 
-    trend_rows = _trend_rows(start_date, end_date, invoices, payments)
+    trend_rows = _trend_rows(start_date, end_date, invoices, payments, work_orders_in_period, paid_makbuzlar_in_period)
     max_trend_value = max(
         (max(row["issued"], row["collected"]) for row in trend_rows), default=Decimal("1")
     ) or Decimal("1")
     max_category_amount = max((row["amount_eur"] for row in category_stats), default=Decimal("1")) or Decimal("1")
     max_aging_amount = max((row["amount"] for row in aging.values()), default=Decimal("1")) or Decimal("1")
+
+    billed_count = len(invoices) + len([m for m in makbuzlar_in_period if m.status in (Makbuz.STATUS_SENT, Makbuz.STATUS_PAID)])
+    total_payment_count = len(payments) + len(paid_makbuzlar_in_period)
 
     return render_template(
         "reports/index.html",
@@ -254,8 +527,8 @@ def index():
         receivable_count=receivable_count,
         overdue_eur=overdue_eur,
         collection_ratio=(collected_eur / issued_eur * 100) if issued_eur else 0,
-        invoice_count=len(invoices),
-        payment_count=len(payments),
+        invoice_count=billed_count,
+        payment_count=total_payment_count,
         treatment_stats=treatment_stats,
         category_stats=category_stats,
         category_labels=INVOICE_CATEGORY_LABELS,

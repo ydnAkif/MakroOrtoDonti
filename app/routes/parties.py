@@ -394,6 +394,18 @@ def add_work_order(party_id):
             flash("Geçersiz tarih.", "danger")
             return redirect(url_for("parties.add_work_order", party_id=party.id))
 
+        locked_makbuz = db.session.execute(
+            db.select(Makbuz).where(
+                Makbuz.party_id == party_id,
+                Makbuz.year == work_date.year,
+                Makbuz.month == work_date.month,
+                Makbuz.status != Makbuz.STATUS_DRAFT
+            )
+        ).scalar_one_or_none()
+        if locked_makbuz:
+            flash("Bu döneme ait makbuz kesinleştirildiği için yeni iş emri eklenemez.", "danger")
+            return redirect(url_for("parties.add_work_order", party_id=party.id))
+
         apparatus_price = parse_float(request.form.get("apparatus_price", "0")) or 0
         extra_price = parse_float(request.form.get("extra_price", "0")) or 0
         exchange_rate_applied = parse_float(request.form.get("exchange_rate_applied", "")) or None
@@ -439,6 +451,20 @@ def edit_work_order(party_id, wo_id):
     party = db.get_or_404(Party, party_id)
     wo = db.get_or_404(WorkOrder, wo_id)
 
+    from app.models.models import Makbuz
+    # Check original month lock
+    locked_orig = db.session.execute(
+        db.select(Makbuz).where(
+            Makbuz.party_id == party_id,
+            Makbuz.year == wo.work_date.year,
+            Makbuz.month == wo.work_date.month,
+            Makbuz.status != Makbuz.STATUS_DRAFT
+        )
+    ).scalar_one_or_none()
+    if locked_orig:
+        flash("Bu döneme ait makbuz kesinleştirildiği için iş emri düzenlenemez.", "danger")
+        return redirect(url_for("parties.detail_party", party_id=party_id))
+
     if request.method == "POST":
         from app.services.validation_service import normalize_display_name, normalize_optional_text, parse_date, parse_float
 
@@ -446,6 +472,20 @@ def edit_work_order(party_id, wo_id):
         if not work_date:
             flash("Geçersiz tarih.", "danger")
             return redirect(url_for("parties.edit_work_order", party_id=party.id, wo_id=wo.id))
+
+        # Check target month lock if date changed
+        if work_date != wo.work_date:
+            locked_target = db.session.execute(
+                db.select(Makbuz).where(
+                    Makbuz.party_id == party_id,
+                    Makbuz.year == work_date.year,
+                    Makbuz.month == work_date.month,
+                    Makbuz.status != Makbuz.STATUS_DRAFT
+                )
+            ).scalar_one_or_none()
+            if locked_target:
+                flash("Hedef döneme ait makbuz kesinleştirildiği için iş emri bu tarihe taşınamaz.", "danger")
+                return redirect(url_for("parties.edit_work_order", party_id=party.id, wo_id=wo.id))
 
         apparatus_price = parse_float(request.form.get("apparatus_price", "0")) or 0
         extra_price = parse_float(request.form.get("extra_price", "0")) or 0
@@ -504,6 +544,20 @@ def edit_work_order(party_id, wo_id):
 @permissions_required("clinical.delete")
 def delete_work_order(party_id, wo_id):
     wo = db.get_or_404(WorkOrder, wo_id)
+
+    from app.models.models import Makbuz
+    locked_makbuz = db.session.execute(
+        db.select(Makbuz).where(
+            Makbuz.party_id == party_id,
+            Makbuz.year == wo.work_date.year,
+            Makbuz.month == wo.work_date.month,
+            Makbuz.status != Makbuz.STATUS_DRAFT
+        )
+    ).scalar_one_or_none()
+    if locked_makbuz:
+        flash("Bu döneme ait makbuz kesinleştirildiği için iş emri silinemez.", "danger")
+        return redirect(url_for("parties.detail_party", party_id=party_id))
+
     db.session.delete(wo)
     db.session.commit()
     flash("İş emri silindi.", "warning")

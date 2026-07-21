@@ -30,7 +30,7 @@ def index():
         )
     ).scalar() or 0
 
-    monthly_total_eur = db.session.execute(
+    monthly_total_try = db.session.execute(
         db.select(db.func.coalesce(db.func.sum(WorkOrder.total_price), 0)).where(
             extract("year", WorkOrder.work_date) == current_year,
             extract("month", WorkOrder.work_date) == current_month,
@@ -65,7 +65,7 @@ def index():
         "dashboard/index.html",
         total_patients=total_patients,
         monthly_work_orders=monthly_work_orders,
-        monthly_total_eur=monthly_total_eur,
+        monthly_total_try=monthly_total_try,
         monthly_drafts=monthly_drafts,
         awaiting_payment=awaiting_payment,
         recent_work_orders=recent_work_orders,
