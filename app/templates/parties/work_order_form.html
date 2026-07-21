@@ -233,8 +233,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const search = document.getElementById('apparatus-search');
         const nq = normalizeText(query);
         const matches = anaTreatments.filter(function(t) {
-            const alreadySelected = selectedApparatus.some(function(item) { return item.id === t.id; });
-            return !alreadySelected && (!nq || normalizeText(t.name).indexOf(nq) !== -1);
+            return !nq || normalizeText(t.name).indexOf(nq) !== -1;
         }).slice(0, 30);
 
         dropdown.innerHTML = '';
@@ -257,8 +256,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 renderApparatusTags();
                 syncApparatusHidden();
                 search.value = '';
-                dropdown.style.display = 'none';
-                search.setAttribute('aria-expanded', 'false');
+                search.focus();
+                renderApparatusDropdown('');
             });
             dropdown.appendChild(btn);
         });
@@ -341,8 +340,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 renderExtraTags();
                 syncExtrasHidden();
                 search.value = '';
-                dropdown.style.display = 'none';
-                search.setAttribute('aria-expanded', 'false');
+                search.focus();
+                renderExtraDropdown('');
             });
             dropdown.appendChild(btn);
         });
