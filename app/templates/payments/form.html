@@ -1,12 +1,12 @@
 {% extends "base.html" %}
-{% block title %}Yeni Tahsilat - {{ clinic_name }}{% endblock %}
+{% block title %}Ödeme Kaydet - {{ clinic_name }}{% endblock %}
 
 {% block content %}
 <div class="mb-4">
     <nav aria-label="breadcrumb">
         <ol class="breadcrumb">
             <li class="breadcrumb-item"><a href="{{ url_for('payments.list_payments') }}">Tahsilatlar</a></li>
-            <li class="breadcrumb-item active">Yeni Tahsilat</li>
+            <li class="breadcrumb-item active">Ödeme Kaydet</li>
         </ol>
     </nav>
 </div>
@@ -15,80 +15,38 @@
     <div class="col-md-8">
         <div class="card border-0 shadow-sm">
             <div class="card-header bg-white">
-                <h5 class="mb-0"><i class="bi bi-cash-coin"></i> Yeni Tahsilat Kaydet</h5>
+                <h5 class="mb-0"><i class="bi bi-cash-coin"></i> Ödeme Kaydet</h5>
+                <small class="text-muted">{{ makbuz.party.name if makbuz.party else '-' }} · {{ makbuz.month }}/{{ makbuz.year }}</small>
             </div>
             <div class="card-body">
-                <form method="POST" action="{{ url_for('payments.add_payment') }}" id="payment-form">
-                    <div class="mb-3">
-                        <label class="form-label">Fatura <span class="text-danger">*</span></label>
-                        <select class="form-select js-searchable-select" name="invoice_id" id="invoice-select" 
-                                data-search-placeholder="Fatura no veya müşteri ara..." required>
-                            <option value="">Fatura seçiniz...</option>
-                            {% for inv in invoices %}
-                            <option value="{{ inv.id }}" 
-                                    data-party="{{ inv.party.display_name if inv.party else inv.patient.full_name }}"
-                                    data-total-eur="{{ inv.total_eur }}"
-                                    data-total-try="{{ inv.total_try }}"
-                                    data-balance-eur="{{ inv.total_eur - (inv.payments|sum(attribute='amount_eur')) }}"
-                                    data-status="{{ inv.status }}"
-                                    {% if selected_invoice_id and inv.id == selected_invoice_id %}selected{% endif %}>
-                                {{ inv.invoice_number }} - {{ inv.party.display_name if inv.party else inv.patient.full_name }}
-                                (€{{ "{:,.2f}".format(inv.total_eur) }} / ₺{{ "{:,.2f}".format(inv.total_try) }})
-                            </option>
-                            {% endfor %}
-                        </select>
-                    </div>
-
+                <div class="alert alert-info mb-3">
+                    <i class="bi bi-info-circle"></i>
+                    Makbuz tutarı: <strong>₺{{ "{:,.2f}".format(makbuz.grand_total) }}</strong>
+                    {% if makbuz.vat_applied %} (Matrah ₺{{ "{:,.2f}".format(makbuz.subtotal) }} + KDV %{{ '{:.2f}'.format(makbuz.vat_rate) }}){% endif %}
+                </div>
+                <form method="POST" action="{{ url_for('payments.mark_paid', makbuz_id=makbuz.id) }}">
                     <div class="row g-3 mb-3">
                         <div class="col-md-4">
                             <label class="form-label">Ödeme Tarihi <span class="text-danger">*</span></label>
-                            <input type="date" class="form-control" name="payment_date" id="payment-date" 
-                                   value="{{ today.isoformat() }}" required>
+                            <input type="date" class="form-control" name="paid_at" value="{{ today.isoformat() }}" required>
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label">Tutar (EUR) <span class="text-danger">*</span></label>
-                            <input type="number" step="0.01" class="form-control" name="amount_eur" id="amount-eur" 
-                                   min="0.01" required placeholder="0.00">
+                            <label class="form-label">Tutar (₺) <span class="text-danger">*</span></label>
+                            <input type="number" step="0.01" min="0.01" class="form-control" name="paid_amount" value="{{ '{:.2f}'.format(makbuz.grand_total) }}" required>
                         </div>
-                        <div class="col-md-4">
-                            <label class="form-label">Tutar (TRY) <span class="text-danger">*</span></label>
-                            <input type="number" step="0.01" class="form-control" name="amount_try" id="amount-try" 
-                                   min="0.01" readonly placeholder="Otomatik hesaplanacak">
-                        </div>
-                    </div>
-
-                    <div class="row g-3 mb-3">
                         <div class="col-md-4">
                             <label class="form-label">Ödeme Yöntemi <span class="text-danger">*</span></label>
-                            <select class="form-select" name="method" id="payment-method" required>
-                                <option value="cash">Nakit</option>
-                                <option value="card">Kredi / Banka Kartı</option>
-                                <option value="transfer">Havale / EFT</option>
-                                <option value="check">Çek</option>
-                                <option value="other">Diğer</option>
+                            <select class="form-select" name="payment_method" required>
+                                {% for key, label in method_labels.items() %}
+                                <option value="{{ key }}" {% if key == 'cash' %}selected{% endif %}>{{ label }}</option>
+                                {% endfor %}
                             </select>
                         </div>
-                        <div class="col-md-4">
-                            <label class="form-label">Referans No</label>
-                            <input type="text" class="form-control" name="reference" id="payment-reference" 
-                                   placeholder="Çek no, işlem no vb.">
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label">Kur (TRY/EUR)</label>
-                            <input type="number" step="0.0001" class="form-control" id="payment-rate" readonly>
-                        </div>
                     </div>
-
                     <div class="mb-3">
-                        <label class="form-label">Notlar</label>
-                        <textarea class="form-control" name="notes" rows="2" placeholder="İsteğe bağlı notlar..."></textarea>
+                        <label class="form-label">Referans No</label>
+                        <input type="text" class="form-control" name="payment_reference" placeholder="Çek no, işlem no vb.">
                     </div>
-
-                    <div class="alert alert-info mb-3" id="invoice-balance-info" style="display: none;">
-                        <i class="bi bi-info-circle"></i> 
-                        <span id="balance-text"></span>
-                    </div>
-
                     <hr>
                     <div class="d-flex justify-content-between">
                         <a href="{{ url_for('payments.list_payments') }}" class="btn btn-outline-secondary">
@@ -103,87 +61,4 @@
         </div>
     </div>
 </div>
-{% endblock %}
-
-{% block scripts %}
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const invoiceSelect = document.getElementById('invoice-select');
-    const amountEur = document.getElementById('amount-eur');
-    const amountTry = document.getElementById('amount-try');
-    const paymentDate = document.getElementById('payment-date');
-    const paymentRate = document.getElementById('payment-rate');
-    const balanceInfo = document.getElementById('invoice-balance-info');
-    const balanceText = document.getElementById('balance-text');
-    const paymentMethod = document.getElementById('payment-method');
-    const paymentReference = document.getElementById('payment-reference');
-    
-    let currentRate = {{ current_rate.eur_to_try if current_rate else 0 }};
-    
-    // Update TRY amount when EUR changes
-    function updateTryAmount() {
-        const eur = parseFloat(amountEur.value) || 0;
-        const rate = parseFloat(paymentRate.value) || currentRate;
-        if (eur > 0 && rate > 0) {
-            amountTry.value = (eur * rate).toFixed(2);
-        } else {
-            amountTry.value = '';
-        }
-    }
-    
-    amountEur.addEventListener('input', updateTryAmount);
-    
-    // Handle invoice selection
-    invoiceSelect.addEventListener('change', function() {
-        const option = this.options[this.selectedIndex];
-        if (!option.value) {
-            balanceInfo.style.display = 'none';
-            amountEur.value = '';
-            amountTry.value = '';
-            paymentReference.value = '';
-            return;
-        }
-        
-        const totalEur = parseFloat(option.dataset.totalEur) || 0;
-        const balanceEur = parseFloat(option.dataset.balanceEur) || totalEur;
-        // Auto-fill amount with balance
-        amountEur.value = balanceEur.toFixed(2);
-        updateTryAmount();
-        
-        // Show balance info
-        balanceText.textContent = `Kalan borç: €${balanceEur.toFixed(2)} / ₺${(balanceEur * (parseFloat(paymentRate.value) || currentRate)).toFixed(2)} · Toplam: €${totalEur.toFixed(2)}`;
-        balanceInfo.style.display = 'block';
-        
-        // Set reference based on payment method
-        if (paymentMethod.value === 'check' || paymentMethod.value === 'transfer') {
-            paymentReference.value = option.text.split(' ')[0]; // invoice number
-        }
-    });
-    
-    paymentDate.addEventListener('change', async function() {
-        if (!this.value) return;
-        try {
-            const response = await fetch(`/makbuzlar/api/exchange-rate?date=${encodeURIComponent(this.value)}`);
-            if (!response.ok) throw new Error('rate unavailable');
-            const data = await response.json();
-            currentRate = Number(data.rate);
-            paymentRate.value = currentRate.toFixed(4);
-            updateTryAmount();
-            if (invoiceSelect.value) invoiceSelect.dispatchEvent(new Event('change'));
-        } catch (_error) {
-            paymentRate.value = '';
-            amountTry.value = '';
-        }
-    });
-    
-    // Initialize
-    paymentRate.value = currentRate.toFixed(4);
-    if (invoiceSelect.value) {
-        invoiceSelect.dispatchEvent(new Event('change', { bubbles: true }));
-    }
-    
-    // Auto-focus on invoice select
-    invoiceSelect.focus();
-});
-</script>
 {% endblock %}

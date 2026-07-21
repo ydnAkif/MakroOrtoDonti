@@ -112,6 +112,12 @@ class WhatsAppService:
             return {"connected": False, "status": "disconnected", "phone_number": None, "connected_at": None}
 
     @classmethod
+    def _build_jid(cls, phone_number: str):
+        from neonize.utils.jid import build_jid
+        clean_phone = phone_number.replace("+", "").replace(" ", "").replace("-", "")
+        return build_jid(clean_phone)
+
+    @classmethod
     def send_message(cls, phone_number: str, message: str) -> dict:
         """Send a text message to a phone number."""
         try:
@@ -122,18 +128,34 @@ class WhatsAppService:
             if client is None:
                 return {"success": False, "message": "WhatsApp istemcisi mevcut değil."}
 
-            # Format phone number for WhatsApp JID
-            clean_phone = phone_number.replace("+", "").replace(" ", "").replace("-", "")
-            if not clean_phone.endswith("@s.whatsapp.net"):
-                jid = f"{clean_phone}@s.whatsapp.net"
-            else:
-                jid = clean_phone
-
-            client.send_message(jid, message)
+            client.send_message(cls._build_jid(phone_number), message)
             return {"success": True, "message": f"Mesaj gönderildi: {phone_number}"}
 
         except Exception as e:
             return {"success": False, "message": f"Gönderim hatası: {str(e)}"}
+
+    @classmethod
+    def send_document(cls, phone_number: str, file_bytes: bytes, filename: str, caption: str = "") -> dict:
+        """Send a document (e.g. PDF) to a phone number."""
+        try:
+            if not cls._connected:
+                return {"success": False, "message": "WhatsApp bağlı değil."}
+
+            client = cls.get_client()
+            if client is None:
+                return {"success": False, "message": "WhatsApp istemcisi mevcut değil."}
+
+            client.send_document(
+                cls._build_jid(phone_number),
+                file_bytes,
+                caption=caption,
+                filename=filename,
+                mimetype="application/pdf",
+            )
+            return {"success": True, "message": f"Belge gönderildi: {phone_number}"}
+
+        except Exception as e:
+            return {"success": False, "message": f"Belge gönderim hatası: {str(e)}"}
 
     @classmethod
     def send_invoice_message(cls, invoice) -> dict:
@@ -172,6 +194,40 @@ Saygılarımızla,
 Makro Ortodonti"""
 
         return cls.send_message(phone, message)
+
+    @classmethod
+    def send_makbuz_message(cls, makbuz, pdf_bytes: bytes) -> dict:
+        """Send a monthly doctor receipt (özet metin + PDF) via WhatsApp."""
+        party = makbuz.party
+        if not party or not party.phone:
+            return {"success": False, "message": "Doktorun telefon numarası bulunmuyor."}
+
+        month_names = [
+            "", "Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran",
+            "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık",
+        ]
+        period = f"{month_names[makbuz.month]} {makbuz.year}"
+
+        message = f"""Sayın {party.name},
+
+{period} dönemine ait makbuzunuz hazırlanmıştır.
+
+İş Emri Sayısı: {makbuz.work_order_count}
+Ara Toplam: ₺{makbuz.subtotal:,.2f}
+{"KDV (%" + f"{makbuz.vat_rate:,.2f}" + "): ₺" + f"{makbuz.vat_amount:,.2f}" if makbuz.vat_applied else ""}
+Genel Toplam: ₺{makbuz.grand_total:,.2f}
+
+Makbuzunuz ekte gönderilmiştir.
+
+Saygılarımızla,
+Makro Ortodonti"""
+
+        text_result = cls.send_message(party.phone, message)
+        if not text_result["success"]:
+            return text_result
+
+        filename = f"makbuz_{makbuz.year}_{makbuz.month:02d}_{party.id}.pdf"
+        return cls.send_document(party.phone, pdf_bytes, filename=filename, caption=f"{period} Makbuzu")
 
     @classmethod
     def send_reminder(cls, patient, message: str) -> dict:

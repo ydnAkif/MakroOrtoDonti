@@ -629,27 +629,43 @@ class TestWhatsAppRoutes:
         }, follow_redirects=False)
         assert response.status_code == 302
 
-    def test_send_invoice(self, client, app):
+    def test_send_makbuz(self, client, app):
         from app.extensions import db
-        from app.models.models import Party, PartyType
-        from app.models.invoice_service import InvoiceService
+        from app.models.models import Party, PartyType, WorkOrder, Makbuz
 
         login(client, "admin", "admin-pass")
         with app.app_context():
             party = db.session.execute(
                 db.select(Party).where(Party.party_type == PartyType.DENTIST).limit(1)
             ).scalar_one()
-            inv = InvoiceService.create_invoice(
-                session=db.session,
-                party_id=party.id,
-                items=[{"item_type": "service", "description": "Test", "quantity": 1, "unit_price_eur": 100}],
-                invoice_date=date.today(),
-            )
-            inv_id = inv.id
+            party_id = party.id
+            db.session.add(WorkOrder(
+                party_id=party_id, work_date=date.today(), apparatus_type="Nance",
+                patient_name="Test Hasta", apparatus_price=500, extra_price=0, total_price=500,
+            ))
+            db.session.commit()
 
-        with patch("app.services.whatsapp_service.WhatsAppService.send_invoice_message", return_value={"success": True, "message": "Gonderildi"}):
-            response = client.post(f"/whatsapp/send-invoice/{inv_id}", follow_redirects=False)
+        response = client.post(
+            f"/makbuzlar/{party_id}/generate",
+            data={"year": date.today().year, "month": date.today().month},
+            follow_redirects=False,
+        )
+        assert response.status_code == 302
+
+        with app.app_context():
+            makbuz = db.session.execute(
+                db.select(Makbuz).where(Makbuz.party_id == party_id)
+            ).scalar_one()
+            makbuz_id = makbuz.id
+            assert makbuz.grand_total == 500
+
+        with patch("app.services.whatsapp_service.WhatsAppService.send_makbuz_message", return_value={"success": True, "message": "Gonderildi"}):
+            response = client.post(f"/makbuzlar/{makbuz_id}/send", follow_redirects=False)
             assert response.status_code == 302
+
+        with app.app_context():
+            makbuz = db.session.get(Makbuz, makbuz_id)
+            assert makbuz.status == Makbuz.STATUS_SENT
 
     def test_send_bulk(self, client, app):
         from app.extensions import db

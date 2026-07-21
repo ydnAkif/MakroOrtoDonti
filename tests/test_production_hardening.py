@@ -66,7 +66,10 @@ def test_whatsapp_connected_send_formats_jid(monkeypatch, app):
     with app.app_context():
         result = WhatsAppService.send_message("+90 555-111-22-33", "Merhaba")
     assert result["success"] is True
-    assert fake.sent == ("905551112233@s.whatsapp.net", "Merhaba")
+    jid, message = fake.sent
+    assert jid.User == "905551112233"
+    assert jid.Server == "s.whatsapp.net"
+    assert message == "Merhaba"
 
 
 def test_email_success_path_uses_tls_login_and_pdf(monkeypatch, app):

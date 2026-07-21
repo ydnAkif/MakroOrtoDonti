@@ -154,4 +154,7 @@ def create_app(config_class=Config) -> Flask:
         db.session.commit()
         print(f"Purged {result.rowcount or 0} audit rows older than {days} days")
 
+    from .services.scheduler_service import init_scheduler
+    init_scheduler(app)
+
     return app

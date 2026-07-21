@@ -90,6 +90,16 @@ def fetch_and_store_rate() -> float:
     return rate_value
 
 
+def get_rate_for_date(target_date: date) -> ExchangeRate | None:
+    """Return the exchange rate row effective on or before target_date."""
+    return db.session.execute(
+        db.select(ExchangeRate)
+        .where(ExchangeRate.rate_date <= target_date)
+        .order_by(ExchangeRate.rate_date.desc())
+        .limit(1)
+    ).scalar_one_or_none()
+
+
 def get_latest_rate() -> float | None:
     """Get the most recent EUR/TRY rate."""
     rate = db.session.execute(

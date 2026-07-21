@@ -14,3 +14,4 @@ python-dotenv==1.2.2
 neonize==0.4.3.post0
 openpyxl==3.1.5
 sentry-sdk[flask]==2.38.0
+APScheduler==3.11.3

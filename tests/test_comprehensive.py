@@ -545,92 +545,8 @@ def test_invoice_search(client, app):
 
 # ==================== PAYMENTS ====================
 
-def test_payment_add(client, app):
-    """Yeni tahsilat ekleme."""
-    login(client, "admin", "admin-pass")
-
-    with app.app_context():
-        party = db.session.execute(
-            db.select(Party).where(Party.party_type == PartyType.DENTIST).limit(1)
-        ).scalar_one()
-        client.post("/invoices/add", data={
-            "party_id": party.id,
-            "invoice_date": date.today().isoformat(),
-            "items_json": json.dumps([{
-                "item_type": "treatment",
-                "treatment_id": 1,
-                "description": "Payment Add Test",
-                "quantity": 1,
-                "unit_price_eur": 300.00,
-            }]),
-        })
-        invoice_id = db.session.execute(
-            db.select(Invoice).order_by(Invoice.id.desc())
-        ).scalar_one().id
-
-    response = client.post("/payments/add", data={
-        "invoice_id": invoice_id,
-        "payment_date": date.today().isoformat(),
-        "amount_eur": 100.00,
-        "method": "transfer",
-        "reference": "TEST-REF-001",
-    }, follow_redirects=False)
-    assert response.status_code == 302
-
-    with app.app_context():
-        payment = db.session.execute(
-            db.select(Payment).where(Payment.invoice_id == invoice_id)
-        ).scalar_one()
-        assert payment.amount_eur == 100.0
-        assert payment.method == PaymentMethod.TRANSFER
-
-
-def test_payment_delete(client, app):
-    """Tahsilat silme + fatura durumu geri alma."""
-    login(client, "admin", "admin-pass")
-
-    with app.app_context():
-        party = db.session.execute(
-            db.select(Party).where(Party.party_type == PartyType.DENTIST).limit(1)
-        ).scalar_one()
-        client.post("/invoices/add", data={
-            "party_id": party.id,
-            "invoice_date": date.today().isoformat(),
-            "items_json": json.dumps([{
-                "item_type": "treatment",
-                "treatment_id": 1,
-                "description": "Payment Delete Test",
-                "quantity": 1,
-                "unit_price_eur": 500.00,
-            }]),
-        })
-        invoice_id = db.session.execute(
-            db.select(Invoice).order_by(Invoice.id.desc())
-        ).scalar_one().id
-
-    # Full payment
-    response = client.post("/payments/add", data={
-        "invoice_id": invoice_id,
-        "payment_date": date.today().isoformat(),
-        "amount_eur": 500.00,
-        "method": "cash",
-    }, follow_redirects=False)
-    assert response.status_code == 302
-
-    with app.app_context():
-        invoice = db.session.get(Invoice, invoice_id)
-        assert invoice.status == "paid"
-        payment_id = db.session.execute(
-            db.select(Payment).where(Payment.invoice_id == invoice_id)
-        ).scalar_one().id
-
-    # Delete payment
-    response = client.post(f"/payments/{payment_id}/delete", follow_redirects=False)
-    assert response.status_code == 302
-
-    with app.app_context():
-        invoice = db.session.get(Invoice, invoice_id)
-        assert invoice.status == "pending"
+# Not: eski hasta bazlı Invoice tahsilat testleri (test_payment_add, test_payment_delete)
+# kaldırıldı; /payments artık doktor/makbuz tahsilatını yönetiyor (bkz. tests/test_makbuz.py).
 
 
 # ==================== SETTINGS ====================
@@ -863,14 +779,6 @@ def test_payments_list_no_crash(client, app):
 
     today = date.today()
     response = client.get(f"/payments/?start_date={today.isoformat()}&end_date={today.isoformat()}")
-    assert response.status_code == 200
-
-
-def test_payment_form_no_crash(client, app):
-    """Bug #9: Odeme formu current_rate olmadan craslamamali."""
-    login(client, "admin", "admin-pass")
-
-    response = client.get("/payments/add")
     assert response.status_code == 200
 
 
@@ -1408,100 +1316,8 @@ def test_reports_aging_report(client, app):
 
 
 # ==================== PAYMENT TESTS ====================
-
-def test_payment_rejects_amount_above_remaining_balance(client, app):
-    login(client, "admin", "admin-pass")
-    with app.app_context():
-        party = db.session.execute(db.select(Party).limit(1)).scalar_one()
-        invoice = Invoice(
-            party_id=party.id,
-            invoice_number="MKR-PAY-0001",
-            invoice_date=date.today(),
-            due_date=date.today() + timedelta(days=10),
-            total_eur=100.0,
-            total_try=4000.0,
-            exchange_rate=40.0,
-            status=Invoice.STATUS_PENDING,
-        )
-        db.session.add(invoice)
-        db.session.commit()
-        invoice_id = invoice.id
-
-    response = client.post(
-        "/payments/add",
-        data={
-            "invoice_id": invoice_id,
-            "payment_date": date.today().isoformat(),
-            "amount_eur": "100.02",
-            "method": "cash",
-        },
-        follow_redirects=True,
-    )
-    assert "bakiyeyi aşamaz" in response.get_data(as_text=True)
-    with app.app_context():
-        assert db.session.execute(db.select(db.func.count(Payment.id))).scalar_one() == 0
-
-
-def test_payment_flow(client, app):
-    login(client, "admin", "admin-pass")
-
-    with app.app_context():
-        party = db.session.execute(
-            db.select(Party).where(Party.party_type == PartyType.DENTIST).limit(1)
-        ).scalar_one()
-
-    response = client.post("/invoices/add", data={
-        "party_id": party.id,
-        "invoice_date": date.today().isoformat(),
-        "items_json": json.dumps([{
-            "item_type": "treatment",
-            "treatment_id": 1,
-            "description": "Test Tedavi",
-            "quantity": 1,
-            "unit_price_eur": 500.00,
-        }]),
-    }, follow_redirects=False)
-    assert response.status_code == 302
-
-    with app.app_context():
-        invoice = db.session.execute(
-            db.select(Invoice).order_by(Invoice.id.desc())
-        ).scalar_one()
-        inv_id = invoice.id
-        assert invoice.status == "pending"
-        assert invoice.total_eur == 500.0
-
-    response = client.get(f"/payments/add?invoice_id={inv_id}")
-    assert response.status_code == 200
-
-    response = client.post("/payments/add", data={
-        "invoice_id": inv_id,
-        "payment_date": date.today().isoformat(),
-        "amount_eur": 250.00,
-        "method": "cash",
-        "reference": "NAKIT-001",
-    }, follow_redirects=False)
-    assert response.status_code == 302
-
-    with app.app_context():
-        invoice = db.session.get(Invoice, inv_id)
-        assert invoice.status == "pending"
-
-    response = client.post("/payments/add", data={
-        "invoice_id": inv_id,
-        "payment_date": date.today().isoformat(),
-        "amount_eur": 250.00,
-        "method": "transfer",
-        "reference": "EFT-001",
-    }, follow_redirects=False)
-    assert response.status_code == 302
-
-    with app.app_context():
-        invoice = db.session.get(Invoice, inv_id)
-        assert invoice.status == "paid"
-
-    response = client.get("/payments/")
-    assert response.status_code == 200
+# Not: eski hasta bazlı Invoice tahsilat testleri kaldırıldı;
+# /payments artık doktor/makbuz tahsilatını yönetiyor (bkz. tests/test_makbuz.py).
 
 
 def test_party_invoice_link_and_debt_calculation(client, app):

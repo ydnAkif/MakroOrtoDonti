@@ -156,6 +156,7 @@ def add_work_order(party_id):
 
         apparatus_price = parse_float(request.form.get("apparatus_price", "0")) or 0
         extra_price = parse_float(request.form.get("extra_price", "0")) or 0
+        exchange_rate_applied = parse_float(request.form.get("exchange_rate_applied", "")) or None
 
         wo = WorkOrder(
             party_id=party_id,
@@ -166,6 +167,7 @@ def add_work_order(party_id):
             apparatus_price=apparatus_price,
             extra_price=extra_price,
             total_price=apparatus_price + extra_price,
+            exchange_rate_applied=exchange_rate_applied,
             notes=request.form.get("notes", "").strip() or None,
         )
         db.session.add(wo)
@@ -204,6 +206,7 @@ def edit_work_order(party_id, wo_id):
 
         apparatus_price = parse_float(request.form.get("apparatus_price", "0")) or 0
         extra_price = parse_float(request.form.get("extra_price", "0")) or 0
+        exchange_rate_applied = parse_float(request.form.get("exchange_rate_applied", "")) or None
 
         wo.work_date = work_date
         wo.apparatus_type = request.form.get("apparatus_type", "").strip()
@@ -212,6 +215,7 @@ def edit_work_order(party_id, wo_id):
         wo.apparatus_price = apparatus_price
         wo.extra_price = extra_price
         wo.total_price = apparatus_price + extra_price
+        wo.exchange_rate_applied = exchange_rate_applied
         wo.notes = request.form.get("notes", "").strip() or None
 
         db.session.commit()

@@ -72,6 +72,12 @@
                             <input type="text" class="form-control fw-bold" id="total_display" value="{{ '{:.2f}'.format(work_order.total_price) if work_order else '0.00' }}" readonly>
                         </div>
                     </div>
+                    <div class="row g-3 mt-1">
+                        <div class="col-12">
+                            <small class="text-muted" id="rate-info"></small>
+                            <input type="hidden" id="exchange_rate_applied" name="exchange_rate_applied" value="{{ work_order.exchange_rate_applied if work_order and work_order.exchange_rate_applied else '' }}">
+                        </div>
+                    </div>
 
                     <div class="row g-3 mt-2">
                         <div class="col-12">
@@ -99,11 +105,14 @@
 {% block scripts %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    const EUR_TO_TRY = {{ eur_to_try }};
-    const USD_TO_TRY = {{ usd_to_try }};
+    let EUR_TO_TRY = {{ eur_to_try }};
+    let USD_TO_TRY = {{ usd_to_try }};
     const apparatusPrice = document.getElementById('apparatus_price');
     const extraPrice = document.getElementById('extra_price');
     const totalDisplay = document.getElementById('total_display');
+    const rateInfo = document.getElementById('rate-info');
+    const rateAppliedField = document.getElementById('exchange_rate_applied');
+    const workDateInput = document.getElementById('work_date');
 
     function toTL(price, currency) {
         if (currency === 'EUR') return Math.round(price * EUR_TO_TRY * 100) / 100;
@@ -114,6 +123,39 @@ document.addEventListener('DOMContentLoaded', function() {
         return price;
     }
 
+    function syncRateApplied() {
+        const usesEur = selectedApparatus.some(i => i.currency === 'EUR') || selectedExtras.some(i => i.currency === 'EUR');
+        const usesUsd = selectedApparatus.some(i => i.currency === 'USD') || selectedExtras.some(i => i.currency === 'USD');
+        if (usesEur) {
+            rateAppliedField.value = EUR_TO_TRY;
+        } else if (usesUsd && USD_TO_TRY > 0) {
+            rateAppliedField.value = USD_TO_TRY;
+        } else {
+            rateAppliedField.value = '';
+        }
+    }
+
+    function fetchRateForDate(dateStr) {
+        if (!dateStr) return;
+        fetch('{{ url_for("makbuzlar.get_exchange_rate_for_date") }}?date=' + encodeURIComponent(dateStr))
+            .then(function(resp) { return resp.ok ? resp.json() : null; })
+            .then(function(data) {
+                if (!data || data.error) {
+                    rateInfo.textContent = 'Bu tarih için kur bulunamadı, en güncel kur kullanılıyor.';
+                    return;
+                }
+                EUR_TO_TRY = data.rate;
+                if (data.usd_rate) USD_TO_TRY = data.usd_rate;
+                rateInfo.textContent = 'Kur (' + data.display_date + '): 1 EUR = ' + data.rate.toFixed(4) + ' ₺' + (data.usd_rate ? ', 1 USD = ' + data.usd_rate.toFixed(4) + ' ₺' : '');
+                if (selectedApparatus.length) renderApparatusTags();
+                if (selectedExtras.length) renderExtraTags();
+                syncRateApplied();
+            })
+            .catch(function() {
+                rateInfo.textContent = 'Kur bilgisi alınamadı, en güncel kur kullanılıyor.';
+            });
+    }
+
     function updateTotal() {
         const a = parseFloat(apparatusPrice.value) || 0;
         const e = parseFloat(extraPrice.value) || 0;
@@ -122,6 +164,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     apparatusPrice.addEventListener('input', updateTotal);
     extraPrice.addEventListener('input', updateTotal);
+    workDateInput.addEventListener('change', function() { fetchRateForDate(this.value); });
 
     const anaTreatments = {{ ana_islemler_treatments|tojson|safe }};
     const ekstraTreatments = {{ ekstra_islemler_treatments|tojson|safe }};
@@ -167,6 +210,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         apparatusPrice.value = totalTL.toFixed(2);
         updateTotal();
+        syncRateApplied();
     }
 
     function syncApparatusHidden() {
@@ -234,6 +278,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         extraPrice.value = totalTL.toFixed(2);
         updateTotal();
+        syncRateApplied();
     }
 
     function syncExtrasHidden() {
@@ -295,6 +340,9 @@ document.addEventListener('DOMContentLoaded', function() {
     var existingExtra = '{{ work_order.extra_addons|safe if work_order and work_order.extra_addons else "" }}';
     selectedExtras = loadExistingItems(existingExtra, ekstraTreatments);
     if (selectedExtras.length) { renderExtraTags(); syncExtrasHidden(); }
+
+    // Seçili kalemleri, iş emri tarihine ait güncel kurla yeniden hesaplayarak çiz.
+    fetchRateForDate(workDateInput.value);
 });
 </script>
 {% endblock %}

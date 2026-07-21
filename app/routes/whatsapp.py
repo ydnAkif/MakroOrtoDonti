@@ -3,7 +3,7 @@ from flask_login import login_required
 from app.authz import permissions_required
 
 from app.extensions import db
-from app.models.models import Party, PartyType, Invoice, WhatsAppSession
+from app.models.models import Party, WhatsAppSession
 
 whatsapp_bp = Blueprint("whatsapp", __name__)
 
@@ -66,17 +66,6 @@ def send_message():
     result = WhatsAppService.send_message(phone, message)
     flash(result["message"], "success" if result["success"] else "danger")
     return redirect(url_for("whatsapp.index"))
-
-
-@whatsapp_bp.route("/send-invoice/<int:invoice_id>", methods=["POST"])
-@login_required
-@permissions_required("messaging.use")
-def send_invoice(invoice_id):
-    from app.services.whatsapp_service import WhatsAppService
-    invoice = db.get_or_404(Invoice, invoice_id)
-    result = WhatsAppService.send_invoice_message(invoice)
-    flash(result["message"], "success" if result["success"] else "danger")
-    return redirect(url_for("makbuzlar.list_makbuzlar"))
 
 
 @whatsapp_bp.route("/send-bulk", methods=["POST"])

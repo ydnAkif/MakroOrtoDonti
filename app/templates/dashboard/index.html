@@ -30,7 +30,7 @@
     </div>
     <div class="col-6 col-xl-3">
         <article class="card metric-card h-100" style="--metric-color: var(--success-500); --metric-tint: rgba(45,155,115,.13);">
-            <div class="card-body"><span class="metric-icon"><i class="bi bi-currency-euro"></i></span><div class="metric-label">Bu ayki toplam</div><p class="metric-value">€{{ "{:,.2f}".format(monthly_total_eur) }}</p></div>
+            <div class="card-body"><span class="metric-icon"><i class="bi bi-cash-stack"></i></span><div class="metric-label">Bu ayki toplam</div><p class="metric-value">₺{{ "{:,.2f}".format(monthly_total_eur) }}</p></div>
         </article>
     </div>
     <div class="col-6 col-xl-3">
@@ -58,7 +58,7 @@
                                 <td><a href="{{ url_for('makbuzlar.detail_makbuz', party_id=wo.party_id) }}">{{ wo.party.name if wo.party else '-' }}</a></td>
                                 <td>{{ wo.patient_name }}</td>
                                 <td>{{ wo.apparatus_type }}</td>
-                                <td><strong>€{{ "{:,.2f}".format(wo.total_price) }}</strong></td>
+                                <td><strong>₺{{ "{:,.2f}".format(wo.total_price) }}</strong></td>
                             </tr>
                         {% else %}
                             <tr><td colspan="5" class="empty-state text-muted"><i class="bi bi-receipt"></i>Henüz iş emri bulunmuyor.<br><a href="{{ url_for('parties.list_parties') }}">Diş hekimlerini görüntüleyin</a></td></tr>

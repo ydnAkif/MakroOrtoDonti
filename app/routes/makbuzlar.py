@@ -1,15 +1,100 @@
 from flask import Blueprint, render_template, redirect, url_for, flash, request, jsonify
 from flask_login import login_required
-from datetime import date
-from decimal import Decimal
+from datetime import date, datetime
+from decimal import Decimal, InvalidOperation
 
 from app.extensions import db
-from app.models.models import WorkOrder, Party, PartyType, ExchangeRate
+from app.models.models import WorkOrder, Party, Makbuz, money
 from app.authz import permissions_required
-from sqlalchemy import func, extract
+from sqlalchemy import extract
 from app.services.validation_service import parse_date
 
 makbuzlar_bp = Blueprint("makbuzlar", __name__)
+
+MONTHS = [
+    (1, "Ocak"), (2, "Şubat"), (3, "Mart"), (4, "Nisan"),
+    (5, "Mayıs"), (6, "Haziran"), (7, "Temmuz"), (8, "Ağustos"),
+    (9, "Eylül"), (10, "Ekim"), (11, "Kasım"), (12, "Aralık"),
+]
+
+STATUS_LABELS = {
+    Makbuz.STATUS_DRAFT: "Taslak",
+    Makbuz.STATUS_SENT: "Gönderildi",
+    Makbuz.STATUS_PAID: "Ödendi",
+}
+
+
+def _work_orders_for_period(party_id: int, year: int, month: int) -> list[WorkOrder]:
+    return db.session.execute(
+        db.select(WorkOrder)
+        .where(
+            WorkOrder.party_id == party_id,
+            extract("year", WorkOrder.work_date) == year,
+            extract("month", WorkOrder.work_date) == month,
+        )
+        .order_by(WorkOrder.work_date.desc())
+    ).scalars().all()
+
+
+def _existing_makbuzlar(year: int, month: int) -> dict[int, Makbuz]:
+    rows = db.session.execute(
+        db.select(Makbuz).where(Makbuz.year == year, Makbuz.month == month)
+    ).scalars().all()
+    return {m.party_id: m for m in rows}
+
+
+def _parse_vat_form(prefix: str = "") -> tuple[bool, Decimal]:
+    vat_applied = request.form.get(f"{prefix}vat_applied") in ("on", "true", "1")
+    try:
+        vat_rate = Decimal(str(request.form.get(f"{prefix}vat_rate", "0") or "0").replace(",", "."))
+    except InvalidOperation:
+        vat_rate = Decimal("0")
+    if vat_rate < 0:
+        vat_rate = Decimal("0")
+    return vat_applied, vat_rate
+
+
+def _generate_makbuz(party_id: int, year: int, month: int, vat_applied: bool, vat_rate: Decimal) -> Makbuz:
+    """Snapshot that period's work orders into a draft/updated Makbuz row."""
+    existing = db.session.execute(
+        db.select(Makbuz).where(
+            Makbuz.party_id == party_id, Makbuz.year == year, Makbuz.month == month
+        )
+    ).scalar_one_or_none()
+
+    if existing and existing.status != Makbuz.STATUS_DRAFT:
+        raise ValueError("Gönderilmiş veya ödenmiş bir makbuz yeniden oluşturulamaz.")
+
+    work_orders = _work_orders_for_period(party_id, year, month)
+    subtotal = money(sum((wo.total_price for wo in work_orders), Decimal("0.00")))
+
+    makbuz = existing or Makbuz(party_id=party_id, year=year, month=month)
+    makbuz.work_order_count = len(work_orders)
+    makbuz.subtotal = subtotal
+    makbuz.vat_applied = vat_applied
+    makbuz.vat_rate = vat_rate if vat_applied else Decimal("0.00")
+    makbuz.status = Makbuz.STATUS_DRAFT
+    makbuz.generated_at = datetime.now().astimezone()
+    makbuz.recalculate_totals()
+
+    if not existing:
+        db.session.add(makbuz)
+    db.session.flush()
+    return makbuz
+
+
+def _send_makbuz(makbuz: Makbuz) -> tuple[bool, str]:
+    from app.services.makbuz_pdf_service import generate_makbuz_pdf
+    from app.services.whatsapp_service import WhatsAppService
+
+    work_orders = _work_orders_for_period(makbuz.party_id, makbuz.year, makbuz.month)
+    pdf_bytes = generate_makbuz_pdf(makbuz, work_orders)
+    result = WhatsAppService.send_makbuz_message(makbuz, pdf_bytes)
+    if result["success"]:
+        makbuz.status = Makbuz.STATUS_SENT
+        makbuz.sent_at = datetime.now().astimezone()
+        db.session.commit()
+    return result["success"], result["message"]
 
 
 @makbuzlar_bp.route("/")
@@ -29,6 +114,8 @@ def list_makbuzlar():
         )
     ).scalars().all()
 
+    makbuz_by_party = _existing_makbuzlar(year, month)
+
     doctor_data = {}
     for wo in work_orders:
         pid = wo.party_id
@@ -40,6 +127,7 @@ def list_makbuzlar():
                 "total_apparatus": Decimal("0.00"),
                 "total_extra": Decimal("0.00"),
                 "total_price": Decimal("0.00"),
+                "makbuz": makbuz_by_party.get(pid),
             }
         d = doctor_data[pid]
         d["count"] += 1
@@ -53,19 +141,16 @@ def list_makbuzlar():
     grand_total_extra = sum(d["total_extra"] for d in doctors)
     grand_total_price = sum(d["total_price"] for d in doctors)
     grand_total_count = sum(d["count"] for d in doctors)
-
-    months = [
-        (1, "Ocak"), (2, "Şubat"), (3, "Mart"), (4, "Nisan"),
-        (5, "Mayıs"), (6, "Haziran"), (7, "Temmuz"), (8, "Ağustos"),
-        (9, "Eylül"), (10, "Ekim"), (11, "Kasım"), (12, "Aralık"),
-    ]
+    draft_count = sum(1 for d in doctors if d["makbuz"] is None or d["makbuz"].status == Makbuz.STATUS_DRAFT)
 
     return render_template(
         "makbuzlar/list.html",
         doctors=doctors,
         year=year,
         month=month,
-        months=months,
+        months=MONTHS,
+        status_labels=STATUS_LABELS,
+        draft_count=draft_count,
         grand_total_apparatus=grand_total_apparatus,
         grand_total_extra=grand_total_extra,
         grand_total_price=grand_total_price,
@@ -81,25 +166,17 @@ def detail_makbuz(party_id):
     year = request.args.get("year", date.today().year, type=int)
     month = request.args.get("month", date.today().month, type=int)
 
-    work_orders = db.session.execute(
-        db.select(WorkOrder)
-        .where(
-            WorkOrder.party_id == party_id,
-            extract("year", WorkOrder.work_date) == year,
-            extract("month", WorkOrder.work_date) == month,
+    work_orders = _work_orders_for_period(party_id, year, month)
+
+    total_apparatus = sum((wo.apparatus_price for wo in work_orders), Decimal("0.00"))
+    total_extra = sum((wo.extra_price for wo in work_orders), Decimal("0.00"))
+    total_price = sum((wo.total_price for wo in work_orders), Decimal("0.00"))
+
+    makbuz = db.session.execute(
+        db.select(Makbuz).where(
+            Makbuz.party_id == party_id, Makbuz.year == year, Makbuz.month == month
         )
-        .order_by(WorkOrder.work_date.desc())
-    ).scalars().all()
-
-    total_apparatus = sum(wo.apparatus_price for wo in work_orders)
-    total_extra = sum(wo.extra_price for wo in work_orders)
-    total_price = sum(wo.total_price for wo in work_orders)
-
-    months = [
-        (1, "Ocak"), (2, "Şubat"), (3, "Mart"), (4, "Nisan"),
-        (5, "Mayıs"), (6, "Haziran"), (7, "Temmuz"), (8, "Ağustos"),
-        (9, "Eylül"), (10, "Ekim"), (11, "Kasım"), (12, "Aralık"),
-    ]
+    ).scalar_one_or_none()
 
     return render_template(
         "makbuzlar/detail.html",
@@ -107,11 +184,84 @@ def detail_makbuz(party_id):
         work_orders=work_orders,
         year=year,
         month=month,
-        months=months,
+        months=MONTHS,
+        status_labels=STATUS_LABELS,
+        makbuz=makbuz,
         total_apparatus=total_apparatus,
         total_extra=total_extra,
         total_price=total_price,
     )
+
+
+@makbuzlar_bp.route("/<int:party_id>/generate", methods=["POST"])
+@login_required
+@permissions_required("billing.edit")
+def generate_makbuz(party_id):
+    year = request.form.get("year", date.today().year, type=int)
+    month = request.form.get("month", date.today().month, type=int)
+    vat_applied, vat_rate = _parse_vat_form()
+
+    try:
+        makbuz = _generate_makbuz(party_id, year, month, vat_applied, vat_rate)
+        db.session.commit()
+        flash(f"Makbuz taslağı oluşturuldu: ₺{makbuz.grand_total:,.2f}", "success")
+    except ValueError as exc:
+        db.session.rollback()
+        flash(str(exc), "danger")
+
+    return redirect(url_for("makbuzlar.detail_makbuz", party_id=party_id, year=year, month=month))
+
+
+@makbuzlar_bp.route("/<int:makbuz_id>/send", methods=["POST"])
+@login_required
+@permissions_required("billing.edit")
+def send_makbuz(makbuz_id):
+    makbuz = db.get_or_404(Makbuz, makbuz_id)
+    success, message = _send_makbuz(makbuz)
+    flash(message, "success" if success else "danger")
+    return redirect(url_for("makbuzlar.detail_makbuz", party_id=makbuz.party_id, year=makbuz.year, month=makbuz.month))
+
+
+@makbuzlar_bp.route("/bulk-send", methods=["POST"])
+@login_required
+@permissions_required("billing.edit")
+def bulk_approve_and_send():
+    year = request.form.get("year", date.today().year, type=int)
+    month = request.form.get("month", date.today().month, type=int)
+    party_ids = request.form.getlist("party_ids", type=int)
+
+    if not party_ids:
+        flash("Gönderilecek doktor seçilmedi.", "danger")
+        return redirect(url_for("makbuzlar.list_makbuzlar", year=year, month=month))
+
+    generated, sent, failed = 0, 0, 0
+    for pid in party_ids:
+        vat_applied, vat_rate = _parse_vat_form(prefix=f"vat_{pid}_")
+        try:
+            makbuz = _generate_makbuz(pid, year, month, vat_applied, vat_rate)
+            db.session.commit()
+            generated += 1
+        except ValueError:
+            db.session.rollback()
+            makbuz = db.session.execute(
+                db.select(Makbuz).where(Makbuz.party_id == pid, Makbuz.year == year, Makbuz.month == month)
+            ).scalar_one_or_none()
+            if makbuz is None or makbuz.status == Makbuz.STATUS_DRAFT:
+                failed += 1
+                continue
+
+        success, _ = _send_makbuz(makbuz)
+        if success:
+            sent += 1
+        else:
+            failed += 1
+
+    flash(
+        f"Toplu gönderim tamamlandı: {sent} makbuz gönderildi, {failed} başarısız "
+        f"({generated} taslak yeniden hesaplandı).",
+        "info" if not failed else "warning",
+    )
+    return redirect(url_for("makbuzlar.list_makbuzlar", year=year, month=month))
 
 
 @makbuzlar_bp.route("/api/exchange-rate")
@@ -123,17 +273,14 @@ def get_exchange_rate_for_date():
     if not target_date:
         return jsonify({"error": "Geçersiz tarih"}), 400
 
-    rate = db.session.execute(
-        db.select(ExchangeRate)
-        .where(ExchangeRate.rate_date <= target_date)
-        .order_by(ExchangeRate.rate_date.desc())
-        .limit(1)
-    ).scalar_one_or_none()
+    from app.services.exchange_service import get_rate_for_date
+    rate = get_rate_for_date(target_date)
     if not rate:
         return jsonify({"error": "Bu tarih için kur bulunamadı"}), 404
 
     return jsonify({
         "rate": float(rate.eur_to_try),
+        "usd_rate": float(rate.usd_to_try) if rate.usd_to_try is not None else None,
         "rate_date": rate.rate_date.isoformat(),
         "display_date": rate.rate_date.strftime("%d.%m.%Y"),
         "source": rate.source,

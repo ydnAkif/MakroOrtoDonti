@@ -482,6 +482,7 @@ class WorkOrder(Base, TimestampMixin):
     apparatus_price: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=Decimal("0.00"))
     extra_price: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=Decimal("0.00"))
     total_price: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=Decimal("0.00"))
+    exchange_rate_applied: Mapped[Decimal | None] = mapped_column(Numeric(12, 4), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     party: Mapped["Party"] = relationship(lazy="selectin")
@@ -490,7 +491,58 @@ class WorkOrder(Base, TimestampMixin):
         self.total_price = money(self.apparatus_price + self.extra_price)
 
     def __repr__(self) -> str:
-        return f"<WorkOrder {self.patient_name} ({self.apparatus_type}) €{self.total_price:.2f}>"
+        return f"<WorkOrder {self.patient_name} ({self.apparatus_type}) ₺{self.total_price:.2f}>"
+
+
+class Makbuz(Base, TimestampMixin):
+    """Doktor bazlı, aylık, kalıcı makbuz kaydı (WorkOrder toplamlarının anlık görüntüsü)."""
+
+    __tablename__ = "makbuzlar"
+
+    STATUS_DRAFT = "draft"
+    STATUS_SENT = "sent"
+    STATUS_PAID = "paid"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    party_id: Mapped[int] = mapped_column(ForeignKey("parties.id"), nullable=False, index=True)
+    year: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    month: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+
+    work_order_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    subtotal: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False, default=Decimal("0.00"))
+    vat_applied: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    vat_rate: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False, default=Decimal("0.00"))
+    vat_amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False, default=Decimal("0.00"))
+    grand_total: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False, default=Decimal("0.00"))
+
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default=STATUS_DRAFT, index=True)
+    generated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=lambda: datetime.now().astimezone())
+    sent_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    paid_at: Mapped[date | None] = mapped_column(nullable=True)
+    paid_amount: Mapped[Decimal | None] = mapped_column(Numeric(14, 2), nullable=True)
+    payment_method: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    payment_reference: Mapped[str | None] = mapped_column(String(100), nullable=True)
+
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    party: Mapped["Party"] = relationship(lazy="selectin")
+
+    __table_args__ = (
+        UniqueConstraint("party_id", "year", "month", name="uq_makbuz_party_period"),
+    )
+
+    def recalculate_totals(self) -> None:
+        self.vat_amount = money(self.subtotal * self.vat_rate / Decimal("100")) if self.vat_applied else Decimal("0.00")
+        self.grand_total = money(self.subtotal + self.vat_amount)
+
+    @property
+    def outstanding_amount(self) -> Decimal:
+        paid = self.paid_amount or Decimal("0.00")
+        return money(self.grand_total - paid)
+
+    def __repr__(self) -> str:
+        return f"<Makbuz {self.party_id} {self.year}-{self.month:02d} ₺{self.grand_total:.2f} ({self.status})>"
 
 
 class LoginAttempt(Base, TimestampMixin):
