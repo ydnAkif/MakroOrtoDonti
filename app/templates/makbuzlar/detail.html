@@ -177,8 +177,26 @@
                     <tr>
                         <td>{{ wo.work_date.strftime('%d.%m.%Y') }}</td>
                         <td><strong>{{ wo.patient_name }}</strong></td>
-                        <td>{{ wo.apparatus_type }}</td>
-                        <td>{{ wo.extra_addons or '-' }}</td>
+                        <td>
+                            {% set items = wo.apparatus_type|fromjson %}
+                            {% if items is iterable and items is not string and items|length > 0 %}
+                                {% for item in items %}
+                                    <span class="badge bg-primary">{{ item.name if item is mapping else item }} ({{ (item.currency if item is mapping else 'TL')|currency_symbol }}{{ "{:,.2f}".format(item.price|float if item is mapping else 0) }})</span>
+                                {% endfor %}
+                            {% else %}
+                                {{ wo.apparatus_type }}
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% set extras = wo.extra_addons|fromjson %}
+                            {% if extras is iterable and extras is not string and extras|length > 0 %}
+                                {% for ex in extras %}
+                                    <span class="badge bg-info text-dark">{{ ex.name if ex is mapping else ex }} ({{ (ex.currency if ex is mapping else 'TL')|currency_symbol }}{{ "{:,.2f}".format(ex.price|float if ex is mapping else 0) }})</span>
+                                {% endfor %}
+                            {% else %}
+                                {{ wo.extra_addons or '-' }}
+                            {% endif %}
+                        </td>
                         <td class="text-end">₺{{ "{:,.2f}".format(wo.apparatus_price) }}</td>
                         <td class="text-end">₺{{ "{:,.2f}".format(wo.extra_price) }}</td>
                         <td class="text-end fw-bold">₺{{ "{:,.2f}".format(wo.total_price) }}</td>

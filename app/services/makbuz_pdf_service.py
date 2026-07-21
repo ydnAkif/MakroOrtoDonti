@@ -1,7 +1,35 @@
+import json
 import os
 
 from fpdf import FPDF
 from fpdf.enums import XPos, YPos
+
+CURRENCY_SYMBOLS = {"TL": "₺", "EUR": "€", "USD": "$"}
+
+
+def _format_items(raw: str | None) -> str:
+    """Render a WorkOrder apparatus_type/extra_addons field for display.
+
+    The field stores either a JSON array of {name, price, currency} objects
+    (selected from the treatment catalog) or, for legacy rows, a plain
+    description string.
+    """
+    if not raw:
+        return ""
+    try:
+        items = json.loads(raw)
+    except (json.JSONDecodeError, TypeError):
+        return raw
+    if not isinstance(items, list) or not items:
+        return raw
+    parts = []
+    for item in items:
+        if isinstance(item, dict):
+            symbol = CURRENCY_SYMBOLS.get(item.get("currency", "TL"), "₺")
+            parts.append(f"{item.get('name', '')} ({symbol}{float(item.get('price', 0)):,.2f})")
+        else:
+            parts.append(str(item))
+    return ", ".join(parts)
 
 FONT_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "fonts")
 FONT_PATH = os.path.join(FONT_DIR, "DejaVuSans.ttf")
@@ -168,9 +196,10 @@ class MakbuzPDF(FPDF):
             if self.get_y() > 255:
                 self.add_page()
                 self._table_header()
-            detail = wo.apparatus_type or ""
-            if wo.extra_addons:
-                detail = f"{detail} + {wo.extra_addons}" if detail else wo.extra_addons
+            detail = _format_items(wo.apparatus_type)
+            extra_detail = _format_items(wo.extra_addons)
+            if extra_detail:
+                detail = f"{detail} + {extra_detail}" if detail else extra_detail
             self.set_fill_color(*(self.SURFACE if index % 2 == 0 else (255, 255, 255)))
             self.set_text_color(*self.INK)
             self.set_font(self.default_font, "", 7.2)

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from datetime import date
+import json
+from datetime import date, datetime
 from decimal import Decimal
 from unittest.mock import patch
 
@@ -243,3 +244,72 @@ def test_scheduler_noop_when_not_first_of_month(app):
             assert count == 0
     finally:
         sched.date = original_date
+
+
+def test_makbuz_detail_renders_catalog_item_names_not_raw_json(client, app):
+    """apparatus_type/extra_addons store a JSON catalog selection; the page
+    must show item names, not the raw JSON (regression: was displayed as-is)."""
+    login(client, "admin", "admin-pass")
+    party_id = _make_doctor(app, name="Fatma Aydın")
+    apparatus = json.dumps([{"id": 31, "name": "Activator (FKO)", "price": 2500, "currency": "TL"}])
+    extra = json.dumps([{"id": 49, "name": "Lingual Sheat", "price": 4, "currency": "USD"}])
+    with app.app_context():
+        db.session.add(WorkOrder(
+            party_id=party_id, work_date=date(2026, 7, 20), apparatus_type=apparatus,
+            extra_addons=extra, patient_name="Fatma Aydın",
+            apparatus_price=2500, extra_price=Decimal("188.57"), total_price=Decimal("2688.57"),
+        ))
+        db.session.commit()
+
+    response = client.get(f"/makbuzlar/{party_id}?year=2026&month=7")
+    html = response.get_data(as_text=True)
+    assert response.status_code == 200
+    assert '[{"id"' not in html
+    assert "Activator (FKO)" in html
+    assert "Lingual Sheat" in html
+
+    response = client.get("/")
+    html = response.get_data(as_text=True)
+    assert '[{"id"' not in html
+    assert "Activator (FKO)" in html
+
+
+def test_format_items_parses_catalog_json_and_falls_back_to_plain_text():
+    from app.services.makbuz_pdf_service import _format_items
+
+    catalog_json = json.dumps([{"id": 31, "name": "Activator (FKO)", "price": 2500, "currency": "TL"}])
+    assert _format_items(catalog_json) == "Activator (FKO) (₺2,500.00)"
+
+    multi_json = json.dumps([
+        {"id": 1, "name": "A", "price": 10, "currency": "USD"},
+        {"id": 2, "name": "B", "price": 20, "currency": "TL"},
+    ])
+    assert _format_items(multi_json) == "A ($10.00), B (₺20.00)"
+
+    assert _format_items("Lingual Ark") == "Lingual Ark"
+    assert _format_items(None) == ""
+    assert _format_items("") == ""
+
+
+def test_makbuz_pdf_generation_does_not_crash_with_catalog_json(app):
+    from app.services.makbuz_pdf_service import generate_makbuz_pdf
+
+    party_id = _make_doctor(app, name="Fatma Aydın PDF")
+    apparatus = json.dumps([{"id": 31, "name": "Activator (FKO)", "price": 2500, "currency": "TL"}])
+    with app.app_context():
+        wo = WorkOrder(
+            party_id=party_id, work_date=date(2026, 7, 20), apparatus_type=apparatus,
+            patient_name="Fatma Aydın", apparatus_price=2500, extra_price=0, total_price=2500,
+        )
+        db.session.add(wo)
+        makbuz = Makbuz(
+            party_id=party_id, year=2026, month=7, work_order_count=1,
+            subtotal=Decimal("2500.00"), generated_at=datetime.now(),
+        )
+        makbuz.recalculate_totals()
+        db.session.add(makbuz)
+        db.session.commit()
+
+        pdf_bytes = generate_makbuz_pdf(makbuz, [wo])
+        assert pdf_bytes[:4] == b"%PDF"
+        assert len(pdf_bytes) > 1000

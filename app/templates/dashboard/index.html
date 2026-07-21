@@ -57,7 +57,16 @@
                                 <td>{{ wo.work_date.strftime('%d.%m.%Y') }}</td>
                                 <td><a href="{{ url_for('makbuzlar.detail_makbuz', party_id=wo.party_id) }}">{{ wo.party.name if wo.party else '-' }}</a></td>
                                 <td>{{ wo.patient_name }}</td>
-                                <td>{{ wo.apparatus_type }}</td>
+                                <td>
+                                    {% set items = wo.apparatus_type|fromjson %}
+                                    {% if items is iterable and items is not string and items|length > 0 %}
+                                        {%- for item in items -%}
+                                            {{ item.name if item is mapping else item }}{% if not loop.last %}, {% endif %}
+                                        {%- endfor -%}
+                                    {% else %}
+                                        {{ wo.apparatus_type }}
+                                    {% endif %}
+                                </td>
                                 <td><strong>₺{{ "{:,.2f}".format(wo.total_price) }}</strong></td>
                             </tr>
                         {% else %}
