@@ -6,7 +6,7 @@ from decimal import Decimal
 from unittest.mock import patch
 
 from app.extensions import db
-from app.models.models import Party, PartyType, WorkOrder, Makbuz, Settings
+from app.models.models import Party, PartyType, WorkOrder, Makbuz, MakbuzPayment, Settings
 
 from conftest import login
 
@@ -260,6 +260,116 @@ def test_send_and_mark_paid_flow(client, app):
         makbuz = db.session.get(Makbuz, makbuz_id)
         assert makbuz.status == Makbuz.STATUS_SENT
         assert makbuz.paid_amount is None
+
+
+def test_partial_payment_stays_open_and_carries_to_next_period(client, app):
+    login(client, "admin", "admin-pass")
+    party_id = _make_doctor(app, name="Dr. Kısmi Tahsilat")
+    _add_work_order(app, party_id, date(2026, 6, 1), Decimal("2641.52"))
+    client.post(f"/makbuzlar/{party_id}/generate", data={"year": 2026, "month": 6})
+
+    with app.app_context():
+        june = db.session.execute(
+            db.select(Makbuz).where(Makbuz.party_id == party_id, Makbuz.month == 6)
+        ).scalar_one()
+        june.status = Makbuz.STATUS_SENT
+        june.sent_at = datetime.now().astimezone()
+        june_id = june.id
+        db.session.commit()
+
+    response = client.post(
+        f"/payments/{june_id}/mark-paid",
+        data={
+            "paid_at": "2026-07-05",
+            "paid_amount": "2500.00",
+            "payment_method": "transfer",
+            "payment_reference": "EFT-123",
+            "notes": "Kısmi tahsilat",
+        },
+        follow_redirects=True,
+    )
+    html = response.get_data(as_text=True)
+    assert "Kısmi ödeme kaydedildi" in html
+    assert "141.52" in html
+
+    with app.app_context():
+        june = db.session.get(Makbuz, june_id)
+        assert june.status == Makbuz.STATUS_SENT
+        assert june.collected_amount == Decimal("2500.00")
+        assert june.outstanding_amount == Decimal("141.52")
+        payment = db.session.execute(
+            db.select(MakbuzPayment).where(MakbuzPayment.makbuz_id == june_id)
+        ).scalar_one()
+        assert payment.reference == "EFT-123"
+
+    _add_work_order(app, party_id, date(2026, 7, 1), Decimal("100.00"))
+    client.post(f"/makbuzlar/{party_id}/generate", data={"year": 2026, "month": 7})
+
+    with app.app_context():
+        from app.services.makbuz_account_service import account_statement
+
+        july = db.session.execute(
+            db.select(Makbuz).where(Makbuz.party_id == party_id, Makbuz.month == 7)
+        ).scalar_one()
+        statement = account_statement(july)
+        assert statement.previous_balance == Decimal("141.52")
+        assert statement.previous_periods[0].period_label == "Haziran 2026"
+        assert statement.previous_periods[0].original_total == Decimal("2641.52")
+        assert statement.previous_periods[0].collected == Decimal("2500.00")
+        assert statement.total_due == Decimal("241.52")
+
+        from app.services.whatsapp_service import WhatsAppService
+
+        with (
+            patch.object(WhatsAppService, "send_message", return_value={"success": True, "message": "ok"}) as send_text,
+            patch.object(WhatsAppService, "send_document", return_value={"success": True, "message": "ok"}),
+        ):
+            WhatsAppService.send_makbuz_message(july, b"pdf")
+        message = send_text.call_args.args[1]
+        assert "Haziran 2026: ₺2,641.52 makbuz - ₺2,500.00 tahsilat = ₺141.52 kalan" in message
+        assert "Toplam Açık Bakiye: ₺241.52" in message
+
+    response = client.post(
+        f"/payments/{june_id}/mark-paid",
+        data={
+            "paid_at": "2026-07-10",
+            "paid_amount": "141.52",
+            "payment_method": "cash",
+        },
+        follow_redirects=False,
+    )
+    assert "tab=paid" in response.location
+    with app.app_context():
+        june = db.session.get(Makbuz, june_id)
+        assert june.status == Makbuz.STATUS_PAID
+        assert june.collected_amount == Decimal("2641.52")
+        assert june.outstanding_amount == Decimal("0.00")
+        assert len(june.payment_entries) == 2
+
+
+def test_payment_cannot_exceed_remaining_balance(client, app):
+    login(client, "admin", "admin-pass")
+    party_id = _make_doctor(app, name="Dr. Fazla Tahsilat")
+    _add_work_order(app, party_id, date(2026, 6, 1), Decimal("100.00"))
+    client.post(f"/makbuzlar/{party_id}/generate", data={"year": 2026, "month": 6})
+
+    with app.app_context():
+        makbuz = db.session.execute(
+            db.select(Makbuz).where(Makbuz.party_id == party_id)
+        ).scalar_one()
+        makbuz.status = Makbuz.STATUS_SENT
+        makbuz.sent_at = datetime.now().astimezone()
+        makbuz_id = makbuz.id
+        db.session.commit()
+
+    response = client.post(
+        f"/payments/{makbuz_id}/mark-paid",
+        data={"paid_amount": "100.01", "payment_method": "cash"},
+        follow_redirects=True,
+    )
+    assert "bakiyeyi aşamaz" in response.get_data(as_text=True)
+    with app.app_context():
+        assert db.session.scalar(db.select(db.func.count(MakbuzPayment.id))) == 0
 
 
 def test_send_failure_keeps_status(client, app):

@@ -1,5 +1,6 @@
 from collections import defaultdict
-from datetime import date, datetime, timedelta
+from collections.abc import Sequence
+from datetime import date, timedelta
 from decimal import Decimal
 
 from flask import Blueprint, render_template, request
@@ -59,7 +60,7 @@ def _resolve_period(today: date) -> tuple[date, date, str]:
     return start, end, period
 
 
-def _trend_rows(start: date, end: date, invoices: list[Invoice], payments: list[Payment], work_orders: list[WorkOrder], paid_makbuzlar: list[Makbuz]) -> list[dict]:
+def _trend_rows(start: date, end: date, invoices: Sequence[Invoice], payments: Sequence[Payment], work_orders: Sequence[WorkOrder], makbuz_collections: list[tuple[date, Decimal]]) -> list[dict]:
     day_span = (end - start).days + 1
     use_months = day_span > 100
     values: dict[tuple[int, int] | date, dict[str, Decimal]] = defaultdict(
@@ -90,19 +91,17 @@ def _trend_rows(start: date, end: date, invoices: list[Invoice], payments: list[
             rate = Decimal("1")
         values[key_for(wo.work_date)]["issued"] += wo.total_price / rate
 
-    # Paid makbuzlar (collected)
-    for makbuz in paid_makbuzlar:
-        if makbuz.paid_at:
-            rate_obj = get_rate_for_date(makbuz.paid_at)
-            rate = rate_obj.eur_to_try if rate_obj else Decimal("1")
-            if not rate or rate <= 0:
-                rate = Decimal("1")
-            paid_try = makbuz.paid_amount or makbuz.grand_total or Decimal("0.00")
-            values[key_for(makbuz.paid_at)]["collected"] += paid_try / rate
+    # Monthly receipt collection movements, including partial payments.
+    for payment_date, amount_try in makbuz_collections:
+        rate_obj = get_rate_for_date(payment_date)
+        rate = rate_obj.eur_to_try if rate_obj else Decimal("1")
+        if not rate or rate <= 0:
+            rate = Decimal("1")
+        values[key_for(payment_date)]["collected"] += amount_try / rate
 
     rows = []
     for key in sorted(values):
-        if use_months:
+        if isinstance(key, tuple):
             label = f"{key[1]:02d}.{key[0]}"
         else:
             label = key.strftime("%d.%m")
@@ -224,15 +223,25 @@ def index():
 
     makbuz_collected_try = Decimal("0.00")
     makbuz_collected_eur = Decimal("0.00")
-    paid_makbuzlar_in_period = []
+    makbuz_collections_in_period: list[tuple[date, Decimal]] = []
 
     for m in all_makbuzlar:
-        if m.status == Makbuz.STATUS_PAID and m.paid_at and start_date <= m.paid_at <= end_date:
-            paid_makbuzlar_in_period.append(m)
-            paid_try = m.paid_amount or m.grand_total or Decimal("0.00")
+        if m.payment_entries:
+            movements = [
+                (entry.payment_date, entry.amount)
+                for entry in m.payment_entries
+                if start_date <= entry.payment_date <= end_date
+            ]
+        elif m.paid_at and m.paid_amount and start_date <= m.paid_at <= end_date:
+            # Compatibility for databases not migrated yet and legacy test fixtures.
+            movements = [(m.paid_at, m.paid_amount)]
+        else:
+            movements = []
+
+        for payment_date, paid_try in movements:
+            makbuz_collections_in_period.append((payment_date, paid_try))
             makbuz_collected_try += paid_try
-            
-            rate_obj = get_rate_for_date(m.paid_at)
+            rate_obj = get_rate_for_date(payment_date)
             rate = rate_obj.eur_to_try if rate_obj else Decimal("1")
             if not rate or rate <= 0:
                 rate = Decimal("1")
@@ -294,11 +303,18 @@ def index():
         if m.status not in (Makbuz.STATUS_SENT, Makbuz.STATUS_PAID):
             continue
             
-        is_paid_before_end = (m.status == Makbuz.STATUS_PAID and m.paid_at and m.paid_at <= end_date)
-        if is_paid_before_end:
+        if m.payment_entries:
+            collected_before_end = sum(
+                (entry.amount for entry in m.payment_entries if entry.payment_date <= end_date),
+                Decimal("0.00"),
+            )
+        elif m.paid_at and m.paid_at <= end_date:
+            collected_before_end = m.paid_amount or Decimal("0.00")
+        else:
+            collected_before_end = Decimal("0.00")
+        remaining_try = max(m.grand_total - collected_before_end, Decimal("0.00"))
+        if remaining_try <= Decimal("0.01"):
             continue
-            
-        remaining_try = m.grand_total
         
         m_work_orders = db.session.execute(
             db.select(WorkOrder)
@@ -320,9 +336,11 @@ def index():
             m_subtotal_eur += wo.total_price / rate
             
         if m.vat_applied:
-            remaining_eur = m_subtotal_eur * (Decimal("1") + m.vat_rate / Decimal("100"))
+            full_total_eur = m_subtotal_eur * (Decimal("1") + m.vat_rate / Decimal("100"))
         else:
-            remaining_eur = m_subtotal_eur
+            full_total_eur = m_subtotal_eur
+        remaining_ratio = remaining_try / m.grand_total if m.grand_total else Decimal("0")
+        remaining_eur = full_total_eur * remaining_ratio
             
         if remaining_eur <= Decimal("0.01"):
             continue
@@ -502,7 +520,7 @@ def index():
         .limit(1)
     ).scalar_one_or_none()
 
-    trend_rows = _trend_rows(start_date, end_date, invoices, payments, work_orders_in_period, paid_makbuzlar_in_period)
+    trend_rows = _trend_rows(start_date, end_date, invoices, payments, work_orders_in_period, makbuz_collections_in_period)
     max_trend_value = max(
         (max(row["issued"], row["collected"]) for row in trend_rows), default=Decimal("1")
     ) or Decimal("1")
@@ -510,7 +528,7 @@ def index():
     max_aging_amount = max((row["amount"] for row in aging.values()), default=Decimal("1")) or Decimal("1")
 
     billed_count = len(invoices) + len([m for m in makbuzlar_in_period if m.status in (Makbuz.STATUS_SENT, Makbuz.STATUS_PAID)])
-    total_payment_count = len(payments) + len(paid_makbuzlar_in_period)
+    total_payment_count = len(payments) + len(makbuz_collections_in_period)
 
     return render_template(
         "reports/index.html",

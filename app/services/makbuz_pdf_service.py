@@ -252,35 +252,64 @@ class MakbuzPDF(FPDF):
             self.line(x0, y0 + row_h, x0 + sum(widths), y0 + row_h)
             self.set_y(y0 + row_h)
 
-    def add_totals(self, makbuz):
-        if self.get_y() > 225:
+    def add_totals(self, makbuz, statement):
+        required_height = 48 + len(statement.previous_periods) * 8
+        if self.get_y() + required_height > 266:
             self.add_page()
         self.ln(4)
-        x_label, x_value = 126, 163
-        rows = [("Ara toplam", f"₺{makbuz.subtotal:,.2f}", False)]
-        if makbuz.vat_applied:
-            rows.append((f"KDV (%{makbuz.vat_rate:,.2f})", f"₺{makbuz.vat_amount:,.2f}", False))
+
+        self.set_font(self.default_font, "B", 9)
+        self.set_text_color(*self.AQUA_DARK)
+        self.cell(0, 7, "BAKİYE DÖKÜMÜ", ln=True)
+
+        x_label = 112
+        rows = [("Bu dönem makbuz tutarı", f"₺{makbuz.grand_total:,.2f}", False)]
+        if statement.current_collected > 0:
+            rows.append(("Bu dönem tahsil edilen", f"-₺{statement.current_collected:,.2f}", False))
+            rows.append(("Bu dönem kalan", f"₺{statement.current_outstanding:,.2f}", True))
         for label, value, bold in rows:
-            self.set_xy(x_label, self.get_y())
+            self.set_x(x_label)
             self.set_font(self.default_font, "B" if bold else "", 8)
             self.set_text_color(*self.MUTED if not bold else self.INK)
-            self.cell(37, 7, label, align="R")
+            self.cell(51, 7, label, align="R")
             self.set_text_color(*self.INK)
             self.cell(35, 7, value, align="R")
             self.ln()
 
-        self.set_x(126)
+        if statement.previous_periods:
+            self.ln(2)
+            self.set_fill_color(*self.SKY_PALE)
+            self.set_text_color(*self.INK)
+            self.set_font(self.default_font, "B", 7.5)
+            self.cell(48, 8, "Önceki açık dönem", fill=True)
+            self.cell(46, 8, "Makbuz tutarı", fill=True, align="R")
+            self.cell(46, 8, "Tahsil edilen", fill=True, align="R")
+            self.cell(46, 8, "Kalan", fill=True, align="R")
+            self.ln()
+            for period in statement.previous_periods:
+                self.set_font(self.default_font, "", 7.5)
+                self.set_text_color(*self.INK)
+                self.cell(48, 7, period.period_label)
+                self.cell(46, 7, f"₺{period.original_total:,.2f}", align="R")
+                self.cell(46, 7, f"-₺{period.collected:,.2f}", align="R")
+                self.set_font(self.default_font, "B", 7.5)
+                self.cell(46, 7, f"₺{period.outstanding:,.2f}", align="R")
+                self.ln()
+
+        self.ln(3)
+        self.set_x(112)
         self.set_fill_color(*self.AQUA_DARK)
         self.set_text_color(255, 255, 255)
         self.set_font(self.default_font, "B", 10)
-        self.cell(37, 11, "GENEL TOPLAM", fill=True, align="R")
-        self.cell(35, 11, f"₺{makbuz.grand_total:,.2f}", fill=True, align="R")
+        self.cell(51, 11, "TOPLAM AÇIK BAKİYE", fill=True, align="R")
+        self.cell(35, 11, f"₺{statement.total_due:,.2f}", fill=True, align="R")
         self.ln()
 
 
 def generate_makbuz_pdf(makbuz, work_orders) -> bytes:
     from app.extensions import db
     from app.models.models import Settings
+    from app.services.makbuz_account_service import account_statement
 
     def get_setting(key, default=""):
         value = db.session.execute(
@@ -297,7 +326,7 @@ def generate_makbuz_pdf(makbuz, work_orders) -> bytes:
     pdf.add_page()
     pdf.add_summary(makbuz, makbuz.party.name if makbuz.party else "Bilinmeyen doktor")
     pdf.add_items_table(work_orders)
-    pdf.add_totals(makbuz)
+    pdf.add_totals(makbuz, account_statement(makbuz))
 
     output = pdf.output()
     return bytes(output) if isinstance(output, (bytes, bytearray)) else str(output).encode("latin-1", errors="ignore")

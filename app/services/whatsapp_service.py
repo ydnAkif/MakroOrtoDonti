@@ -19,7 +19,11 @@ import os
 import threading
 import time
 from datetime import datetime, timezone
+from decimal import Decimal
+from types import SimpleNamespace
 from typing import Optional
+
+from flask import has_app_context
 
 from app.extensions import db
 from app.models.models import WhatsAppSession
@@ -499,16 +503,52 @@ Makro Ortodonti"""
         ]
         period = f"{month_names[makbuz.month]} {makbuz.year}"
 
+        from app.services.makbuz_account_service import account_statement
+
+        if has_app_context():
+            statement = account_statement(makbuz)
+        else:
+            # Keep this formatter usable in isolated service tests; real sends
+            # run inside an app context and receive the full account history.
+            current_total = Decimal(str(makbuz.grand_total))
+            statement = SimpleNamespace(
+                current_collected=Decimal("0.00"),
+                current_outstanding=current_total,
+                previous_periods=[],
+                total_due=current_total,
+            )
+        balance_lines = []
+        if statement.current_collected > 0:
+            balance_lines.extend([
+                f"Bu Dönem Tahsil Edilen: -₺{statement.current_collected:,.2f}",
+                f"Bu Dönem Kalan: ₺{statement.current_outstanding:,.2f}",
+            ])
+        if statement.previous_periods:
+            balance_lines.append("")
+            balance_lines.append("Önceki dönemlerden kalanlar:")
+            for open_period in statement.previous_periods:
+                balance_lines.append(
+                    f"• {open_period.period_label}: ₺{open_period.original_total:,.2f} makbuz"
+                    f" - ₺{open_period.collected:,.2f} tahsilat"
+                    f" = ₺{open_period.outstanding:,.2f} kalan"
+                )
+        balance_lines.extend(["", f"Toplam Açık Bakiye: ₺{statement.total_due:,.2f}"])
+        balance_text = "\n".join(balance_lines)
+        vat_text = (
+            f"KDV (%{makbuz.vat_rate:,.2f}): ₺{makbuz.vat_amount:,.2f}\n"
+            if makbuz.vat_applied else ""
+        )
+
         message = f"""Sayın {party.name},
 
 {period} dönemine ait makbuzunuz hazırlanmıştır.
 
 İş Emri Sayısı: {makbuz.work_order_count}
 Ara Toplam: ₺{makbuz.subtotal:,.2f}
-{"KDV (%" + f"{makbuz.vat_rate:,.2f}" + "): ₺" + f"{makbuz.vat_amount:,.2f}" if makbuz.vat_applied else ""}
-Genel Toplam: ₺{makbuz.grand_total:,.2f}
+{vat_text}Bu Dönem Toplamı: ₺{makbuz.grand_total:,.2f}
+{balance_text}
 
-Makbuzunuz ekte gönderilmiştir.
+Ayrıntılı iş ve bakiye dökümü ekteki makbuzda yer almaktadır.
 
 Saygılarımızla,
 Makro Ortodonti"""

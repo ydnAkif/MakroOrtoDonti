@@ -20,7 +20,7 @@
     <li class="nav-item" role="presentation">
         <button class="nav-link {% if active_tab == 'paid' %}active{% endif %} fw-bold py-2 px-3" id="paid-tab" data-bs-toggle="tab" data-bs-target="#paid-pane" type="button" role="tab" aria-selected="{{ 'true' if active_tab == 'paid' else 'false' }}">
             <i class="bi bi-check-circle me-1"></i> Tahsil edilenler
-            <span class="badge bg-success ms-1">{{ paid_makbuzlar|length }}</span>
+            <span class="badge bg-success ms-1">{{ payment_entries|length }}</span>
         </button>
     </li>
     <li class="nav-item" role="presentation">
@@ -47,7 +47,9 @@
                                 <th>Doktor</th>
                                 <th>Dönem</th>
                                 <th>Gönderim Tarihi</th>
-                                <th>Tutar</th>
+                                <th class="text-end">Makbuz</th>
+                                <th class="text-end">Tahsil edilen</th>
+                                <th class="text-end">Kalan</th>
                                 <th class="text-end">İşlem</th>
                             </tr>
                         </thead>
@@ -57,7 +59,12 @@
                                 <td class="fw-bold">{{ m.party.name if m.party else '-' }}</td>
                                 <td>{{ m.month }}/{{ m.year }}</td>
                                 <td>{{ m.sent_at.strftime('%d.%m.%Y') if m.sent_at else '-' }}</td>
-                                <td class="fw-bold">₺{{ "{:,.2f}".format(m.grand_total) }}</td>
+                                <td class="text-end">₺{{ "{:,.2f}".format(m.grand_total) }}</td>
+                                <td class="text-end text-success">₺{{ "{:,.2f}".format(m.collected_amount) }}</td>
+                                <td class="text-end fw-bold text-danger">
+                                    ₺{{ "{:,.2f}".format(m.outstanding_amount) }}
+                                    {% if m.is_partially_paid %}<span class="badge bg-warning text-dark ms-1">Kısmi ödendi</span>{% endif %}
+                                </td>
                                 <td class="text-end">
                                     <a href="{{ url_for('payments.mark_paid', makbuz_id=m.id) }}" class="btn btn-sm btn-primary">
                                         <i class="bi bi-plus-circle"></i> Ödeme Kaydet
@@ -81,27 +88,32 @@
     <div class="tab-pane fade {% if active_tab == 'paid' %}show active{% endif %}" id="paid-pane" role="tabpanel">
         <div class="work-panel">
             <div class="work-panel__header">
-                <div><h2>Tahsil edilenler</h2><p>Ödeme kayıtlarını kontrol edin veya yanlış kaydı geri alın.</p></div>
+                <div><h2>Tahsilat hareketleri</h2><p>Her ödemeyi tarih ve kaynak makbuzuyla birlikte izleyin.</p></div>
             </div>
             <div class="table-responsive">
                 <table class="table table-hover align-middle mb-0">
-                    <thead><tr><th>Doktor</th><th>Dönem</th><th>Ödeme tarihi</th><th>Yöntem</th><th class="text-end">Tahsil edilen</th><th class="text-end">İşlem</th></tr></thead>
+                    <thead><tr><th>Doktor</th><th>Kaynak dönem</th><th>Ödeme tarihi</th><th>Yöntem</th><th>Referans / Not</th><th class="text-end">Tahsil edilen</th><th class="text-end">İşlem</th></tr></thead>
                     <tbody>
-                        {% for m in paid_makbuzlar %}
+                        {% for entry in payment_entries %}
+                        {% set m = entry.makbuz %}
                         <tr>
                             <td><strong>{{ m.party.display_name if m.party else '-' }}</strong></td>
                             <td>{{ '%02d'|format(m.month) }}/{{ m.year }}</td>
-                            <td>{{ m.paid_at.strftime('%d.%m.%Y') if m.paid_at else '-' }}</td>
-                            <td>{{ method_labels.get(m.payment_method, m.payment_method or '-') }}</td>
-                            <td class="text-end fw-bold">₺{{ "{:,.2f}".format(m.paid_amount or 0) }}</td>
-                            <td class="text-end">
-                                <form method="POST" action="{{ url_for('payments.unmark_paid', makbuz_id=m.id) }}" class="d-inline" onsubmit="return confirm('Bu ödeme kaydı geri alınsın ve makbuz yeniden tahsilat bekliyor durumuna geçsin mi?');">
-                                    <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-arrow-counterclockwise"></i> Ödenmedi olarak işaretle</button>
+                            <td>{{ entry.payment_date.strftime('%d.%m.%Y') }}</td>
+                            <td>{{ method_labels.get(entry.method, entry.method) }}</td>
+                            <td>{{ entry.reference or entry.notes or '-' }}</td>
+                            <td class="text-end fw-bold text-success">₺{{ "{:,.2f}".format(entry.amount) }}</td>
+                            <td class="text-end text-nowrap">
+                                <form method="POST" action="{{ url_for('payments.delete_payment', payment_id=entry.id) }}" class="d-inline" onsubmit="return confirm('Bu tahsilat hareketi silinsin mi? Kalan borç yeniden hesaplanacaktır.');">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i> Sil</button>
+                                </form>
+                                <form method="POST" action="{{ url_for('payments.unmark_paid', makbuz_id=m.id) }}" class="d-none">
+                                    <button type="submit">Tümünü geri al</button>
                                 </form>
                             </td>
                         </tr>
                         {% else %}
-                        <tr><td colspan="6" class="empty-state">Bu filtrelerde tahsil edilmiş makbuz yok.</td></tr>
+                        <tr><td colspan="7" class="empty-state">Bu filtrelerde tahsilat hareketi yok.</td></tr>
                         {% endfor %}
                     </tbody>
                 </table>

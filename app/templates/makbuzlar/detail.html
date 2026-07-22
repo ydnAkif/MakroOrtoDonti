@@ -96,13 +96,20 @@
         {% if makbuz %}
         <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
             <div>
-                <span class="badge {{ 'bg-success' if makbuz.status == 'paid' else ('bg-primary' if makbuz.status == 'sent' else 'bg-secondary') }} mb-2">{{ status_labels.get(makbuz.status, makbuz.status) }}</span>
+                <span class="badge {{ 'bg-success' if makbuz.status == 'paid' else ('bg-warning text-dark' if makbuz.is_partially_paid else ('bg-primary' if makbuz.status == 'sent' else 'bg-secondary')) }} mb-2">{{ 'Kısmi ödendi' if makbuz.is_partially_paid else status_labels.get(makbuz.status, makbuz.status) }}</span>
                 <p class="mb-1">Matrah: <strong>₺{{ "{:,.2f}".format(makbuz.subtotal) }}</strong>
                     {% if makbuz.vat_applied %} + KDV (%{{ '{:.2f}'.format(makbuz.vat_rate) }}): <strong>₺{{ "{:,.2f}".format(makbuz.vat_amount) }}</strong>{% endif %}
                 </p>
-                <p class="mb-1">Genel Toplam: <strong class="fs-5">₺{{ "{:,.2f}".format(makbuz.grand_total) }}</strong></p>
+                <p class="mb-1">Dönem Toplamı: <strong class="fs-5">₺{{ "{:,.2f}".format(makbuz.grand_total) }}</strong></p>
+                {% if makbuz.collected_amount > 0 %}
+                <p class="mb-1">Tahsil edilen: <strong class="text-success">₺{{ "{:,.2f}".format(makbuz.collected_amount) }}</strong> · Dönemden kalan: <strong class="text-danger">₺{{ "{:,.2f}".format(makbuz.outstanding_amount) }}</strong></p>
+                {% endif %}
+                {% if statement and statement.previous_balance > 0 %}
+                <p class="mb-1">Önceki dönemlerden devir: <strong class="text-danger">₺{{ "{:,.2f}".format(statement.previous_balance) }}</strong></p>
+                {% endif %}
+                {% if statement %}<p class="mb-1">Toplam açık bakiye: <strong class="fs-5">₺{{ "{:,.2f}".format(statement.total_due) }}</strong></p>{% endif %}
                 {% if makbuz.sent_at %}<small class="text-muted">Gönderildi: {{ makbuz.sent_at.strftime('%d.%m.%Y %H:%M') }}</small><br>{% endif %}
-                {% if makbuz.status == 'paid' %}<small class="text-muted">Ödendi: {{ makbuz.paid_at.strftime('%d.%m.%Y') if makbuz.paid_at else '-' }} (₺{{ "{:,.2f}".format(makbuz.paid_amount) if makbuz.paid_amount else '-' }})</small>{% endif %}
+                {% if makbuz.status == 'paid' %}<small class="text-muted">Kapatıldı: {{ makbuz.paid_at.strftime('%d.%m.%Y') if makbuz.paid_at else '-' }}</small>{% endif %}
             </div>
             <div class="d-flex gap-2">
                 {% if makbuz.status == 'draft' %}
@@ -160,6 +167,35 @@
         {% endif %}
     </div>
 </div>
+
+{% if makbuz and (makbuz.payment_entries or (statement and statement.previous_periods)) %}
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-white"><h5 class="mb-0"><i class="bi bi-journal-text"></i> Bakiye Açıklaması</h5></div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table align-middle mb-0">
+                <thead><tr><th>Kaynak</th><th>Açıklama</th><th class="text-end">Tutar</th></tr></thead>
+                <tbody>
+                    {% for period in statement.previous_periods %}
+                    <tr>
+                        <td><strong>{{ period.period_label }}</strong></td>
+                        <td>₺{{ "{:,.2f}".format(period.original_total) }} makbuz − ₺{{ "{:,.2f}".format(period.collected) }} tahsilat</td>
+                        <td class="text-end fw-bold text-danger">₺{{ "{:,.2f}".format(period.outstanding) }} kalan</td>
+                    </tr>
+                    {% endfor %}
+                    {% for entry in makbuz.payment_entries %}
+                    <tr>
+                        <td><strong>{{ entry.payment_date.strftime('%d.%m.%Y') }}</strong></td>
+                        <td>Bu dönem tahsilatı{% if entry.reference %} · {{ entry.reference }}{% endif %}{% if entry.notes %} · {{ entry.notes }}{% endif %}</td>
+                        <td class="text-end fw-bold text-success">−₺{{ "{:,.2f}".format(entry.amount) }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
 
 <!-- Work Orders Table -->
 <div class="card border-0 shadow-sm">

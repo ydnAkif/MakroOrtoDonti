@@ -198,6 +198,11 @@ def detail_makbuz(party_id):
             Makbuz.party_id == party_id, Makbuz.year == year, Makbuz.month == month
         )
     ).scalar_one_or_none()
+    statement = None
+    if makbuz:
+        from app.services.makbuz_account_service import account_statement
+
+        statement = account_statement(makbuz)
 
     return render_template(
         "makbuzlar/detail.html",
@@ -208,6 +213,7 @@ def detail_makbuz(party_id):
         months=MONTHS,
         status_labels=STATUS_LABELS,
         makbuz=makbuz,
+        statement=statement,
         total_apparatus=total_apparatus,
         total_extra=total_extra,
         total_price=total_price,

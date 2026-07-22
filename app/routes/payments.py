@@ -4,7 +4,7 @@ from datetime import date
 from decimal import Decimal
 
 from app.extensions import db
-from app.models.models import Party, PartyType, Makbuz, money
+from app.models.models import Party, PartyType, Makbuz, MakbuzPayment, money
 from app.authz import permissions_required
 
 payments_bp = Blueprint("payments", __name__)
@@ -56,7 +56,7 @@ def list_payments():
             Decimal("0.00"),
         ))
         paid = money(sum(
-            (m.paid_amount or Decimal("0.00") for m in m_list if m.status == Makbuz.STATUS_PAID),
+            (m.collected_amount for m in m_list),
             Decimal("0.00"),
         ))
         rows.append({
@@ -77,17 +77,20 @@ def list_payments():
     pending_makbuzlar = sorted(
         (
             m for m in all_makbuzlar
-            if m.status == Makbuz.STATUS_SENT and m.party_id in visible_party_ids
+            if m.status in (Makbuz.STATUS_SENT, Makbuz.STATUS_PAID)
+            and m.outstanding_amount > 0
+            and m.party_id in visible_party_ids
         ),
         key=lambda m: (m.year, m.month),
         reverse=True,
     )
-    paid_makbuzlar = sorted(
+    payment_entries = sorted(
         (
-            m for m in all_makbuzlar
-            if m.status == Makbuz.STATUS_PAID and m.party_id in visible_party_ids
+            entry for m in all_makbuzlar
+            if m.party_id in visible_party_ids
+            for entry in m.payment_entries
         ),
-        key=lambda m: (m.paid_at or date.min, m.year, m.month),
+        key=lambda entry: (entry.payment_date, entry.id),
         reverse=True,
     )
 
@@ -97,7 +100,7 @@ def list_payments():
         "payments/list.html",
         rows=rows,
         pending_makbuzlar=pending_makbuzlar,
-        paid_makbuzlar=paid_makbuzlar,
+        payment_entries=payment_entries,
         method_labels=METHOD_LABELS,
         grand_billed=grand_billed,
         grand_paid=grand_paid,
@@ -114,6 +117,9 @@ def list_payments():
 @permissions_required("billing.edit")
 def mark_paid(makbuz_id):
     makbuz = db.get_or_404(Makbuz, makbuz_id)
+    if makbuz.outstanding_amount <= 0:
+        flash("Bu makbuzun açık bakiyesi bulunmuyor.", "info")
+        return redirect(url_for("payments.list_payments", tab="paid"))
 
     if request.method == "POST":
         from app.services.validation_service import parse_date, parse_decimal
@@ -122,18 +128,41 @@ def mark_paid(makbuz_id):
         paid_amount = parse_decimal(request.form.get("paid_amount", ""))
         method = request.form.get("payment_method", "cash")
         reference = request.form.get("payment_reference", "").strip() or None
+        notes = request.form.get("notes", "").strip() or None
 
         if paid_amount is None or paid_amount <= 0:
             flash("Geçerli bir ödeme tutarı girin.", "danger")
             return redirect(url_for("payments.mark_paid", makbuz_id=makbuz.id))
+        if method not in METHOD_LABELS:
+            flash("Geçerli bir ödeme yöntemi seçin.", "danger")
+            return redirect(url_for("payments.mark_paid", makbuz_id=makbuz.id))
 
-        makbuz.paid_at = paid_date
-        makbuz.paid_amount = paid_amount
-        makbuz.payment_method = method
-        makbuz.payment_reference = reference
-        makbuz.status = Makbuz.STATUS_PAID
-        db.session.commit()
-        flash(f"Ödeme kaydedildi: ₺{paid_amount:,.2f}", "success")
+        try:
+            from app.services.makbuz_account_service import record_payment
+
+            record_payment(
+                makbuz,
+                payment_date=paid_date,
+                amount=paid_amount,
+                method=method,
+                reference=reference,
+                notes=notes,
+            )
+            db.session.commit()
+        except (TypeError, ValueError) as exc:
+            db.session.rollback()
+            flash(str(exc), "danger")
+            return redirect(url_for("payments.mark_paid", makbuz_id=makbuz.id))
+
+        if makbuz.outstanding_amount > 0:
+            flash(
+                f"Kısmi ödeme kaydedildi: ₺{paid_amount:,.2f}. "
+                f"Kalan bakiye: ₺{makbuz.outstanding_amount:,.2f}",
+                "success",
+            )
+            return redirect(url_for("payments.list_payments", tab="pending"))
+
+        flash(f"Ödeme kaydedildi ve makbuz kapandı: ₺{paid_amount:,.2f}", "success")
         return redirect(url_for("payments.list_payments", tab="paid"))
 
     return render_template(
@@ -149,11 +178,34 @@ def mark_paid(makbuz_id):
 @permissions_required("billing.edit")
 def unmark_paid(makbuz_id):
     makbuz = db.get_or_404(Makbuz, makbuz_id)
+    for entry in list(makbuz.payment_entries):
+        db.session.delete(entry)
     makbuz.status = Makbuz.STATUS_SENT if makbuz.sent_at else Makbuz.STATUS_DRAFT
     makbuz.paid_at = None
     makbuz.paid_amount = None
     makbuz.payment_method = None
     makbuz.payment_reference = None
     db.session.commit()
-    flash("Ödeme kaydı geri alındı.", "warning")
+    flash("Makbuza ait tüm tahsilat hareketleri geri alındı.", "warning")
     return redirect(url_for("payments.list_payments"))
+
+
+@payments_bp.route("/entries/<int:payment_id>/delete", methods=["POST"])
+@login_required
+@permissions_required("billing.edit")
+def delete_payment(payment_id):
+    payment = db.get_or_404(MakbuzPayment, payment_id)
+    makbuz = payment.makbuz
+    makbuz.payment_entries.remove(payment)
+    db.session.flush()
+
+    from app.services.makbuz_account_service import sync_makbuz_collection
+
+    sync_makbuz_collection(makbuz)
+    db.session.commit()
+    flash(
+        f"₺{payment.amount:,.2f} tutarındaki tahsilat hareketi silindi. "
+        f"Güncel kalan: ₺{makbuz.outstanding_amount:,.2f}",
+        "warning",
+    )
+    return redirect(url_for("payments.list_payments", tab="paid"))
