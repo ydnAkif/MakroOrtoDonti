@@ -334,8 +334,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const search = document.getElementById('extra-addons-search');
         const nq = normalizeText(query);
         const matches = ekstraTreatments.filter(function(t) {
-            const alreadySelected = selectedExtras.some(function(item) { return item.id === t.id; });
-            return !alreadySelected && (!nq || normalizeText(t.name).indexOf(nq) !== -1);
+            return !nq || normalizeText(t.name).indexOf(nq) !== -1;
         }).slice(0, 30);
 
         dropdown.innerHTML = '';
