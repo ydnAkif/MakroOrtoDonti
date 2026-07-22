@@ -345,6 +345,40 @@ def bulk_generate_drafts():
     return redirect(url_for("makbuzlar.list_makbuzlar", year=year, month=month))
 
 
+@makbuzlar_bp.route("/bulk-delete", methods=["POST"])
+@login_required
+@permissions_required("billing.edit")
+def bulk_delete_makbuzlar():
+    """Seçili taslak makbuzları siler. Sadece STATUS_DRAFT olan makbuzlar silinebilir."""
+    year = request.form.get("year", date.today().year, type=int)
+    month = request.form.get("month", date.today().month, type=int)
+    party_ids = request.form.getlist("party_ids", type=int)
+
+    if not party_ids:
+        flash("Silinecek doktor seçilmedi.", "danger")
+        return redirect(url_for("makbuzlar.list_makbuzlar", year=year, month=month))
+
+    makbuzlar = db.session.execute(
+        db.select(Makbuz).where(
+            Makbuz.party_id.in_(party_ids),
+            Makbuz.year == year,
+            Makbuz.month == month,
+            Makbuz.status == Makbuz.STATUS_DRAFT,
+        )
+    ).scalars().all()
+
+    if not makbuzlar:
+        flash("Seçilen doktorlar için silinebilir taslak makbuz yok. Yalnızca taslak makbuzlar silinebilir.", "warning")
+        return redirect(url_for("makbuzlar.list_makbuzlar", year=year, month=month))
+
+    count = len(makbuzlar)
+    for m in makbuzlar:
+        db.session.delete(m)
+    db.session.commit()
+    flash(f"{count} taslak makbuz silindi.", "success")
+    return redirect(url_for("makbuzlar.list_makbuzlar", year=year, month=month))
+
+
 @makbuzlar_bp.route("/api/exchange-rate")
 @login_required
 @permissions_required("billing.edit")

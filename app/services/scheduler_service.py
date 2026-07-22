@@ -225,9 +225,21 @@ def init_scheduler(app) -> None:
         id="makbuz_monthly_auto_send",
         replace_existing=True,
     )
+
+    from app.services.backup_service import scheduled_backup
+    scheduler.add_job(
+        scheduled_backup,
+        trigger="cron",
+        hour=2,
+        minute=0,
+        args=[app],
+        id="nightly_db_backup",
+        replace_existing=True,
+    )
+
     scheduler.start()
     _scheduler = scheduler
     logger.info(
-        "Makbuz zamanlayıcısı başlatıldı (ayın 1'i: 06:00 taslaklar, "
-        "09:30 otomatik gönderim — ayar açıksa)."
+        "Zamanlayıcı başlatıldı: ayın 1'i 06:00 taslaklar, "
+        "09:30 otomatik gönderim (ayar açıksa), her gece 02:00 yedekleme."
     )

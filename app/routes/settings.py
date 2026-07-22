@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, redirect, url_for, flash, request
+from flask import Blueprint, render_template, redirect, url_for, flash, request, send_file
 from flask_login import login_required
 from datetime import date
 
@@ -22,12 +22,16 @@ def index():
 
     smtp_password_configured = bool(settings_dict.get("smtp_password"))
 
+    from app.services.backup_service import list_backups
+    backups = list_backups()
+
     return render_template(
         "settings/index.html",
         settings=settings_dict,
         smtp_password_configured=smtp_password_configured,
         exchange_rates=exchange_rates,
         today=date.today(),
+        backups=backups,
     )
 
 
@@ -110,6 +114,83 @@ def add_exchange_rate():
 
     db.session.commit()
     flash(f"{rate_date} tarihli kur eklendi/güncellendi.", "success")
+    return redirect(url_for("settings.index"))
+
+
+@settings_bp.route("/backup/create", methods=["POST"])
+@login_required
+@permissions_required("settings.manage")
+def create_backup():
+    from app.services.backup_service import create_backup as _create_backup
+    try:
+        dest = _create_backup()
+        flash(f"Yedek alındı: {dest.name}", "success")
+    except Exception as exc:
+        flash(f"Yedekleme başarısız: {exc}", "danger")
+    return redirect(url_for("settings.index") + "#backup")
+
+
+@settings_bp.route("/backup/download/<filename>")
+@login_required
+@permissions_required("settings.manage")
+def download_backup(filename):
+    from app.services.backup_service import get_backup_path
+    path = get_backup_path(filename)
+    if not path:
+        flash("Yedek dosyası bulunamadı.", "danger")
+        return redirect(url_for("settings.index") + "#backup")
+    return send_file(path, as_attachment=True, download_name=filename)
+
+
+@settings_bp.route("/reset-defaults", methods=["POST"])
+@login_required
+@permissions_required("settings.manage")
+def reset_defaults():
+    """Klinik kimlik ayarlarını varsayılan değerlere sıfırlar."""
+    # Yalnızca klinik bilgisi alanlarını sıfırla; SMTP, WhatsApp, kur kayıtları dokunulmaz.
+    resettable = {
+        "clinic_name", "clinic_address", "clinic_phone", "clinic_email",
+        "tax_id", "invoice_prefix", "invoice_footer_text",
+    }
+    for key in resettable:
+        default_val = Settings.DEFAULTS.get(key, "")
+        setting = db.session.execute(
+            db.select(Settings).where(Settings.key == key)
+        ).scalar_one_or_none()
+        if setting:
+            setting.value = default_val
+        else:
+            db.session.add(Settings(key=key, value=default_val))
+    db.session.commit()
+    flash("Klinik bilgileri varsayılan değerlere sıfırlandı.", "warning")
+    return redirect(url_for("settings.index"))
+
+
+@settings_bp.route("/purge-demo-data", methods=["POST"])
+@login_required
+@permissions_required("settings.manage")
+def purge_demo_data():
+    """Doktor/işlem kataloğu ve kullanıcılara dokunmadan tüm operasyonel veriyi siler."""
+    from app.models.models import (
+        WorkOrder, Makbuz, MakbuzSendLog, Payment, ExchangeRate, AuditLog,
+        Invoice, InvoiceItem,
+    )
+
+    # Sıralama önemli: FK bağımlılıkları aşağıdan yukarıya silinir
+    db.session.execute(db.delete(MakbuzSendLog))
+    db.session.execute(db.delete(Makbuz))
+    db.session.execute(db.delete(Payment))
+    db.session.execute(db.delete(InvoiceItem))
+    db.session.execute(db.delete(Invoice))
+    db.session.execute(db.delete(WorkOrder))
+    db.session.execute(db.delete(ExchangeRate))
+    db.session.execute(db.delete(AuditLog))
+    db.session.commit()
+
+    flash(
+        "Demo veriler temizlendi. Döviz kuru bir sonraki istekte otomatik çekilecek.",
+        "success",
+    )
     return redirect(url_for("settings.index"))
 
 

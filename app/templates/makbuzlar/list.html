@@ -59,6 +59,9 @@
                 <button type="submit" class="btn btn-success btn-sm" id="bulk-send-button" formmethod="post" formaction="{{ url_for('makbuzlar.bulk_send_makbuzlar') }}" onclick="return confirm('Seçili taslaklar WhatsApp üzerinden gönderilsin mi?');" disabled>
                     <i class="bi bi-whatsapp" aria-hidden="true"></i> Seçilenleri WhatsApp'tan gönder
                 </button>
+                <button type="submit" class="btn btn-danger btn-sm" id="bulk-delete-button" formmethod="post" formaction="{{ url_for('makbuzlar.bulk_delete_makbuzlar') }}" onclick="return confirm('Seçili taslak makbuzlar kalıcı olarak silinecek. Emin misiniz?');" disabled>
+                    <i class="bi bi-trash" aria-hidden="true"></i> Seçilenleri sil
+                </button>
                 {% endif %}
             </div>
         </div>
@@ -181,9 +184,11 @@
         var count = document.getElementById("makbuz-selected-count");
         var generateButton = document.getElementById("bulk-generate-button");
         var sendButton = document.getElementById("bulk-send-button");
+        var deleteButton = document.getElementById("bulk-delete-button");
         if (count) count.textContent = selected.length + " doktor seçildi";
         if (generateButton) generateButton.disabled = selected.length === 0;
         if (sendButton) sendButton.disabled = selected.length === 0;
+        if (deleteButton) deleteButton.disabled = selected.length === 0;
         selectAll.checked = all.length > 0 && selected.length === all.length;
         selectAll.indeterminate = selected.length > 0 && selected.length < all.length;
     };
